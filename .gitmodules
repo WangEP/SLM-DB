@@ -1,0 +1,4 @@
+[submodule "quartz"]
+	path = quartz
+	url = https://github.com/HewlettPackard/quartz.git
+	branch = master
