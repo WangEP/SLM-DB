@@ -16,7 +16,7 @@ namespace leveldb {
 class Arena {
  public:
   Arena();
-  ~Arena();
+  virtual ~Arena();
 
   // Return a pointer to a newly allocated memory block of "bytes" bytes.
   char* Allocate(size_t bytes);
@@ -30,9 +30,9 @@ class Arena {
     return reinterpret_cast<uintptr_t>(memory_usage_.NoBarrier_Load());
   }
 
- private:
+ protected:
   char* AllocateFallback(size_t bytes);
-  char* AllocateNewBlock(size_t block_bytes);
+  virtual char* AllocateNewBlock(size_t block_bytes);
 
   // Allocation state
   char* alloc_ptr_;
@@ -44,6 +44,7 @@ class Arena {
   // Total memory usage of the arena.
   port::AtomicPointer memory_usage_;
 
+ private:
   // No copying allowed
   Arena(const Arena&);
   void operator=(const Arena&);

@@ -39,7 +39,8 @@ set(SRC_FILES
         util/logging.cc
         util/options.cc
         util/filter_policy.cc
-        util/status.cc)
+        util/status.cc
+        util/pm_arena.cc)
 
 add_library(leveldb STATIC ${SRC_FILES})
 add_subdirectory(quartz)
