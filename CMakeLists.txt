@@ -19,6 +19,7 @@ set(SRC_FILES
         db/version_edit.cc
         db/version_set.cc
         db/write_batch.cc
+        db/mock_log.h
         table/block.cc
         table/block_builder.cc
         table/filter_block.cc

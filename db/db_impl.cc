@@ -32,6 +32,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
+#include "mock_log.h"
 
 namespace leveldb {
 
@@ -188,7 +189,7 @@ Status DBImpl::NewDB() {
     return s;
   }
   {
-    log::Writer log(file);
+    log::MockWriter log(file);
     std::string record;
     new_db.EncodeTo(&record);
     s = log.AddRecord(record);
@@ -399,7 +400,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   // paranoid_checks==false so that corruptions cause entire commits
   // to be skipped instead of propagating bad information (like overly
   // large sequence numbers).
-  log::Reader reader(file, &reporter, true/*checksum*/,
+  log::MockReader reader(file, &reporter, true/*checksum*/,
                      0/*initial_offset*/);
   Log(options_.info_log, "Recovering log #%llu",
       (unsigned long long) log_number);
@@ -460,7 +461,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     if (env_->GetFileSize(fname, &lfile_size).ok() &&
         env_->NewAppendableFile(fname, &logfile_).ok()) {
       Log(options_.info_log, "Reusing old log %s \n", fname.c_str());
-      log_ = new log::Writer(logfile_, lfile_size);
+      log_ = new log::MockWriter(logfile_, lfile_size);
       logfile_number_ = log_number;
       if (mem != NULL) {
         mem_ = mem;
@@ -1366,7 +1367,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       delete logfile_;
       logfile_ = lfile;
       logfile_number_ = new_log_number;
-      log_ = new log::Writer(lfile);
+      log_ = new log::MockWriter(lfile);
       imm_ = mem_;
       has_imm_.Release_Store(imm_);
       mem_ = new MemTable(internal_comparator_);
@@ -1507,7 +1508,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
       edit.SetLogNumber(new_log_number);
       impl->logfile_ = lfile;
       impl->logfile_number_ = new_log_number;
-      impl->log_ = new log::Writer(lfile);
+      impl->log_ = new log::MockWriter(lfile);
       impl->mem_ = new MemTable(impl->internal_comparator_);
       impl->mem_->Ref();
     }

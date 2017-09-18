@@ -43,19 +43,19 @@ class Reader {
   Reader(SequentialFile* file, Reporter* reporter, bool checksum,
          uint64_t initial_offset);
 
-  ~Reader();
+  virtual ~Reader();
 
   // Read the next record into *record.  Returns true if read
   // successfully, false if we hit end of the input.  May use
   // "*scratch" as temporary storage.  The contents filled in *record
   // will only be valid until the next mutating operation on this
   // reader or the next mutation to *scratch.
-  bool ReadRecord(Slice* record, std::string* scratch);
+  virtual bool ReadRecord(Slice* record, std::string* scratch);
 
   // Returns the physical offset of the last record returned by ReadRecord.
   //
   // Undefined before the first call to ReadRecord.
-  uint64_t LastRecordOffset();
+  virtual uint64_t LastRecordOffset();
 
  private:
   SequentialFile* const file_;

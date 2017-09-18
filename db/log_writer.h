@@ -28,9 +28,9 @@ class Writer {
   // "*dest" must remain live while this Writer is in use.
   Writer(WritableFile* dest, uint64_t dest_length);
 
-  ~Writer();
+  virtual ~Writer();
 
-  Status AddRecord(const Slice& slice);
+  virtual Status AddRecord(const Slice& slice);
 
  private:
   WritableFile* dest_;
