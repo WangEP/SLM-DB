@@ -99,7 +99,7 @@ class SkipList {
 
   // Immutable after construction
   Comparator const compare_;
-  Arena* const arena_;    // Arena used for allocations of nodes
+  PMArena* const arena_;    // Arena used for allocations of nodes
 
   Node* const head_;
 
@@ -184,6 +184,7 @@ typename SkipList<Key,Comparator>::Node*
 SkipList<Key,Comparator>::NewNode(const Key& key, int height) {
   char* mem = arena_->AllocateAligned(
       sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
+  arena_->clflush(mem, sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
   return new (mem) Node(key);
 }
 
@@ -365,7 +366,9 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
+    arena_->clflush((char *) x->Next(i), sizeof(Node*));
     prev[i]->SetNext(i, x);
+    arena_->clflush((char *) prev[i]->Next(i), sizeof(Node*));
   }
 }
 
