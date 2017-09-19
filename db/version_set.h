@@ -22,6 +22,7 @@
 #include "db/version_edit.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
+#include "mock_log.h"
 
 namespace leveldb {
 
@@ -307,7 +308,7 @@ class VersionSet {
 
   // Opened lazily
   WritableFile* descriptor_file_;
-  log::Writer* descriptor_log_;
+  log::MockWriter* descriptor_log_;
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
   Version* current_;        // == dummy_versions_.prev_
 

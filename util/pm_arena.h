@@ -19,6 +19,7 @@ class PMArena : public Arena {
   virtual char* AllocateNewBlock(size_t block_bytes) override;
 
   inline void clflush(char *data, int len) {
+    if (data == NULL) return;
     volatile char *ptr = (char *)((unsigned long)data &~(CACHE_LINE_SIZE-1));
     mfence();
     for (; ptr<data+len; ptr+=CACHE_LINE_SIZE) {

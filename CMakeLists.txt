@@ -179,13 +179,13 @@ target_include_directories(leveldb
 #link_directories(quartz/src/lib)
 #target_include_directories(leveldb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/include/)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
 
 target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
-        nvmemul
+#        nvmemul
         )
 #target_link_libraries(leveldb PUBLIC nvmemul)
 
