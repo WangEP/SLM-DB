@@ -359,6 +359,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // immediately drop to the next level since NULL sorts after all
     // keys.  In the latter case the reader will use the new node.
     max_height_.NoBarrier_Store(reinterpret_cast<void*>(height));
+    arena_->clflush((char *) height, sizeof(int));
   }
 
   x = NewNode(key, height);
