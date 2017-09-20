@@ -14,7 +14,7 @@ namespace leveldb {
 
 class PMArena : public Arena {
  public:
-  virtual ~PMArena() {}
+  virtual ~PMArena();
 
   virtual char* AllocateNewBlock(size_t block_bytes) override;
 
@@ -40,6 +40,9 @@ class PMArena : public Arena {
   uint64_t clflush_cnt;
 
  private:
+#if QUARTZ
+  std::vector<size_t> blocks_bytes_;
+#endif
 
   static inline void cpu_pause() {
     asm volatile("mfence":::"memory");
