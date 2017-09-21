@@ -6,11 +6,12 @@
 #define STORAGE_LEVELDB_DB_MEMTABLE_H_
 
 #include <string>
-#include <util/pm_arena.h>
+#include <util/persist.h>
 #include "leveldb/db.h"
 #include "db/dbformat.h"
 #include "db/skiplist.h"
 #include "util/arena.h"
+#include "db/global_index.h"
 
 namespace leveldb {
 
@@ -76,8 +77,9 @@ class MemTable {
 
   KeyComparator comparator_;
   int refs_;
-  PMArena arena_;
+  Arena arena_;
   Table table_;
+  //GlobalIndex index_;
 
   // No copying allowed
   MemTable(const MemTable&);

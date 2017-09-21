@@ -50,6 +50,7 @@ endif()
 add_definitions(-DLEVELDB_ATOMIC_PRESENT)
 add_definitions(-DOS_LINUX)
 add_definitions(-DLEVELDB_PLATFORM_POSIX)
+#add_definitions(-DQUARTZ)
 add_definitions(-fno-builtin-memcmp)
 
 set(LEVEL_DB_FILES
@@ -134,10 +135,14 @@ set(LEVEL_DB_FILES
         util/options.cc
         util/random.h
         util/status.cc
-        util/pm_arena.cc
-        util/pm_arena.h
+        util/persist.h
         port/port.h
-        port/atomic_pointer.h)
+        port/atomic_pointer.h
+        db/global_index.h
+        db/nvm_btree.cc
+        db/nvm_btree.h
+        db/logger.cc
+        db/logger.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

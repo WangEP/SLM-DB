@@ -99,7 +99,7 @@ class SkipList {
 
   // Immutable after construction
   Comparator const compare_;
-  PMArena* const arena_;    // Arena used for allocations of nodes
+  Arena* const arena_;    // Arena used for allocations of nodes
 
   Node* const head_;
 
@@ -184,7 +184,7 @@ typename SkipList<Key,Comparator>::Node*
 SkipList<Key,Comparator>::NewNode(const Key& key, int height) {
   char* mem = arena_->AllocateAligned(
       sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
-  arena_->clflush(mem, sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
+  clflush(mem, sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
   return new (mem) Node(key);
 }
 
@@ -325,7 +325,7 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindLast()
 template<typename Key, class Comparator>
 SkipList<Key,Comparator>::SkipList(Comparator cmp, Arena* arena)
     : compare_(cmp),
-      arena_((PMArena *const) arena),
+      arena_(arena),
       head_(NewNode(0 /* any key will do */, kMaxHeight)),
       max_height_(reinterpret_cast<void*>(1)),
       rnd_(0xdeadbeef) {
@@ -359,7 +359,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // immediately drop to the next level since NULL sorts after all
     // keys.  In the latter case the reader will use the new node.
     max_height_.NoBarrier_Store(reinterpret_cast<void*>(height));
-    arena_->clflush((char *) height, sizeof(int));
+    clflush((char *) height, sizeof(int));
   }
 
   x = NewNode(key, height);
@@ -367,9 +367,9 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
-    arena_->clflush((char *) x->Next(i), sizeof(Node*));
+    clflush((char *) x->Next(i), sizeof(Node*));
     prev[i]->SetNext(i, x);
-    arena_->clflush((char *) prev[i]->Next(i), sizeof(Node*));
+    clflush((char *) prev[i]->Next(i), sizeof(Node*));
   }
 }
 

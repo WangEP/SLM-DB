@@ -10,13 +10,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "port/port.h"
+#if QUARTZ
+#include "quartz/src/lib/pmalloc.h"
+#endif
 
 namespace leveldb {
 
 class Arena {
  public:
   Arena();
-  virtual ~Arena();
+  ~Arena();
 
   // Return a pointer to a newly allocated memory block of "bytes" bytes.
   char* Allocate(size_t bytes);
@@ -30,9 +33,9 @@ class Arena {
     return reinterpret_cast<uintptr_t>(memory_usage_.NoBarrier_Load());
   }
 
- protected:
+ private:
   char* AllocateFallback(size_t bytes);
-  virtual char* AllocateNewBlock(size_t block_bytes);
+  char* AllocateNewBlock(size_t block_bytes);
 
   // Allocation state
   char* alloc_ptr_;
@@ -41,10 +44,13 @@ class Arena {
   // Array of new[] allocated memory blocks
   std::vector<char*> blocks_;
 
+#if QUARTZ
+  std::vector<size_t> blocks_bytes_;
+#endif
+
   // Total memory usage of the arena.
   port::AtomicPointer memory_usage_;
 
- private:
   // No copying allowed
   Arena(const Arena&);
   void operator=(const Arena&);
