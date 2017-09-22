@@ -178,7 +178,7 @@ struct ReadOptions {
 
   ReadOptions()
       : verify_checksums(false),
-        fill_cache(true),
+        fill_cache(false),
         snapshot(NULL) {
   }
 };

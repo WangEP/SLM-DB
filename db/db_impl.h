@@ -14,6 +14,7 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
+#include "global_index.h"
 
 namespace leveldb {
 
@@ -144,6 +145,7 @@ class DBImpl : public DB {
   uint64_t logfile_number_;
   log::Writer* log_;
   uint32_t seed_;                // For sampling.
+  GlobalIndex index_;            // For indexing
 
   // Queue of writers.
   std::deque<Writer*> writers_;

@@ -2,6 +2,7 @@
 #define STORAGE_LEVELDB_DB_GLOBAL_INDEX_H
 
 #include <cstdint>
+#include "nvm_btree.h"
 
 namespace leveldb {
 
@@ -9,14 +10,39 @@ class GlobalIndex {
  public:
   GlobalIndex() {}
 
-  virtual void Get(uint64_t, void*) = 0;
+  void Get(const uint64_t&, void*);
 
-  virtual void Add(uint64_t, void*) = 0;
+  void Add(const uint64_t&, const void*);
 
-  virtual void Delete(uint64_t) = 0;
+  void Update(const uint64_t&, void*);
 
-  virtual void Range(uint64_t, uint64_t) = 0;
+  void Delete(uint64_t);
+
+  void Range(uint64_t, uint64_t);
+
+ private:
+  BTree tree;
 };
+
+void GlobalIndex::Get(const uint64_t& key, void* offset) {
+  tree.search(key, offset);
+}
+
+void GlobalIndex::Add(const uint64_t& key, const void* offset) {
+  tree.insert(key, (void *) offset);
+}
+
+void GlobalIndex::Delete(uint64_t) {
+
+}
+
+void GlobalIndex::Range(uint64_t, uint64_t) {
+
+}
+
+void GlobalIndex::Update(const uint64_t &, void*) {
+
+}
 
 } // namespace leveldb
 
