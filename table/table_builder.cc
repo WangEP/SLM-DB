@@ -45,7 +45,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  GlobalIndex global_index;
+  GlobalIndex* global_index;
 
   Rep(const Options& opt, WritableFile* f)
       : options(opt),
@@ -105,11 +105,11 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
-    // global index building
-    auto f = std::async(std::launch::async, r->global_index.Update, r->last_key, Slice(handle_encoding));
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
-    f.wait();
+    // global index building
+    r->global_index->Add(r->last_key, r->pending_handle.offset(),
+                        r->pending_handle.size(), false);
   }
 
   if (r->filter_block != NULL) {
@@ -241,7 +241,8 @@ Status TableBuilder::Finish() {
       r->index_block.Add(r->last_key, Slice(handle_encoding));
       r->pending_index_entry = false;
       // global index finishing
-      r->global_index.Add(r->last_key, Slice(handle_encoding));
+      r->global_index->Add(r->last_key, r->pending_handle.offset(),
+                           r->pending_handle.size(), false);
     }
     WriteBlock(&r->index_block, &index_block_handle);
   }
@@ -275,7 +276,7 @@ uint64_t TableBuilder::FileSize() const {
   return rep_->offset;
 }
 
-void TableBuilder::SetIndex(GlobalIndex &global_index) {
+void TableBuilder::SetIndex(GlobalIndex* global_index) {
   rep_->global_index = global_index;
 }
 

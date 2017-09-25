@@ -29,7 +29,7 @@ extern Status BuildTable(const std::string& dbname,
                          TableCache* table_cache,
                          Iterator* iter,
                          FileMetaData* meta,
-                         GlobalIndex& global_index);
+                         GlobalIndex* global_index);
 
 }  // namespace leveldb
 

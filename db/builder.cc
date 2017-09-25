@@ -20,7 +20,7 @@ Status BuildTable(const std::string& dbname,
                   TableCache* table_cache,
                   Iterator* iter,
                   FileMetaData* meta,
-                  GlobalIndex& global_index) {
+                  GlobalIndex* global_index) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();

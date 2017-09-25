@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <future>
 #include "db/memtable.h"
 #include "db/dbformat.h"
 #include "leveldb/comparator.h"
@@ -18,7 +19,7 @@ static Slice GetLengthPrefixedSlice(const char* data) {
   return Slice(p, len);
 }
 
-MemTable::MemTable(const InternalKeyComparator& cmp, GlobalIndex& index)
+MemTable::MemTable(const InternalKeyComparator& cmp, GlobalIndex* index)
     : comparator_(cmp),
       index_(index),
       refs_(0),
@@ -103,9 +104,9 @@ void MemTable::Add(SequenceNumber s, ValueType type,
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
   // flushing to PM
-  clflush(buf, internal_key_size);
+  clflush(p, val_size);
   // adding to global index
-  index_.Add(key.ToString(), buf);
+  index_->Add(key.ToString(), (uint64_t&) p, val_size, true);
   assert((p + val_size) - buf == encoded_len);
   table_.Insert(buf);
 }

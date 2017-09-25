@@ -14,7 +14,7 @@
 #define STORAGE_LEVELDB_INCLUDE_TABLE_BUILDER_H_
 
 #include <stdint.h>
-#include <db/global_index.h>
+#include "db/global_index.h"
 #include "leveldb/options.h"
 #include "leveldb/status.h"
 
@@ -75,7 +75,7 @@ class TableBuilder {
   // Finish() call, returns the size of the final generated file.
   uint64_t FileSize() const;
 
-  void SetIndex(GlobalIndex& global_index);
+  void SetIndex(GlobalIndex* global_index);
 
  private:
   bool ok() const { return status().ok(); }
