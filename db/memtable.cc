@@ -104,9 +104,8 @@ void MemTable::Add(SequenceNumber s, ValueType type,
   memcpy(p, value.data(), val_size);
   // flushing to PM
   clflush(buf, internal_key_size);
-  // adding to Btree
-  // as key is string, using hash to convert
-  index_.Add(hash_(key.ToString()), buf);
+  // adding to global index
+  index_.Add(key.ToString(), buf);
   assert((p + val_size) - buf == encoded_len);
   table_.Insert(buf);
 }
