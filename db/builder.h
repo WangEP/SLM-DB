@@ -6,7 +6,6 @@
 #define STORAGE_LEVELDB_DB_BUILDER_H_
 
 #include "leveldb/status.h"
-#include "global_index.h"
 
 namespace leveldb {
 
@@ -28,8 +27,7 @@ extern Status BuildTable(const std::string& dbname,
                          const Options& options,
                          TableCache* table_cache,
                          Iterator* iter,
-                         FileMetaData* meta,
-                         GlobalIndex* global_index);
+                         FileMetaData* meta);
 
 }  // namespace leveldb
 

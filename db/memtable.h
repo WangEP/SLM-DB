@@ -11,7 +11,7 @@
 #include "db/dbformat.h"
 #include "db/skiplist.h"
 #include "util/arena.h"
-#include "db/global_index.h"
+
 
 namespace leveldb {
 

@@ -1,6 +1,7 @@
-#include "iostream"
+#include <iostream>
 #include "leveldb/db.h"
-#include "leveldb/status.h"
+
+uint64_t clflush_cnt = 0;
 
 int main(int argc, char** argv) {
   std::cout << "Hello, hac" << std::endl;

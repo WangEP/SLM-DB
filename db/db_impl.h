@@ -10,7 +10,6 @@
 #include "db/dbformat.h"
 #include "db/log_writer.h"
 #include "db/snapshot.h"
-#include "db/global_index.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "port/port.h"
@@ -145,7 +144,7 @@ class DBImpl : public DB {
   uint64_t logfile_number_;
   log::Writer* log_;
   uint32_t seed_;                // For sampling.
-  GlobalIndex* index_;            // For indexing
+  GlobalIndex* global_index_;            // For indexing
 
   // Queue of writers.
   std::deque<Writer*> writers_;

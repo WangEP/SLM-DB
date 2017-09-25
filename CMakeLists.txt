@@ -52,6 +52,7 @@ add_definitions(-DOS_LINUX)
 add_definitions(-DLEVELDB_PLATFORM_POSIX)
 #add_definitions(-DQUARTZ)
 add_definitions(-fno-builtin-memcmp)
+add_definitions(-Wint-to-pointer-cast)
 
 set(LEVEL_DB_FILES
         include/leveldb/c.h
@@ -142,7 +143,7 @@ set(LEVEL_DB_FILES
         db/nvm_btree.cc
         db/nvm_btree.h
         db/logger.cc
-        db/logger.h)
+        db/logger.h db/global_index.cc)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

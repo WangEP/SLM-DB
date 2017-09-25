@@ -19,8 +19,7 @@ Status BuildTable(const std::string& dbname,
                   const Options& options,
                   TableCache* table_cache,
                   Iterator* iter,
-                  FileMetaData* meta,
-                  GlobalIndex* global_index) {
+                  FileMetaData* meta) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
@@ -34,7 +33,6 @@ Status BuildTable(const std::string& dbname,
     }
 
     TableBuilder* builder = new TableBuilder(options, file);
-    builder->SetIndex(global_index);
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();

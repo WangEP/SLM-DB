@@ -15,6 +15,7 @@ class Env;
 class FilterPolicy;
 class Logger;
 class Snapshot;
+class GlobalIndex;
 
 // DB contents are stored in a set of blocks, each of which holds a
 // sequence of key,value pairs.  Each block may be compressed before
@@ -152,6 +153,9 @@ struct Options {
   //
   // Default: NULL
   const FilterPolicy* filter_policy;
+
+  // Global index
+  GlobalIndex* global_index;
 
   // Create an Options object with default values for all fields.
   Options();

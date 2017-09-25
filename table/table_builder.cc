@@ -9,12 +9,12 @@
 #include "leveldb/comparator.h"
 #include "leveldb/env.h"
 #include "leveldb/filter_policy.h"
-#include "leveldb/options.h"
 #include "table/block_builder.h"
 #include "table/filter_block.h"
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+#include "db/global_index.h"
 
 namespace leveldb {
 
@@ -58,7 +58,8 @@ struct TableBuilder::Rep {
         closed(false),
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
-        pending_index_entry(false) {
+        pending_index_entry(false),
+        global_index(opt.global_index) {
     index_block_options.block_restart_interval = 1;
   }
 };
@@ -274,10 +275,6 @@ uint64_t TableBuilder::NumEntries() const {
 
 uint64_t TableBuilder::FileSize() const {
   return rep_->offset;
-}
-
-void TableBuilder::SetIndex(GlobalIndex* global_index) {
-  rep_->global_index = global_index;
 }
 
 }  // namespace leveldb

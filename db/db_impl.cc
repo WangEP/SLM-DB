@@ -24,7 +24,6 @@
 #include "leveldb/env.h"
 #include "leveldb/status.h"
 #include "leveldb/table.h"
-#include "leveldb/table_builder.h"
 #include "port/port.h"
 #include "table/block.h"
 #include "table/merger.h"
@@ -32,7 +31,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-#include "mock_log.h"
+#include "db/mock_log.h"
 
 namespace leveldb {
 
@@ -119,6 +118,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
     : env_(raw_options.env),
       internal_comparator_(raw_options.comparator),
       internal_filter_policy_(raw_options.filter_policy),
+      global_index_(raw_options.global_index),
       options_(SanitizeOptions(dbname, &internal_comparator_,
                                &internal_filter_policy_, raw_options)),
       owns_info_log_(options_.info_log != raw_options.info_log),
@@ -421,7 +421,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     WriteBatchInternal::SetContents(&batch, record);
 
     if (mem == NULL) {
-      mem = new MemTable(internal_comparator_, index_);
+      mem = new MemTable(internal_comparator_, global_index_);
       mem->Ref();
     }
     status = WriteBatchInternal::InsertInto(&batch, mem);
@@ -468,7 +468,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
         mem = NULL;
       } else {
         // mem can be NULL if lognum exists but was empty.
-        mem_ = new MemTable(internal_comparator_, index_);
+        mem_ = new MemTable(internal_comparator_, global_index_);
         mem_->Ref();
       }
     }
@@ -500,7 +500,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, index_);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
     mutex_.Lock();
   }
 
@@ -1370,7 +1370,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       log_ = new log::MockWriter(lfile);
       imm_ = mem_;
       has_imm_.Release_Store(imm_);
-      mem_ = new MemTable(internal_comparator_, index_);
+      mem_ = new MemTable(internal_comparator_, global_index_);
       mem_->Ref();
       force = false;   // Do not force another compaction if have room
       MaybeScheduleCompaction();
@@ -1511,7 +1511,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
       impl->logfile_ = lfile;
       impl->logfile_number_ = new_log_number;
       impl->log_ = new log::MockWriter(lfile);
-      impl->mem_ = new MemTable(impl->internal_comparator_, impl->index_);
+      impl->mem_ = new MemTable(impl->internal_comparator_, impl->global_index_);
       impl->mem_->Ref();
     }
   }
