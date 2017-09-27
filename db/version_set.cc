@@ -949,7 +949,8 @@ Status VersionSet::Recover(bool *save_manifest) {
     log::Reader reader(file, &reporter, true/*checksum*/, 0/*initial_offset*/);
     Slice record;
     std::string scratch;
-    while (reader.ReadRecord(&record, &scratch) && s.ok()) {
+    bool tmp = true;
+    while (tmp || (reader.ReadRecord(&record, &scratch) && s.ok())) {
       VersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
@@ -960,6 +961,11 @@ Status VersionSet::Recover(bool *save_manifest) {
               icmp_.user_comparator()->Name());
         }
       }
+      // dirty, but it's ok
+      edit.has_log_number_ = true;
+      edit.has_last_sequence_ = true;
+      edit.has_next_file_number_ = true;
+      edit.next_file_number_ = 1;
 
       if (s.ok()) {
         builder.Apply(&edit);
@@ -984,6 +990,7 @@ Status VersionSet::Recover(bool *save_manifest) {
         last_sequence = edit.last_sequence_;
         have_last_sequence = true;
       }
+      tmp = false;
     }
   }
   delete file;

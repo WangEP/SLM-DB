@@ -109,8 +109,8 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
     // global index building
-    r->global_index->Add(r->last_key, r->pending_handle.offset(),
-                        r->pending_handle.size(), false);
+//    r->global_index->Add(r->last_key, r->pending_handle.offset(),
+//                        r->pending_handle.size(), false);
   }
 
   if (r->filter_block != NULL) {
@@ -242,8 +242,8 @@ Status TableBuilder::Finish() {
       r->index_block.Add(r->last_key, Slice(handle_encoding));
       r->pending_index_entry = false;
       // global index finishing
-      r->global_index->Add(r->last_key, r->pending_handle.offset(),
-                           r->pending_handle.size(), false);
+//      r->global_index->Add(r->last_key, r->pending_handle.offset(),
+//                           r->pending_handle.size(), false);
     }
     WriteBlock(&r->index_block, &index_block_handle);
   }
