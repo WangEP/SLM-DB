@@ -1,4 +1,8 @@
 #include "global_index.h"
+#if QUARTZ
+#include "quartz/src/lib/pmalloc.h"
+#endif
+
 
 namespace leveldb {
 
@@ -8,8 +12,12 @@ const DataMeta* GlobalIndex::Get(const std::string& key) {
 }
 
 void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, bool in_memory) {
-  char* buf = arena_.AllocateAligned(sizeof(DataMeta));
-  auto meta = (DataMeta*)buf;
+  DataMeta *meta;
+#if QUARTZ
+  meta = (DataMeta *) pmalloc(sizeof(DataMeta));
+#else
+  meta = (DataMeta *) malloc(sizeof(DataMeta));
+#endif
   meta->offset = offset;
   meta->size = size;
   meta->in_memory = in_memory;

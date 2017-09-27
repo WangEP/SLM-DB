@@ -3,8 +3,7 @@
 
 #include <cstdint>
 #include <map>
-#include "nvm_btree.h"
-#include "util/arena.h"
+#include "db/nvm_btree.h"
 
 namespace leveldb {
 
@@ -31,7 +30,6 @@ class GlobalIndex {
  private:
   //BTree tree;
   std::map<std::string, void*> tree_; // temporary
-  Arena arena_;
 
   GlobalIndex(const GlobalIndex&);
   void operator=(const GlobalIndex&);
