@@ -140,10 +140,11 @@ set(LEVEL_DB_FILES
         port/port.h
         port/atomic_pointer.h
         db/global_index.h
+        db/global_index.cc
         db/nvm_btree.cc
         db/nvm_btree.h
         db/logger.cc
-        db/logger.h db/global_index.cc)
+        db/logger.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

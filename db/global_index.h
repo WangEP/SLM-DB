@@ -12,7 +12,7 @@ namespace leveldb {
 struct DataMeta {
   uint64_t offset;
   uint64_t size;
-  bool in_memory;
+  void* file; // NULL if in-memory
 };
 
 class GlobalIndex {
@@ -21,7 +21,7 @@ class GlobalIndex {
 
   const DataMeta* Get(const std::string&);
 
-  void Add(const std::string&, const uint64_t&, const uint64_t&, bool);
+  void Add(const std::string&, const uint64_t&, const uint64_t&, void*);
 
   void Delete(const std::string&);
 

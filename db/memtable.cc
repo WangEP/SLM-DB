@@ -103,7 +103,7 @@ void MemTable::Add(SequenceNumber s, ValueType type,
   // flushing to PM
   clflush(p, val_size);
   // adding to global index
-  index_->Add(key.ToString(), (uint64_t&) p, val_size, true);
+  index_->Add(key.ToString(), (uint64_t&) p, val_size, NULL);
   assert((p + val_size) - buf == encoded_len);
   table_.Insert(buf);
 }
