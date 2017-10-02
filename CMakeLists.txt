@@ -144,7 +144,7 @@ set(LEVEL_DB_FILES
         db/nvm_btree.cc
         db/nvm_btree.h
         db/logger.cc
-        db/logger.h)
+        db/logger.h table/raw_block_builder.cc table/raw_block_builder.h table/raw_table_builder.cc table/raw_table_builder.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

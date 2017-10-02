@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include "leveldb/db.h"
 #include "leveldb/table_builder.h"
 
@@ -24,23 +25,28 @@ void standard_db_test() {
   std::cout << key << " : " << outval << std::endl;
 }
 
+
 void sst_db_test() {
   leveldb::DB* db;
   leveldb::Options options;
   options.filter_policy = NULL;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
+  options.write_buffer_size = 8000;
   std::string dbpath = "/tmp/testdb";
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
   assert(status.ok());
-  status = db->Put(leveldb::WriteOptions(), "a1", "value1");
-  status = db->Put(leveldb::WriteOptions(), "b2", "value2");
-  status = db->Put(leveldb::WriteOptions(), "c3", "value3");
-  status = db->Put(leveldb::WriteOptions(), "d4", "value4");
-  status = db->Put(leveldb::WriteOptions(), "e5", "value5");
-  db->CompactRange(NULL, NULL);
+  for (auto i = 0; i < 3000; i++) {
+    std::stringstream key;
+    key << "key" << i ;
+    std::stringstream value;
+    value << "value" << i ;
+    status = db->Put(leveldb::WriteOptions(), key.str(), value.str());
+  }
   std::string val;
-  status = db->Get(leveldb::ReadOptions(), "d4", &val);
+  status = db->Get(leveldb::ReadOptions(), "key1",  &val);
+  std::cout << val << "\n";
+  status = db->Get(leveldb::ReadOptions(), "key50", &val);
   std::cout << val << "\n";
 }
 
