@@ -13,7 +13,7 @@
 #include "db/table_cache.h"
 #include "db/version_set.h"
 #include "db/write_batch_internal.h"
-#include "db/global_index.h"
+#include "include/leveldb/global_index.h"
 #include "table/block.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
@@ -123,7 +123,6 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
-  global_index_ = new GlobalIndex();
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;

@@ -139,7 +139,7 @@ set(LEVEL_DB_FILES
         util/persist.h
         port/port.h
         port/atomic_pointer.h
-        db/global_index.h
+        include/leveldb/global_index.h
         db/global_index.cc
         db/nvm_btree.cc
         db/nvm_btree.h

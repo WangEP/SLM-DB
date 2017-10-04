@@ -1,6 +1,6 @@
 #include "raw_table_builder.h"
 #include "raw_block_builder.h"
-#include "db/global_index.h"
+#include "include/leveldb/global_index.h"
 
 namespace leveldb {
 

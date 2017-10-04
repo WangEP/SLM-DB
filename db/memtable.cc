@@ -5,7 +5,7 @@
 #include <future>
 #include "db/memtable.h"
 #include "leveldb/env.h"
-#include "global_index.h"
+#include "include/leveldb/global_index.h"
 
 namespace leveldb {
 

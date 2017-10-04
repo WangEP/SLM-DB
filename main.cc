@@ -2,6 +2,7 @@
 #include <sstream>
 #include "leveldb/db.h"
 #include "leveldb/table_builder.h"
+#include "leveldb/global_index.h"
 
 uint64_t clflush_cnt = 0;
 
@@ -29,6 +30,7 @@ void standard_db_test() {
 void sst_db_test() {
   leveldb::DB* db;
   leveldb::Options options;
+  options.global_index = new leveldb::GlobalIndex();
   options.filter_policy = NULL;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
@@ -38,7 +40,7 @@ void sst_db_test() {
   assert(status.ok());
   for (auto i = 0; i < 3000; i++) {
     std::stringstream key;
-    key << "key" << i ;
+    key << "key0key" << i ;
     std::stringstream value;
     value << "value" << i ;
     status = db->Put(leveldb::WriteOptions(), key.str(), value.str());

@@ -14,7 +14,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
-#include "db/global_index.h"
+#include "include/leveldb/global_index.h"
 
 namespace leveldb {
 

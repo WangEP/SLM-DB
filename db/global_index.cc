@@ -1,4 +1,4 @@
-#include "global_index.h"
+#include "include/leveldb/global_index.h"
 #if QUARTZ
 #include "quartz/src/lib/pmalloc.h"
 #endif
