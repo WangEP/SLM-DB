@@ -17,7 +17,9 @@ void RawBlockBuilder::Reset() {
 
 void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
   buffer_.append(key.data(), key.size());
+  buffer_.append("\t");
   buffer_.append(value.data(), value.size());
+  buffer_.append("\t");
 }
 
 Slice RawBlockBuilder::Finish() {

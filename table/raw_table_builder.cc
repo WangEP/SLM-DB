@@ -35,11 +35,12 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   GlobalIndex* index = r->global_index;
   assert(!r->closed);
   if (!ok()) return;
-  r->last_key.assign(key.data(), key.size());
+  Slice pref_key(key.data(), key.size() - 8);
+  r->last_key.assign(pref_key.data(), pref_key.size());
   r->num_entries++;
-  r->data_block.Add(key, value);
+  r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  index->Add(key.ToString(), offset, value.size(), false);
+  index->Add(pref_key.ToString(), offset, value.size(), r->file);
 }
 
 void RawTableBuilder::Flush() {
