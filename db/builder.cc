@@ -40,19 +40,12 @@ Status BuildTable(const std::string& dbname,
       meta->largest.DecodeFrom(key);
       builder->Add(key, iter->value());
     }
-    s = builder->Finish();
     if (s.ok()) {
       meta->file_size = builder->FileSize();
       assert(meta->file_size > 0);
     }
+    s = builder->Finish();
     delete builder;
-    if (s.ok()) {
-      s = file->Sync();
-    }
-    if (s.ok()) {
-      s = file->Close();
-    }
-
     // Finish and check for file errors
     if (s.ok()) {
       s = file->Sync();
