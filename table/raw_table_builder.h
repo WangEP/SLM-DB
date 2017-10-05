@@ -8,7 +8,7 @@ namespace leveldb {
 
 class RawTableBuilder {
  public:
-  RawTableBuilder(const Options& options, WritableFile* file);
+  RawTableBuilder(const Options& options, WritableFile* file, FileMetaData* meta);
 
   ~RawTableBuilder();
 

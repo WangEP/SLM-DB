@@ -892,6 +892,21 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
+  // get files for compaction
+  const int space = (compact->compaction->level() == 0 ? compact->compaction->num_input_files(0) + 1 : 2);
+  SequentialFile **files = new SequentialFile*[space];
+  int num = 0;
+  for (int which = 0; which < 2; which++) {
+    for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
+      uint64_t file_number = compact->compaction->input(which, i)->number;
+      std::string name = TableFileName(dbname_, file_number);
+      Status s = env_->NewSequentialFile(name, &files[num]);
+      if (s.ok()) {
+        num++;
+      }
+    }
+  }
+  // TODO: merge files
 
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
   input->SeekToFirst();
@@ -1097,46 +1112,42 @@ Status DBImpl::Get(const ReadOptions& options,
                    const Slice& key,
                    std::string* value) {
   Status s;
-  MutexLock l(&mutex_);
-  SequenceNumber snapshot;
-  if (options.snapshot != NULL) {
-    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
-  } else {
-    snapshot = versions_->LastSequence();
-  }
-
-  MemTable* mem = mem_;
-  MemTable* imm = imm_;
   Version* current = versions_->current();
-  mem->Ref();
-  if (imm != NULL) imm->Ref();
   current->Ref();
 
   bool have_stat_update = false;
   Version::GetStats stats;
 
-  // Unlock while reading from files and memtables
-  {
-    mutex_.Unlock();
-    // First look in the memtable, then in the immutable memtable (if any).
-    LookupKey lkey(key, snapshot);
-    if (mem->Get(lkey, value, &s)) {
-      // Done
-    } else if (imm != NULL && imm->Get(lkey, value, &s)) {
-      // Done
-    } else {
-      s = current->Get(options, lkey, value, &stats);
-      have_stat_update = true;
+  const DataMeta *data_meta = global_index_->Get(key.ToString());
+  char *p = new char[data_meta->size];
+  Slice result(p, data_meta->size);
+
+  if (data_meta->meta == NULL) {
+    // in memory
+    memcpy(p, (const void *) data_meta->offset, data_meta->size);
+  } else {
+    // in disk
+    FileMetaData *file_meta = (FileMetaData *) data_meta->meta;
+    std::string fname = TableFileName(dbname_, file_meta->number);
+    RandomAccessFile *file;
+    s = env_->NewRandomAccessFile(fname, &file);
+    if (!s.ok()) {
+      return s;
     }
-    mutex_.Lock();
+    file->Read(data_meta->offset, data_meta->size, &result, p);
+    have_stat_update = true;
+    stats.seek_file = file_meta;
+    //stats.seek_file_level = file_meta->
   }
 
+  value->assign(result.ToString());
+  // TODO: stat upgrade level
   if (have_stat_update && current->UpdateStats(stats)) {
     MaybeScheduleCompaction();
   }
-  mem->Unref();
-  if (imm != NULL) imm->Unref();
+
   current->Unref();
+  
   return s;
 }
 

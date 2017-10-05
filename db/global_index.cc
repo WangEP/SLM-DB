@@ -11,7 +11,7 @@ const DataMeta* GlobalIndex::Get(const std::string& key) {
   return (const DataMeta *) p;
 }
 
-void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, void* file ) {
+void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, void* meta ) {
   DataMeta *meta;
 #if QUARTZ
   meta = (DataMeta *) pmalloc(sizeof(DataMeta));
@@ -20,7 +20,7 @@ void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint
 #endif
   meta->offset = offset;
   meta->size = size;
-  meta->file = file;
+  meta->meta = meta;
   clflush((char *) meta, sizeof(DataMeta));
   tree_.insert({key, meta});
 }

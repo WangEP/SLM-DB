@@ -1,3 +1,4 @@
+#include <db/version_edit.h>
 #include "raw_table_builder.h"
 #include "raw_block_builder.h"
 #include "include/leveldb/global_index.h"
@@ -7,6 +8,7 @@ namespace leveldb {
 struct RawTableBuilder::Rep {
   Options options;
   WritableFile* file;
+  FileMetaData* meta;
   Status status;
   RawBlockBuilder data_block;
   std::string last_key;
@@ -14,17 +16,18 @@ struct RawTableBuilder::Rep {
   bool closed;
   GlobalIndex* global_index;
 
-  Rep(const Options& opt, WritableFile* f)
+  Rep(const Options& opt, WritableFile* f, FileMetaData* m)
       : options(opt),
         file(f),
+        meta(m),
         num_entries(0),
         closed(false),
         global_index(opt.global_index),
         data_block(&options) {}
 };
 
-RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file)
-    : rep_(new Rep(options, file)) { }
+RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, FileMetaData* meta)
+    : rep_(new Rep(options, file, meta)) { }
 
 RawTableBuilder::~RawTableBuilder() {
   delete rep_;
@@ -40,7 +43,7 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->num_entries++;
   r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  index->Add(pref_key.ToString(), offset, value.size(), r->file);
+  index->Add(pref_key.ToString(), offset, value.size(), r->meta);
 }
 
 void RawTableBuilder::Flush() {
