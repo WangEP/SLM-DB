@@ -11,6 +11,8 @@ void standard_db_test() {
   leveldb::Options options;
   options.filter_policy = NULL;
   options.create_if_missing = true;
+  options.global_index = new leveldb::GlobalIndex();
+  options.compression = leveldb::kNoCompression;
   std::string dbpath = "/tmp/testdb";
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
   assert(status.ok());
@@ -53,6 +55,6 @@ void sst_db_test() {
 }
 
 int main(int argc, char** argv) {
-  //standard_db_test();
-  sst_db_test();
+  standard_db_test();
+  //sst_db_test();
 }

@@ -6,8 +6,13 @@
 
 namespace leveldb {
 
+GlobalIndex::GlobalIndex() {
+  tree_ = new BTree();
+}
+
 const DataMeta* GlobalIndex::Get(const std::string& key) {
-  void* p = tree_.find(key)->second;
+  size_t hash = std::hash<std::string>{}(key);
+  void *p = tree_->search(hash);
   return (const DataMeta *) p;
 }
 
@@ -22,7 +27,8 @@ void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint
   meta->size = size;
   meta->file_meta = file_meta;
   clflush((char *) meta, sizeof(DataMeta));
-  tree_.insert({key, meta});
+  size_t hash = std::hash<std::string>{}(key);
+  tree_->insert(hash, meta);
 }
 
 

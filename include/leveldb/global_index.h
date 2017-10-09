@@ -17,7 +17,7 @@ struct DataMeta {
 
 class GlobalIndex {
  public:
-  GlobalIndex() {}
+  GlobalIndex();
 
   const DataMeta* Get(const std::string&);
 
@@ -28,8 +28,8 @@ class GlobalIndex {
   void Range(const std::string&, const std::string&);
 
  private:
-  //BTree tree;
-  std::map<std::string, void*> tree_; // temporary
+  BTree *tree_;
+  //std::map<std::string, void*> tree_; // temporary
 
   GlobalIndex(const GlobalIndex&);
   void operator=(const GlobalIndex&);
