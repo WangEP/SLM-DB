@@ -12,7 +12,7 @@ namespace leveldb {
 struct DataMeta {
   uint64_t offset;
   uint64_t size;
-  void* meta; // NULL if in-memory
+  void* file_meta; // NULL if in-memory
 };
 
 class GlobalIndex {

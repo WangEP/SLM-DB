@@ -6,6 +6,8 @@
 
 namespace leveldb {
 
+struct FileMetaData;
+
 class RawTableBuilder {
  public:
   RawTableBuilder(const Options& options, WritableFile* file, FileMetaData* meta);

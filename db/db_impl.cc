@@ -1122,12 +1122,12 @@ Status DBImpl::Get(const ReadOptions& options,
   char *p = new char[data_meta->size];
   Slice result(p, data_meta->size);
 
-  if (data_meta->meta == NULL) {
+  if (data_meta->file_meta == NULL) {
     // in memory
     memcpy(p, (const void *) data_meta->offset, data_meta->size);
   } else {
     // in disk
-    FileMetaData *file_meta = (FileMetaData *) data_meta->meta;
+    FileMetaData *file_meta = (FileMetaData *) data_meta->file_meta;
     std::string fname = TableFileName(dbname_, file_meta->number);
     RandomAccessFile *file;
     s = env_->NewRandomAccessFile(fname, &file);
