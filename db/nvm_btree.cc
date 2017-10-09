@@ -147,6 +147,16 @@ void BTree::insert(int64_t key, void *ptr) {
   }
 }
 
+bool BTree::update(int64_t key, void *ptr) {
+  Node *p = root;
+  while (p->type == Node::Internal) {
+    p = (Node *) ((iNode*) p)->search(key);
+    if (p == NULL) p = root;
+  }
+  bool status = ((lNode *) p)->update(key, ptr);
+  return status;
+}
+
 void* BTree::search(int64_t key) {
   Node *p = root;
   while (p->type == Node::Internal) {
@@ -559,6 +569,19 @@ void lNode::remove(int64_t key) {
     }
   }
   global.log("Deletion failed", 1);
+}
+
+bool lNode::update(int64_t key, void *ptr) {
+  for (int32_t i = 0; i < CARDINALITY; i++) {
+    if (entry[i].key == key && entry[i].ptr != NULL) {
+      entry[i].ptr = ptr;
+      return true;
+    }
+  }
+  if (sibling && sibling->splitKey < key) {
+    return ((lNode*) sibling)->update(key, ptr);
+  }
+  return false;
 }
 
 void *lNode::search(int64_t key) {

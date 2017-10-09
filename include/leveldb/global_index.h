@@ -23,6 +23,8 @@ class GlobalIndex {
 
   void Add(const std::string&, const uint64_t&, const uint64_t&, void*);
 
+  void Update(const std::string&, const uint64_t&, const uint64_t&, void*);
+
   void Delete(const std::string&);
 
   void Range(const std::string&, const std::string&);
