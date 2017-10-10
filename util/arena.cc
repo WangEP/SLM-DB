@@ -17,7 +17,7 @@ Arena::Arena() : memory_usage_(0) {
 Arena::~Arena() {
   for (size_t i = 0; i < blocks_.size(); i++) {
 #if QUARTZ
-    pfree(blocks[i], blocks_bytes_[i]);
+    pfree(blocks_[i], blocks_bytes_[i]);
 #else
     delete[] blocks_[i];
 #endif

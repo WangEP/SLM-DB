@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.7)
 
 project(leveldb CXX)
 set(CMAKE_DEBUG_POSTFIX "d")
+set(QUARTZ 1)
 
 #set(Boost_USE_STATIC_LIBS ON)
 #set(Boost_USE_MULTITHREAD ON)
@@ -50,9 +51,11 @@ endif()
 add_definitions(-DLEVELDB_ATOMIC_PRESENT)
 add_definitions(-DOS_LINUX)
 add_definitions(-DLEVELDB_PLATFORM_POSIX)
-#add_definitions(-DQUARTZ)
 add_definitions(-fno-builtin-memcmp)
 add_definitions(-Wint-to-pointer-cast)
+if(QUARTZ)
+    add_definitions(-DQUARTZ)
+endif()
 
 set(LEVEL_DB_FILES
         include/leveldb/c.h
@@ -182,19 +185,16 @@ target_include_directories(leveldb
 #add_library(nvmemul SHARED IMPORTED)
 #set_property(TARGET nvmemul PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/quartz/build/src/lib/libnvmemul.so)
 
-#include_directories(quartz/src/lib)
-#link_directories(quartz/src/lib)
-#target_include_directories(leveldb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/include/)
-
-#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
-
 target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
-#        nvmemul
         )
-#target_link_libraries(leveldb PUBLIC nvmemul)
+
+if (QUARTZ)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
+    target_link_libraries(leveldb PUBLIC nvmemul)
+endif()
 
 add_executable(leveldbmain main.cc)
 
