@@ -41,6 +41,10 @@ class Node {
   Node(Type, int64_t);
   Node(Type, Node*);
   Node(Type, int64_t, Node*);
+  void newNode(Type);
+  void newNode(Type, int64_t);
+  void newNode(Type, Node*);
+  void newNode(Type, int64_t, Node*);
 
   void *operator new(size_t size) {
     void *ret;
@@ -97,6 +101,7 @@ class lNode : public Node {
 
   // Core
   lNode();
+  void newlNode();
   void insert(int64_t, void*);
   Split* split(int64_t, void*);
   Merge* merge(void);
@@ -132,6 +137,8 @@ class iNode : public Node {
   // Core
   iNode();
   iNode(Split*);
+  void newiNode();
+  void newiNode(Split*);
   bool overflow(void);
   int32_t insert(int64_t, Node*, Node*);
   Split* split(int64_t, Node*, Node*);

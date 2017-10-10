@@ -80,7 +80,6 @@ class MemTable {
   Arena arena_;
   Table table_;
   GlobalIndex* index_;
-  std::hash<std::string> hash_;
 
   // No copying allowed
   MemTable(const MemTable&);
