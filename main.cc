@@ -7,6 +7,7 @@
 uint64_t clflush_cnt = 0;
 
 void standard_db_test() {
+  std::cout << "start\n";
   leveldb::DB* db;
   leveldb::Options options;
   options.filter_policy = NULL;
@@ -15,6 +16,7 @@ void standard_db_test() {
   options.compression = leveldb::kNoCompression;
   std::string dbpath = "/tmp/testdb";
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
+  std::cout << "open\n";
   assert(status.ok());
   std::string key = "test";
   std::string val = "test_value";
@@ -55,6 +57,6 @@ void sst_db_test() {
 }
 
 int main(int argc, char** argv) {
-  standard_db_test();
-  //sst_db_test();
+  //standard_db_test();
+  sst_db_test();
 }

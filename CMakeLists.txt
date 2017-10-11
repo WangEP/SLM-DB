@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.7)
 
 project(leveldb CXX)
 set(CMAKE_DEBUG_POSTFIX "d")
-set(QUARTZ 1)
+set(QUARTZ 0)
 
 #set(Boost_USE_STATIC_LIBS ON)
 #set(Boost_USE_MULTITHREAD ON)
@@ -192,13 +192,16 @@ target_link_libraries(leveldb
         )
 
 if (QUARTZ)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
-    target_link_libraries(leveldb PUBLIC nvmemul)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}}/quartz/src/lib)
+        target_link_libraries(leveldb PUBLIC nvmemul)
 endif()
 
 add_executable(leveldbmain main.cc)
-
 target_link_libraries(leveldbmain PUBLIC leveldb)
+
+install(TARGETS leveldb DESTINATION lib)
+install(TARGETS leveldbmain DESTINATION bin)
 
 #set_target_properties(leveldbutil PROPERTIES
 #        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
