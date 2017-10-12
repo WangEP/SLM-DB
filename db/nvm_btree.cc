@@ -14,9 +14,7 @@ Logger global(1);
 // BTree //
 BTree::BTree() {
   global.log("BTreeConstruction");
-  lNode *lnode = (lNode *) allocate(sizeof(lNode));
-  lnode->newlNode();
-  root = lnode;
+  root = new lNode();
   failedSearch = 0;
 }
 
@@ -141,9 +139,7 @@ void BTree::insert(int64_t key, void *ptr) {
       }
     } else { // Height increased
       if (s->original != root) continue;
-      iNode *inode = (iNode *) allocate(sizeof(iNode));
-      inode->newiNode(s);
-      root = inode;
+      root = (Node *) new iNode(s);
       clflush((char *) &root, sizeof(void *));
       delete s;
       s = NULL;
@@ -424,30 +420,6 @@ Node::Node(Type _type) {
   sibling = NULL;
 }
 
-void Node::newNode(Type _type) {
-  type = _type;
-  splitKey = -1;
-  sibling = NULL;
-}
-
-void Node::newNode(Type _type, Node *_sibling) {
-  type = _type;
-  sibling = _sibling;
-  splitKey = -1;
-}
-
-void Node::newNode(Type _type, int64_t _splitKey) {
-  type = _type;
-  splitKey = _splitKey;
-  sibling = NULL;
-}
-
-void Node::newNode(Type _type, int64_t _splitKey, Node *_sibling) {
-  type = _type;
-  splitKey = _splitKey;
-  sibling = _sibling;
-}
-
 void Node::print() {
   if (type == Node::Leaf) {
     ((lNode *) this)->print();
@@ -474,15 +446,6 @@ lNode::lNode() : Node(Node::Leaf) {
   }
 }
 
-void lNode::newlNode() {
-  global.log("Leaf Node Constructed.");
-  newNode(Node::Leaf);
-  for (auto &e : entry) {
-    e.key = 0;
-    e.ptr = NULL;
-  }
-}
-
 bool lNode::overflow(void) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].ptr == NULL) return false;
@@ -502,21 +465,20 @@ void lNode::insert(int64_t key, void *ptr) {
 }
 
 Split *lNode::split(int64_t key, void *ptr) {
-  Split *s = (Split *) allocate(sizeof(Split));
+  Split *s = new Split;
   array<LeafEntry, CARDINALITY> temp(entry);
   sort(temp.begin(), temp.end(),
        [](LeafEntry a, LeafEntry b) {
          if (b.ptr == NULL) return true;
          return a.key < b.key;
        });
+  lNode *left, *right;
 
   int32_t mIdx = CARDINALITY / 2;
   int64_t median = temp[mIdx].key;
 
-  lNode *left = (lNode *) allocate(sizeof(lNode));
-  left->newlNode();
-  lNode *right = (lNode *) allocate(sizeof(lNode));
-  right->newlNode();
+  left = new lNode();
+  right = new lNode();
 
   left->sibling = right;
   right->sibling = this->sibling;
@@ -544,7 +506,7 @@ Split *lNode::split(int64_t key, void *ptr) {
 }
 
 Merge *lNode::merge() {
-  Merge *m  = (Merge *) allocate(sizeof(Merge));
+  Merge *m = new Merge;
   lNode *_left = this;
   lNode *_right = (lNode *) sibling;
   array<LeafEntry, CARDINALITY * 2> temp;
@@ -564,8 +526,7 @@ Merge *lNode::merge() {
        });
 
   if (cnt <= CARDINALITY) { // Merge
-    lNode *merged = (lNode *) allocate(sizeof(lNode));
-    merged->newlNode();
+    lNode *merged = new lNode();
     copy(temp.begin(), temp.begin() + cnt, merged->entry.begin());
     merged->splitKey = _left->splitKey;
     merged->sibling = _right->sibling;
@@ -576,10 +537,8 @@ Merge *lNode::merge() {
     m->left = merged;
     m->right = NULL;
   } else {
-    lNode *left = (lNode *) allocate(sizeof(lNode));
-    left->newlNode();
-    lNode *right = (lNode *) allocate(sizeof(lNode));
-    right->newlNode();
+    lNode *left = new lNode();
+    lNode *right = new lNode();
     int32_t mIdx = cnt / 2;
     int64_t median = temp[mIdx].key;
 
@@ -723,26 +682,6 @@ iNode::iNode(Split *s) : Node(Node::Internal) {
   insert(s->splitKey, s->left, s->right);
 }
 
-void iNode::newiNode() {
-  newNode(Node::Internal);
-  global.log("Internal Node Constructed");
-  root = -1;
-  cnt = 0;
-  deleteCnt = 0;
-  for (auto &e : entry) {
-    e.key = 0;
-    e.left = -1;
-    e.right = -1;
-    e.lPtr = NULL;
-    e.rPtr = NULL;
-  }
-}
-
-void iNode::newiNode(Split *s) {
-  newiNode();
-  insert(s->splitKey, s->left, s->right);
-}
-
 bool iNode::overflow(void) {
   return cnt >= CARDINALITY;
 }
@@ -818,11 +757,9 @@ Split *iNode::split(int64_t key, Node *_left, Node *_right) {
   LeafEntry *sorted = transform(cnt, leftmost);
 
   if (cnt == CARDINALITY) { // split
-    Split *s = (Split *) allocate(sizeof(Split));
-    iNode *left = (iNode *) allocate(sizeof(iNode));
-    left->newiNode();
-    iNode *right = (iNode *) allocate(sizeof(iNode));
-    right->newiNode();
+    Split *s = new Split;
+    iNode *left = new iNode();
+    iNode *right = new iNode();
 
     int32_t ptrIdx = -1;
     int32_t mIdx = cnt / 2;
@@ -1074,9 +1011,9 @@ int32_t iNode::count() {
 Merge *iNode::merge(void) {
   iNode *_left = (iNode *) this;
   iNode *_right = (iNode *) this->sibling;
-  Merge *m = (Merge *) allocate(sizeof(Merge));
+  Merge *m = new Merge;
 
-  LeafEntry *sorted = (LeafEntry *) allocate(2 * CARDINALITY * sizeof(LeafEntry));
+  LeafEntry *sorted = new LeafEntry[CARDINALITY * 2];
   Node *leftmost = NULL;
   int32_t cnt = 0;
   int32_t ptrIdx = 0;
@@ -1089,8 +1026,7 @@ Merge *iNode::merge(void) {
   ptrIdx = -1;
 
   if (!(cnt > CARDINALITY)) { // MERGE
-    iNode *left = (iNode *) allocate(sizeof(iNode));
-    left->newiNode();
+    iNode *left = new iNode();
     left->balancedInsert(sorted, 0, cnt - 1, ptrIdx, leftmost);
     left->sibling = _right->sibling;
     left->splitKey = splitKey;
@@ -1101,10 +1037,8 @@ Merge *iNode::merge(void) {
     m->left = left;
     m->right = NULL;
   } else { // REDISTRIBUTION
-    iNode *left = (iNode *) allocate(sizeof(iNode));
-    left->newiNode();
-    iNode *right = (iNode *) allocate(sizeof(iNode));
-    right->newiNode();
+    iNode *left = new iNode();
+    iNode *right = new iNode();
     int32_t mIdx = cnt / 2;
     int64_t median = sorted[mIdx].key;
 
@@ -1153,7 +1087,7 @@ Node *iNode::getRightmostPtr(int32_t loc) {
 }
 
 LeafEntry *iNode::transform(int32_t &cnt, Node *&leftmost) {
-  LeafEntry *transformed = (LeafEntry *) allocate(CARDINALITY * sizeof(LeafEntry));
+  LeafEntry *transformed = new LeafEntry[CARDINALITY];
   cnt = 0;
   int32_t ptrIdx = 0;
   transform(transformed, cnt, ptrIdx, leftmost, true);

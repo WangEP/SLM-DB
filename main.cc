@@ -50,9 +50,9 @@ void sst_db_test() {
     status = db->Put(leveldb::WriteOptions(), key.str(), value.str());
   }
   std::string val;
-  status = db->Get(leveldb::ReadOptions(), "key1",  &val);
+  status = db->Get(leveldb::ReadOptions(), "key0key0",  &val);
   std::cout << val << "\n";
-  status = db->Get(leveldb::ReadOptions(), "key50", &val);
+  status = db->Get(leveldb::ReadOptions(), "key0key100", &val);
   std::cout << val << "\n";
 }
 

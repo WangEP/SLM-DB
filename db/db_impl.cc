@@ -1119,6 +1119,10 @@ Status DBImpl::Get(const ReadOptions& options,
   Version::GetStats stats;
 
   const DataMeta *data_meta = global_index_->Get(key.ToString());
+  if (data_meta == nullptr) {
+    s.IsNotFound();
+    return s;
+  }
   char *p = new char[data_meta->size];
   Slice result(p, data_meta->size);
 
