@@ -44,7 +44,7 @@ class Node {
 
   void *operator new(size_t size) {
     void *ret;
-    ret = allocate(size);
+    posix_memalign(&ret, 64, size);
     return ret;
   }
   void print();

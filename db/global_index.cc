@@ -13,8 +13,7 @@ const DataMeta* GlobalIndex::Get(const std::string& key) {
 }
 
 void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, void* file_meta) {
-  DataMeta *meta;
-  meta = (DataMeta *) allocate(sizeof(DataMeta));
+  DataMeta *meta = new DataMeta;
   meta->offset = offset;
   meta->size = size;
   meta->file_meta = file_meta;
@@ -24,8 +23,7 @@ void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint
 }
 
 void GlobalIndex::Update(const std::string& key, const uint64_t& offset, const uint64_t& size, void* file_meta) {
-  DataMeta *meta;
-  meta = (DataMeta *) allocate(sizeof(DataMeta));
+  DataMeta *meta = new DataMeta;
   meta->offset = offset;
   meta->size = size;
   meta->file_meta = file_meta;

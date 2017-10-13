@@ -2,17 +2,6 @@ cmake_minimum_required(VERSION 3.7)
 
 project(leveldb CXX)
 set(CMAKE_DEBUG_POSTFIX "d")
-set(QUARTZ 0)
-
-#set(Boost_USE_STATIC_LIBS ON)
-#set(Boost_USE_MULTITHREAD ON)
-#set(Boost_USE_STATIC_RUNTIME OFF)
-
-#find_package(Boost COMPONENTS
-#        date_time
-#        filesystem
-#        system
-#        REQUIRED)
 
 set(SNAPPY_LIBRARY "")
 
@@ -166,24 +155,12 @@ else()
 endif()
 
 add_library(leveldb ${LEVEL_DB_FILES})
-#include(ExternalProject)
-
-#ExternalProject_Add(
-#        quartz
-#        GIT_REPOSITORY "https://github.com/HewlettPackard/quartz.git"
-#        GIT_TAG "master"
-#        UPDATE_COMMAND ""
-#        INSTALL_COMMAND ""
-#)
-
 
 target_include_directories(leveldb
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
-#add_library(nvmemul SHARED IMPORTED)
-#set_property(TARGET nvmemul PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/quartz/build/src/lib/libnvmemul.so)
 
 target_link_libraries(leveldb
         PRIVATE
@@ -191,24 +168,6 @@ target_link_libraries(leveldb
         ${Pthread_LIBRARY}
         )
 
-if (QUARTZ)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/quartz/src/lib)
-        include_directories(${CMAKE_CURRENT_SOURCE_DIR}}/quartz/src/lib)
-        target_link_libraries(leveldb PUBLIC nvmemul)
-endif()
 
 add_executable(leveldbmain main.cc)
 target_link_libraries(leveldbmain PUBLIC leveldb)
-
-install(TARGETS leveldb DESTINATION lib)
-install(TARGETS leveldbmain DESTINATION bin)
-
-#set_target_properties(leveldbutil PROPERTIES
-#        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-
-# we distribute the leveldbutil as it might be useful
-#install(TARGETS leveldbutil
-#        RUNTIME DESTINATION bin
-#        LIBRARY DESTINATION lib
-#        ARCHIVE DESTINATION lib)
-
