@@ -62,6 +62,8 @@ set(LEVEL_DB_FILES
         include/leveldb/table.h
         include/leveldb/table_builder.h
         include/leveldb/write_batch.h
+        include/leveldb/global_index.h
+        db/c.cc
         db/builder.cc
         db/builder.h
         db/db_impl.cc
@@ -91,6 +93,11 @@ set(LEVEL_DB_FILES
         db/version_set.cc
         db/version_set.h
         db/write_batch.cc
+        db/global_index.cc
+        db/nvm_btree.cc
+        db/nvm_btree.h
+        db/logger.cc
+        db/logger.h
         table/block.cc
         table/block.h
         table/block_builder.cc
@@ -107,6 +114,10 @@ set(LEVEL_DB_FILES
         table/table_builder.cc
         table/two_level_iterator.cc
         table/two_level_iterator.h
+        table/raw_block_builder.cc
+        table/raw_block_builder.h
+        table/raw_table_builder.cc
+        table/raw_table_builder.h
         util/arena.cc
         util/arena.h
         util/bloom.cc
@@ -130,13 +141,7 @@ set(LEVEL_DB_FILES
         util/status.cc
         util/persist.h
         port/port.h
-        port/atomic_pointer.h
-        include/leveldb/global_index.h
-        db/global_index.cc
-        db/nvm_btree.cc
-        db/nvm_btree.h
-        db/logger.cc
-        db/logger.h table/raw_block_builder.cc table/raw_block_builder.h table/raw_table_builder.cc table/raw_table_builder.h)
+        port/atomic_pointer.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -161,7 +166,8 @@ target_include_directories(leveldb
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
-set_target_properties(leveldb PROPERTIES PUBLIC_HEADER "include/*.h")
+set_target_properties(leveldb PROPERTIES PUBLIC_HEADER
+        "include/leveldb/c.h;include/leveldb/cache.h;include/leveldb/comparator.h;include/leveldb/db.h;include/leveldb/dumpfile.h;include/leveldb/env.h;include/leveldb/iterator.h;include/leveldb/filter_policy.h;include/leveldb/iterator.h;include/leveldb/options.h;include/leveldb/slice.h;include/leveldb/status.h;include/leveldb/table.h;include/leveldb/table_builder.h;include/leveldb/write_batch.h;include/leveldb/global_index.h")
 
 target_link_libraries(leveldb
         PRIVATE
@@ -169,7 +175,7 @@ target_link_libraries(leveldb
         ${Pthread_LIBRARY}
         )
 
-INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include)
+INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
 
 add_executable(leveldbmain main.cc)
 target_link_libraries(leveldbmain PUBLIC leveldb)
