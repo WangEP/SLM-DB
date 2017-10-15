@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.7)
 
-project(leveldb CXX)
+project(leveldb C CXX)
 set(CMAKE_DEBUG_POSTFIX "d")
 
 set(SNAPPY_LIBRARY "")
@@ -161,6 +161,7 @@ target_include_directories(leveldb
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
+set_target_properties(leveldb PROPERTIES PUBLIC_HEADER "include/*.h")
 
 target_link_libraries(leveldb
         PRIVATE
@@ -168,6 +169,7 @@ target_link_libraries(leveldb
         ${Pthread_LIBRARY}
         )
 
+INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include)
 
 add_executable(leveldbmain main.cc)
 target_link_libraries(leveldbmain PUBLIC leveldb)
