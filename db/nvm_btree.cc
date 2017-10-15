@@ -574,8 +574,10 @@ void lNode::remove(int64_t key) {
 bool lNode::update(int64_t key, void *ptr) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
+      void *p = entry[i].ptr;
       entry[i].ptr = ptr;
       clflush((char *) entry[i].ptr, sizeof(void*));
+      delete p;
       return true;
     }
   }

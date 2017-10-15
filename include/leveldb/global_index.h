@@ -9,6 +9,11 @@ namespace leveldb {
 
 // TODO: concurrency control
 
+struct IndexFileMeta {
+  uint64_t file_number;
+  uint64_t level;
+};
+
 struct DataMeta {
   uint64_t offset;
   uint64_t size;

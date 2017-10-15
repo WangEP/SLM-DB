@@ -359,7 +359,6 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // immediately drop to the next level since NULL sorts after all
     // keys.  In the latter case the reader will use the new node.
     max_height_.NoBarrier_Store(reinterpret_cast<void*>(height));
-    clflush((char *) &height, sizeof(int));
   }
 
   x = NewNode(key, height);
@@ -367,9 +366,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
-    clflush((char *) x->Next(i), sizeof(Node*));
     prev[i]->SetNext(i, x);
-    clflush((char *) prev[i]->Next(i), sizeof(Node*));
   }
 }
 

@@ -8,7 +8,7 @@ namespace leveldb {
 struct RawTableBuilder::Rep {
   Options options;
   WritableFile* file;
-  FileMetaData* meta;
+  IndexFileMeta* meta;
   Status status;
   RawBlockBuilder data_block;
   std::string last_key;
@@ -16,7 +16,7 @@ struct RawTableBuilder::Rep {
   bool closed;
   GlobalIndex* global_index;
 
-  Rep(const Options& opt, WritableFile* f, FileMetaData* m)
+  Rep(const Options& opt, WritableFile* f, IndexFileMeta* m)
       : options(opt),
         file(f),
         meta(m),
@@ -26,7 +26,7 @@ struct RawTableBuilder::Rep {
         data_block(&options) {}
 };
 
-RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, FileMetaData* meta)
+RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, IndexFileMeta* meta)
     : rep_(new Rep(options, file, meta)) { }
 
 RawTableBuilder::~RawTableBuilder() {

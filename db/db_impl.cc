@@ -477,7 +477,9 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
+  IndexFileMeta *index_file_meta = new IndexFileMeta;
   meta.number = versions_->NewFileNumber();
+  index_file_meta->file_number = meta.number;
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
@@ -486,7 +488,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, index_file_meta);
     mutex_.Lock();
   }
 
@@ -515,6 +517,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
   stats_[level].Add(stats);
+  index_file_meta->level = level;
   return s;
 }
 
@@ -1131,8 +1134,8 @@ Status DBImpl::Get(const ReadOptions& options,
     memcpy(p, (const void *) data_meta->offset, data_meta->size);
   } else {
     // in disk
-    FileMetaData *file_meta = (FileMetaData *) data_meta->file_meta;
-    std::string fname = TableFileName(dbname_, file_meta->number);
+    IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
+    std::string fname = TableFileName(dbname_, index_file_meta->file_number);
     RandomAccessFile *file;
     s = env_->NewRandomAccessFile(fname, &file);
     if (!s.ok()) {
@@ -1140,15 +1143,15 @@ Status DBImpl::Get(const ReadOptions& options,
     }
     file->Read(data_meta->offset, data_meta->size, &result, p);
     have_stat_update = true;
-    stats.seek_file = file_meta;
-    //stats.seek_file_level = file_meta->
   }
 
   value->assign(result.ToString());
-  // TODO: stat upgrade level
+  // TODO: stat upgrade FileMetaData
+  /* skip for now
   if (have_stat_update && current->UpdateStats(stats)) {
     MaybeScheduleCompaction();
   }
+   */
 
   current->Unref();
   
