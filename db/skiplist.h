@@ -367,6 +367,11 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     // we publish a pointer to "x" in prev[i].
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
     prev[i]->SetNext(i, x);
+    if (i == 0) {
+      // clflush first level only
+      clflush((char *) x->Next(i), sizeof(Node*));
+      clflush((char *) prev[i]->Next(i), sizeof(Node*));
+    }
   }
 }
 
