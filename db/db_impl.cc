@@ -1155,7 +1155,7 @@ Status DBImpl::Get(const ReadOptions& options,
         }
         file->Read(data_meta->offset, data_meta->size, &result, p);
         //have_stat_update = true;
-        value->assign(result.ToString());
+        if (!result.empty()) value->assign(result.ToString());
       }
     }
     mutex_.Lock();
