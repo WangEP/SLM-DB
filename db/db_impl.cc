@@ -1115,37 +1115,52 @@ Status DBImpl::Get(const ReadOptions& options,
                    const Slice& key,
                    std::string* value) {
   Status s;
+  MutexLock l(&mutex_);
+
+  SequenceNumber snapshot;
+  if (options.snapshot != NULL) {
+    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
+  } else {
+    snapshot = versions_->LastSequence();
+  }
+
   Version* current = versions_->current();
   current->Ref();
 
-  bool have_stat_update = false;
+  //bool have_stat_update = false;
   Version::GetStats stats;
+  MemTable* mem = mem_;
+  MemTable* imm = imm_;
 
-  const DataMeta *data_meta = global_index_->Get(key.ToString());
-  if (data_meta == nullptr) {
-    s.IsNotFound();
-    return s;
-  }
-  char *p = new char[data_meta->size];
-  Slice result(p, data_meta->size);
+  mem->Ref();
+  if (imm != NULL) imm->Ref();
+  {
+    mutex_.Unlock();
 
-  if (data_meta->file_meta == NULL) {
-    // in memory
-    memcpy(p, (const void *) data_meta->offset, data_meta->size);
-  } else {
-    // in disk
-    IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
-    std::string fname = TableFileName(dbname_, index_file_meta->file_number);
-    RandomAccessFile *file;
-    s = env_->NewRandomAccessFile(fname, &file);
-    if (!s.ok()) {
-      return s;
+    LookupKey lkey(key, snapshot);
+    if (mem->Get(lkey, value, &s)) {
+      // in memory
+    } else {
+      // in disk
+      const DataMeta *data_meta = global_index_->Get(key.ToString());
+      if (data_meta != nullptr) {
+        char *p = new char[data_meta->size];
+        Slice result(p, data_meta->size);
+        IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
+        std::string fname = TableFileName(dbname_, index_file_meta->file_number);
+        RandomAccessFile *file;
+        s = env_->NewRandomAccessFile(fname, &file);
+        if (!s.ok()) {
+          return s;
+        }
+        file->Read(data_meta->offset, data_meta->size, &result, p);
+        //have_stat_update = true;
+        value->assign(result.ToString());
+      }
     }
-    file->Read(data_meta->offset, data_meta->size, &result, p);
-    have_stat_update = true;
+    mutex_.Lock();
   }
 
-  value->assign(result.ToString());
   // TODO: stat upgrade FileMetaData
   /* skip for now
   if (have_stat_update && current->UpdateStats(stats)) {
@@ -1153,6 +1168,8 @@ Status DBImpl::Get(const ReadOptions& options,
   }
    */
 
+  mem->Unref();
+  if (imm != NULL) imm->Unref();
   current->Unref();
   
   return s;

@@ -43,7 +43,11 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->num_entries++;
   r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  index->Update(pref_key.ToString(), offset, value.size(), r->meta);
+  if (index->Get(pref_key.ToString()) == NULL) {
+    index->Add(pref_key.ToString(), offset, value.size(), r->meta);
+  } else {
+    index->Update(pref_key.ToString(), offset, value.size(), r->meta);
+  }
 }
 
 void RawTableBuilder::Flush() {
