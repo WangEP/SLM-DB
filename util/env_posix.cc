@@ -356,6 +356,21 @@ class PosixEnv : public Env {
     // let the OS handle file caching
     if (fd < 0) {
       s = PosixError(fname, errno);
+    } else if (mmap_limit_.Acquire()) {
+      uint64_t size;
+      s = GetFileSize(fname, &size);
+      if (s.ok()) {
+        void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+        if (base != MAP_FAILED) {
+          *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
+        } else {
+          s = PosixError(fname, errno);
+        }
+      }
+      close(fd);
+      if (!s.ok()) {
+        mmap_limit_.Release();
+      }
     } else {
       *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
     }
