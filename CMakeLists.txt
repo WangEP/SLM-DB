@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.0)
 
 project(leveldb C CXX)
 set(CMAKE_DEBUG_POSTFIX "d")
@@ -33,7 +33,7 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++14
+            -std=c++11
     )
 endif()
 
