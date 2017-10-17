@@ -897,6 +897,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
   // get files for compaction
+  /*
   const int space = (compact->compaction->level() == 0 ? compact->compaction->num_input_files(0) + 1 : 2);
   SequentialFile **files = new SequentialFile*[space];
   int num = 0;
@@ -910,6 +911,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
     }
   }
+   */
   // TODO: merge files
 
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
@@ -1343,7 +1345,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
   assert(!writers_.empty());
   bool allow_delay = !force;
   Status s;
-  return s;
   while (true) {
     if (!bg_error_.ok()) {
       // Yield previous error
