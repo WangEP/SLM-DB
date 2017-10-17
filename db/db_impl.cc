@@ -680,6 +680,7 @@ void DBImpl::BackgroundCompaction() {
     CompactMemTable();
     return;
   }
+  return;
 
   Compaction* c;
   bool is_manual = (manual_compaction_ != NULL);
@@ -1342,6 +1343,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
   assert(!writers_.empty());
   bool allow_delay = !force;
   Status s;
+  return s;
   while (true) {
     if (!bg_error_.ok()) {
       // Yield previous error
