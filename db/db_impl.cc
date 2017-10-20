@@ -115,9 +115,6 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_cv_(&mutex_),
       mem_(NULL),
       imm_(NULL),
-      logfile_(NULL),
-      logfile_number_(0),
-      log_(NULL),
       seed_(0),
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
@@ -149,8 +146,6 @@ DBImpl::~DBImpl() {
   if (mem_ != NULL) mem_->Unref();
   if (imm_ != NULL) imm_->Unref();
   delete tmp_batch_;
-  delete log_;
-  delete logfile_;
   delete table_cache_;
 
   if (owns_info_log_) {
@@ -164,7 +159,6 @@ DBImpl::~DBImpl() {
 Status DBImpl::NewDB() {
   VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
-  new_db.SetLogNumber(0);
   new_db.SetNextFile(2);
   new_db.SetLastSequence(0);
 
@@ -175,10 +169,8 @@ Status DBImpl::NewDB() {
     return s;
   }
   {
-    log::MockWriter log(file);
     std::string record;
     new_db.EncodeTo(&record);
-    s = log.AddRecord(record);
     if (s.ok()) {
       s = file->Close();
     }
@@ -221,10 +213,6 @@ void DBImpl::DeleteObsoleteFiles() {
     if (ParseFileName(filenames[i], &number, &type)) {
       bool keep = true;
       switch (type) {
-        case kLogFile:
-          keep = ((number >= versions_->LogNumber()) ||
-                  (number == versions_->PrevLogNumber()));
-          break;
         case kDescriptorFile:
           // Keep my manifest file, and any newer incarnations'
           // (in case there is a race that allows other incarnations)
@@ -292,185 +280,10 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   if (!s.ok()) {
     return s;
   }
-  SequenceNumber max_sequence(0);
-
-  // Recover from all newer log files than the ones named in the
-  // descriptor (new log files may have been added by the previous
-  // incarnation without registering them in the descriptor).
-  //
-  // Note that PrevLogNumber() is no longer used, but we pay
-  // attention to it in case we are recovering a database
-  // produced by an older version of leveldb.
-  const uint64_t min_log = versions_->LogNumber();
-  const uint64_t prev_log = versions_->PrevLogNumber();
-  std::vector<std::string> filenames;
-  s = env_->GetChildren(dbname_, &filenames);
-  if (!s.ok()) {
-    return s;
-  }
-  std::set<uint64_t> expected;
-  versions_->AddLiveFiles(&expected);
-  uint64_t number;
-  FileType type;
-  std::vector<uint64_t> logs;
-  for (size_t i = 0; i < filenames.size(); i++) {
-    if (ParseFileName(filenames[i], &number, &type)) {
-      expected.erase(number);
-      if (type == kLogFile && ((number >= min_log) || (number == prev_log)))
-        logs.push_back(number);
-    }
-  }
-  if (!expected.empty()) {
-    char buf[50];
-    snprintf(buf, sizeof(buf), "%d missing files; e.g.",
-             static_cast<int>(expected.size()));
-    return Status::Corruption(buf, TableFileName(dbname_, *(expected.begin())));
-  }
-
-  // Recover in the order in which the logs were generated
-  std::sort(logs.begin(), logs.end());
-  for (size_t i = 0; i < logs.size(); i++) {
-    s = RecoverLogFile(logs[i], (i == logs.size() - 1), save_manifest, edit,
-                       &max_sequence);
-    if (!s.ok()) {
-      return s;
-    }
-
-    // The previous incarnation may not have written any MANIFEST
-    // records after allocating this log number.  So we manually
-    // update the file number allocation counter in VersionSet.
-    versions_->MarkFileNumberUsed(logs[i]);
-  }
-
-  if (versions_->LastSequence() < max_sequence) {
-    versions_->SetLastSequence(max_sequence);
-  }
 
   return Status::OK();
 }
 
-Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
-                              bool* save_manifest, VersionEdit* edit,
-                              SequenceNumber* max_sequence) {
-  struct LogReporter : public log::Reader::Reporter {
-    Env* env;
-    Logger* info_log;
-    const char* fname;
-    Status* status;  // NULL if options_.paranoid_checks==false
-    virtual void Corruption(size_t bytes, const Status& s) {
-      Log(info_log, "%s%s: dropping %d bytes; %s",
-          (this->status == NULL ? "(ignoring error) " : ""),
-          fname, static_cast<int>(bytes), s.ToString().c_str());
-      if (this->status != NULL && this->status->ok()) *this->status = s;
-    }
-  };
-
-  mutex_.AssertHeld();
-
-  // Open the log file
-  std::string fname = LogFileName(dbname_, log_number);
-  SequentialFile* file;
-  Status status = env_->NewSequentialFile(fname, &file);
-  if (!status.ok()) {
-    MaybeIgnoreError(&status);
-    return status;
-  }
-
-  // Create the log reader.
-  LogReporter reporter;
-  reporter.env = env_;
-  reporter.info_log = options_.info_log;
-  reporter.fname = fname.c_str();
-  reporter.status = (options_.paranoid_checks ? &status : NULL);
-  // We intentionally make log::Reader do checksumming even if
-  // paranoid_checks==false so that corruptions cause entire commits
-  // to be skipped instead of propagating bad information (like overly
-  // large sequence numbers).
-  log::MockReader reader(file, &reporter, true/*checksum*/,
-                     0/*initial_offset*/);
-  Log(options_.info_log, "Recovering log #%llu",
-      (unsigned long long) log_number);
-
-  // Read all the records and add to a memtable
-  std::string scratch;
-  Slice record;
-  WriteBatch batch;
-  int compactions = 0;
-  MemTable* mem = NULL;
-  while (reader.ReadRecord(&record, &scratch) &&
-         status.ok()) {
-    if (record.size() < 12) {
-      reporter.Corruption(
-          record.size(), Status::Corruption("log record too small"));
-      continue;
-    }
-    WriteBatchInternal::SetContents(&batch, record);
-
-    if (mem == NULL) {
-      mem = new MemTable(internal_comparator_, global_index_);
-      mem->Ref();
-    }
-    status = WriteBatchInternal::InsertInto(&batch, mem);
-    MaybeIgnoreError(&status);
-    if (!status.ok()) {
-      break;
-    }
-    const SequenceNumber last_seq =
-        WriteBatchInternal::Sequence(&batch) +
-        WriteBatchInternal::Count(&batch) - 1;
-    if (last_seq > *max_sequence) {
-      *max_sequence = last_seq;
-    }
-
-    if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
-      compactions++;
-      *save_manifest = true;
-      status = WriteLevel0Table(mem, edit, NULL);
-      mem->Unref();
-      mem = NULL;
-      if (!status.ok()) {
-        // Reflect errors immediately so that conditions like full
-        // file-systems cause the DB::Open() to fail.
-        break;
-      }
-    }
-  }
-
-  delete file;
-
-  // See if we should keep reusing the last log file.
-  if (status.ok() && options_.reuse_logs && last_log && compactions == 0) {
-    assert(logfile_ == NULL);
-    assert(log_ == NULL);
-    assert(mem_ == NULL);
-    uint64_t lfile_size;
-    if (env_->GetFileSize(fname, &lfile_size).ok() &&
-        env_->NewAppendableFile(fname, &logfile_).ok()) {
-      Log(options_.info_log, "Reusing old log %s \n", fname.c_str());
-      log_ = new log::MockWriter(logfile_, lfile_size);
-      logfile_number_ = log_number;
-      if (mem != NULL) {
-        mem_ = mem;
-        mem = NULL;
-      } else {
-        // mem can be NULL if lognum exists but was empty.
-        mem_ = new MemTable(internal_comparator_, global_index_);
-        mem_->Ref();
-      }
-    }
-  }
-
-  if (mem != NULL) {
-    // mem did not get reused; compact it.
-    if (status.ok()) {
-      *save_manifest = true;
-      status = WriteLevel0Table(mem, edit, NULL);
-    }
-    mem->Unref();
-  }
-
-  return status;
-}
 
 Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
                                 Version* base) {
@@ -538,8 +351,6 @@ void DBImpl::CompactMemTable() {
 
   // Replace immutable memtable with the generated Table
   if (s.ok()) {
-    edit.SetPrevLogNumber(0);
-    edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
     s = versions_->LogAndApply(&edit, &mutex_);
   }
 
@@ -1151,6 +962,7 @@ Status DBImpl::Get(const ReadOptions& options,
         Slice result(p, data_meta->size);
         IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
         std::string fname = TableFileName(dbname_, index_file_meta->file_number);
+        stats.seek_file_level = (int) index_file_meta->level;
         RandomAccessFile *file;
         s = env_->NewRandomAccessFile(fname, &file);
         if (!s.ok()) {
@@ -1246,24 +1058,10 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
     // into mem_.
     {
       mutex_.Unlock();
-      status = log_->AddRecord(WriteBatchInternal::Contents(updates));
-      bool sync_error = false;
-      if (status.ok() && options.sync) {
-        status = logfile_->Sync();
-        if (!status.ok()) {
-          sync_error = true;
-        }
-      }
       if (status.ok()) {
         status = WriteBatchInternal::InsertInto(updates, mem_);
       }
       mutex_.Lock();
-      if (sync_error) {
-        // The state of the log file is indeterminate: the log record we
-        // just added may or may not show up when the DB is re-opened.
-        // So we force the DB into a mode where all future writes fail.
-        RecordBackgroundError(status);
-      }
     }
     if (updates == tmp_batch_) tmp_batch_->Clear();
 
@@ -1378,20 +1176,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       bg_cv_.Wait();
     } else {
       // Attempt to switch to a new memtable and trigger compaction of old
-      assert(versions_->PrevLogNumber() == 0);
-      uint64_t new_log_number = versions_->NewFileNumber();
-      WritableFile* lfile = NULL;
-      s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
-      if (!s.ok()) {
-        // Avoid chewing through file number space in a tight loop.
-        versions_->ReuseFileNumber(new_log_number);
-        break;
-      }
-      delete log_;
-      delete logfile_;
-      logfile_ = lfile;
-      logfile_number_ = new_log_number;
-      log_ = new log::MockWriter(lfile);
       imm_ = mem_;
       has_imm_.Release_Store(imm_);
       mem_ = new MemTable(internal_comparator_, global_index_);
@@ -1531,17 +1315,11 @@ Status DB::Open(const Options& options, const std::string& dbname,
     s = options.env->NewWritableFile(LogFileName(dbname, new_log_number),
                                      &lfile);
     if (s.ok()) {
-      edit.SetLogNumber(new_log_number);
-      impl->logfile_ = lfile;
-      impl->logfile_number_ = new_log_number;
-      impl->log_ = new log::MockWriter(lfile);
       impl->mem_ = new MemTable(impl->internal_comparator_, impl->global_index_);
       impl->mem_->Ref();
     }
   }
-  if (s.ok() && save_manifest) {
-    edit.SetPrevLogNumber(0);  // No older logs needed after recovery.
-    edit.SetLogNumber(impl->logfile_number_);
+  if (s.ok()) {
     s = impl->versions_->LogAndApply(&edit, &impl->mutex_);
   }
   if (s.ok()) {

@@ -41,7 +41,7 @@ void sst_db_test() {
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
   options.write_buffer_size = 8000;
-  std::string dbpath = "/tmp/testdb";
+  std::string dbpath = "/home/olzhas/Projects/testdb";
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
   assert(status.ok());
   clock_gettime(CLOCK_MONOTONIC, &start);

@@ -218,13 +218,6 @@ class VersionSet {
   // Mark the specified file number as used.
   void MarkFileNumberUsed(uint64_t number);
 
-  // Return the current log file number.
-  uint64_t LogNumber() const { return log_number_; }
-
-  // Return the log file number for the log file that is currently
-  // being compacted, or zero if there is no such log file.
-  uint64_t PrevLogNumber() const { return prev_log_number_; }
-
   // Pick level and inputs for a new compaction.
   // Returns NULL if there is no compaction to be done.
   // Otherwise returns a pointer to a heap-allocated object that
@@ -307,8 +300,6 @@ class VersionSet {
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
-  WritableFile* descriptor_file_;
-  log::MockWriter* descriptor_log_;
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
   Version* current_;        // == dummy_versions_.prev_
 

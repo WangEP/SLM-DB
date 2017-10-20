@@ -390,7 +390,6 @@ class Repairer {
     }
 
     edit_.SetComparatorName(icmp_.user_comparator()->Name());
-    edit_.SetLogNumber(0);
     edit_.SetNextFile(next_file_number_);
     edit_.SetLastSequence(max_sequence);
 

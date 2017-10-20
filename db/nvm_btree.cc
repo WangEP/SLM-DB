@@ -9,11 +9,11 @@ using namespace std;
 
 namespace leveldb {
 
-Logger global(1);
+//Logger global(1);
 
 // BTree //
 BTree::BTree() {
-  global.log("BTreeConstruction");
+  //global.log("BTreeConstruction");
   root = new lNode();
   failedSearch = 0;
 }
@@ -439,7 +439,7 @@ void Node::print(stringstream &ss) {
 
 // Leaf Node //
 lNode::lNode() : Node(Node::Leaf) {
-  global.log("Leaf Node Constructed.");
+  //global.log("Leaf Node Constructed.");
   for (auto &e : entry) {
     e.key = 0;
     e.ptr = NULL;
@@ -568,7 +568,7 @@ void lNode::remove(int64_t key) {
       return;
     }
   }
-  global.log("Deletion failed", 1);
+  //global.log("Deletion failed", 1);
 }
 
 bool lNode::update(int64_t key, void *ptr) {
@@ -656,7 +656,7 @@ void lNode::copy_debug(std::vector<int64_t> &keys) {
 
 // Internal Node //
 iNode::iNode() : Node(Node::Internal) {
-  global.log("Internal Node Constructed");
+  //global.log("Internal Node Constructed");
   root = -1;
   cnt = 0;
   deleteCnt = 0;
@@ -670,7 +670,7 @@ iNode::iNode() : Node(Node::Internal) {
 }
 
 iNode::iNode(Split *s) : Node(Node::Internal) {
-  global.log("Internal Node Constructed");
+  //global.log("Internal Node Constructed");
   root = -1;
   cnt = 0;
   deleteCnt = 0;
@@ -706,7 +706,7 @@ Node *iNode::search(int64_t key) {
       cur = entry[cur].right;
     }
   }
-  global.log("iNode::search - SHOULD NOT REACH HERE", 10);
+  //global.log("iNode::search - SHOULD NOT REACH HERE", 10);
 }
 
 int32_t iNode::insert(int64_t key, Node *_left, Node *_right) {
@@ -750,7 +750,7 @@ int32_t iNode::insert(int64_t key, Node *_left, Node *_right) {
       parent = entry[parent].right;
     }
   }
-  global.log("iNode::insert - SHOULD NOT REACH HERE", 10);
+  //global.log("iNode::insert - SHOULD NOT REACH HERE", 10);
 }
 
 Split *iNode::split(int64_t key, Node *_left, Node *_right) {
@@ -813,7 +813,7 @@ void iNode::remove(int64_t key, Node *replacement) {
 
   if (parent == -1) {
     // Height is reduced.
-    global.log("iNode::remove - SOMETHING WRONG.", 10);
+    //global.log("iNode::remove - SOMETHING WRONG.", 10);
   } else {
     if (dir == iNode::Left) {
       entry[parent].lPtr = replacement;
@@ -828,7 +828,7 @@ void iNode::remove(int64_t key, Node *replacement) {
 }
 
 void iNode::remove(int32_t leftParent, int32_t rightParent, Node *replacement, Node *lSib) {
-  if (replacement == NULL) global.log("SOMETHING WRONG", 10);
+  //if (replacement == NULL) global.log("SOMETHING WRONG", 10);
   if (leftParent == rightParent) {
     block(leftParent, iNode::Left);
     block(leftParent, iNode::Right); // FIXME LATER
