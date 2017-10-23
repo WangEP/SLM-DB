@@ -114,6 +114,9 @@ class Version {
   // Return a human readable string that describes this version's contents.
   std::string DebugString() const;
 
+  // Get stats
+  GetStats CollectStats(uint64_t file_number);
+
  private:
   friend class Compaction;
   friend class VersionSet;
@@ -283,9 +286,6 @@ class VersionSet {
 
   void SetupOtherInputs(Compaction* c);
 
-  // Save current contents to *log
-  Status WriteSnapshot(log::Writer* log);
-
   void AppendVersion(Version* v);
 
   Env* const env_;
@@ -296,8 +296,6 @@ class VersionSet {
   uint64_t next_file_number_;
   uint64_t manifest_file_number_;
   uint64_t last_sequence_;
-  uint64_t log_number_;
-  uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.

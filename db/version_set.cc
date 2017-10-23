@@ -5,19 +5,12 @@
 #include "db/version_set.h"
 
 #include <algorithm>
-#include <stdio.h>
 #include "db/filename.h"
-#include "db/log_reader.h"
-#include "db/log_writer.h"
 #include "db/memtable.h"
 #include "db/table_cache.h"
 #include "leveldb/env.h"
-#include "leveldb/table_builder.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
-#include "util/coding.h"
-#include "util/logging.h"
-#include "mock_log.h"
 
 namespace leveldb {
 
@@ -598,6 +591,20 @@ std::string Version::DebugString() const {
   return r;
 }
 
+Version::GetStats Version::CollectStats(uint64_t file_number) {
+  for (int level = 0; level < config::kNumLevels; level++) {
+    std::vector<FileMetaData*> list = files_[level];
+    for (int i = 0; i < list.size(); i++) {
+      if (list[i]->number == file_number) {
+        GetStats stats;
+        stats.seek_file_level = level;
+        stats.seek_file = list[i];
+      }
+    }
+  }
+  return Version::GetStats();
+}
+
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
@@ -785,8 +792,6 @@ VersionSet::VersionSet(const std::string& dbname,
       next_file_number_(2),
       manifest_file_number_(0),  // Filled by Recover()
       last_sequence_(0),
-      log_number_(0),
-      prev_log_number_(0),
       dummy_versions_(this),
       current_(NULL) {
   AppendVersion(new Version(this));

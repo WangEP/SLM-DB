@@ -491,7 +491,6 @@ void DBImpl::BackgroundCompaction() {
     CompactMemTable();
     return;
   }
-  return;
 
   Compaction* c;
   bool is_manual = (manual_compaction_ != NULL);
@@ -941,7 +940,7 @@ Status DBImpl::Get(const ReadOptions& options,
   Version* current = versions_->current();
   current->Ref();
 
-  //bool have_stat_update = false;
+  bool have_stat_update = false;
   Version::GetStats stats;
   MemTable* mem = mem_;
   MemTable* imm = imm_;
@@ -962,26 +961,23 @@ Status DBImpl::Get(const ReadOptions& options,
         Slice result(p, data_meta->size);
         IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
         std::string fname = TableFileName(dbname_, index_file_meta->file_number);
-        stats.seek_file_level = (int) index_file_meta->level;
+        stats = current->CollectStats(index_file_meta->file_number);
         RandomAccessFile *file;
         s = env_->NewRandomAccessFile(fname, &file);
         if (!s.ok()) {
           return s;
         }
         file->Read(data_meta->offset, data_meta->size, &result, p);
-        //have_stat_update = true;
+        have_stat_update = true;
         if (!result.empty()) value->assign(result.ToString());
       }
     }
     mutex_.Lock();
   }
 
-  // TODO: stat upgrade FileMetaData
-  /* skip for now
   if (have_stat_update && current->UpdateStats(stats)) {
     MaybeScheduleCompaction();
   }
-   */
 
   mem->Unref();
   if (imm != NULL) imm->Unref();
