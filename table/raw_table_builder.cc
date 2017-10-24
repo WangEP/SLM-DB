@@ -8,7 +8,7 @@ namespace leveldb {
 struct RawTableBuilder::Rep {
   Options options;
   WritableFile* file;
-  IndexFileMeta* meta;
+  uint64_t file_number;
   Status status;
   RawBlockBuilder data_block;
   std::string last_key;
@@ -16,18 +16,18 @@ struct RawTableBuilder::Rep {
   bool closed;
   GlobalIndex* global_index;
 
-  Rep(const Options& opt, WritableFile* f, IndexFileMeta* m)
+  Rep(const Options& opt, WritableFile* f, uint64_t number)
       : options(opt),
         file(f),
-        meta(m),
+        file_number(number),
         num_entries(0),
         closed(false),
         global_index(opt.global_index),
         data_block(&options) {}
 };
 
-RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, IndexFileMeta* meta)
-    : rep_(new Rep(options, file, meta)) { }
+RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number)
+    : rep_(new Rep(options, file, file_number)) { }
 
 RawTableBuilder::~RawTableBuilder() {
   delete rep_;
@@ -44,9 +44,9 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
   if (index->Get(pref_key.ToString()) == NULL) {
-    index->Add(pref_key.ToString(), offset, value.size(), r->meta);
+    index->Add(pref_key.ToString(), offset, value.size(), r->file_number);
   } else {
-    index->Update(pref_key.ToString(), offset, value.size(), r->meta);
+    index->Update(pref_key.ToString(), offset, value.size(), r->file_number);
   }
 }
 

@@ -13,22 +13,22 @@ const DataMeta* GlobalIndex::Get(const std::string& key) {
   return (const DataMeta *) p;
 }
 
-void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, void* file_meta) {
+void GlobalIndex::Add(const std::string& key, const uint64_t& offset, const uint64_t& size, const uint64_t& file_number) {
   DataMeta *meta = new DataMeta;
   meta->offset = offset;
   meta->size = size;
-  meta->file_meta = file_meta;
+  meta->file_number = file_number;
   clflush((char *) meta, sizeof(DataMeta));
   int64_t hash = std::hash<std::string>{}(key);
   hash = hash < 0 ? -hash : hash;
   tree_->insert(hash, meta);
 }
 
-void GlobalIndex::Update(const std::string& key, const uint64_t& offset, const uint64_t& size, void* file_meta) {
+void GlobalIndex::Update(const std::string& key, const uint64_t& offset, const uint64_t& size, const uint64_t& file_number) {
   DataMeta *meta = new DataMeta;
   meta->offset = offset;
   meta->size = size;
-  meta->file_meta = file_meta;
+  meta->file_number = file_number;
   clflush((char *) meta, sizeof(DataMeta));
   int64_t hash = std::hash<std::string>{}(key);
   hash = hash < 0 ? -hash : hash;

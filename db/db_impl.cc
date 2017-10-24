@@ -290,9 +290,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
-  IndexFileMeta *index_file_meta = new IndexFileMeta;
   meta.number = versions_->NewFileNumber();
-  index_file_meta->file_number = meta.number;
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
@@ -301,7 +299,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, index_file_meta);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
     mutex_.Lock();
   }
 
@@ -330,7 +328,6 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
   stats_[level].Add(stats);
-  index_file_meta->level = level;
   return s;
 }
 
@@ -959,9 +956,9 @@ Status DBImpl::Get(const ReadOptions& options,
       if (data_meta != nullptr) {
         char *p = new char[data_meta->size];
         Slice result(p, data_meta->size);
-        IndexFileMeta *index_file_meta = (IndexFileMeta *) data_meta->file_meta;
-        std::string fname = TableFileName(dbname_, index_file_meta->file_number);
-        stats = current->CollectStats(index_file_meta->file_number);
+        uint64_t file_number = data_meta->file_number;
+        std::string fname = TableFileName(dbname_, file_number);
+        stats = current->CollectStats(file_number);
         RandomAccessFile *file;
         s = env_->NewRandomAccessFile(fname, &file);
         if (!s.ok()) {
