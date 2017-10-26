@@ -494,8 +494,8 @@ Split *lNode::split(int64_t key, void *ptr) {
   if (key < median) left->insert(key, ptr);
   else right->insert(key, ptr);
 
-  clflush((char *) left, sizeof(lNode));
-  clflush((char *) right, sizeof(lNode));
+  clflush((char *) &left, sizeof(lNode));
+  clflush((char *) &right, sizeof(lNode));
 
   s->original = this;
   s->left = left;
@@ -576,7 +576,7 @@ bool lNode::update(int64_t key, void *ptr) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       void *p = entry[i].ptr;
       entry[i].ptr = ptr;
-      clflush((char *) entry[i].ptr, sizeof(void*));
+      clflush((char *) &entry[i].ptr, sizeof(void*));
       delete p;
       return true;
     }
@@ -786,8 +786,8 @@ Split *iNode::split(int64_t key, Node *_left, Node *_right) {
     s->right = right;
     s->splitKey = median;
 
-    clflush((char *) left, sizeof(iNode));
-    clflush((char *) right, sizeof(iNode));
+    clflush((char *) &left, sizeof(iNode));
+    clflush((char *) &right, sizeof(iNode));
 
     return s;
   } else { // rebalance TODO
@@ -1032,7 +1032,7 @@ Merge *iNode::merge(void) {
     left->balancedInsert(sorted, 0, cnt - 1, ptrIdx, leftmost);
     left->sibling = _right->sibling;
     left->splitKey = splitKey;
-    clflush((char *) left, sizeof(iNode));
+    clflush((char *) &left, sizeof(iNode));
 
     m->_left = this;
     m->_right = _right;
@@ -1057,8 +1057,8 @@ Merge *iNode::merge(void) {
     m->left = left;
     m->right = right;
 
-    clflush((char *) left, sizeof(iNode));
-    clflush((char *) right, sizeof(iNode));
+    clflush((char *) &left, sizeof(iNode));
+    clflush((char *) &right, sizeof(iNode));
   }
   delete sorted;
   return m;

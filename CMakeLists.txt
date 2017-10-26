@@ -141,7 +141,10 @@ set(LEVEL_DB_FILES
         util/status.cc
         util/persist.h
         port/port.h
-        port/atomic_pointer.h)
+        port/atomic_pointer.h
+        table/raw_block_iter.cc
+        table/raw_block_iter.h
+        util/streamer.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
