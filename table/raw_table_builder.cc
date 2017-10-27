@@ -56,8 +56,8 @@ void RawTableBuilder::Flush() {
   if (!ok()) return;
   if (r->data_block.empty()) return;
   Slice raw = r->data_block.Finish();
-  r->data_block.Reset();
   r->file->Append(raw);
+  r->data_block.Reset();
 }
 
 Status RawTableBuilder::status() const {
