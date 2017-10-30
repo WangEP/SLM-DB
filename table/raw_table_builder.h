@@ -26,6 +26,8 @@ class RawTableBuilder {
 
   uint64_t FileSize();
 
+  uint64_t NumEntries() const;
+
  private:
   bool ok() const { return status().ok(); }
 

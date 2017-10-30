@@ -29,7 +29,6 @@ class RawBlockBuilder {
  private:
   const Options* options_;
   std::string buffer_;
-  int counter_;
   bool finished_;
 
   RawBlockBuilder(const RawBlockBuilder&);

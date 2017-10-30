@@ -82,4 +82,8 @@ uint64_t RawTableBuilder::FileSize() {
   return rep_->data_block.GetBufferSize();
 }
 
+uint64_t RawTableBuilder::NumEntries() const {
+  return rep_->num_entries;
+}
+
 } // namespace leveldb

@@ -3,49 +3,56 @@
 
 namespace leveldb {
 
-RawBlockIterator::RawBlockIterator(SequentialFile* file) : stream_(file) {
+RawBlockIterator::RawBlockIterator(SequentialFile* file) : stream_(new Streamer(file)) {
+  count = 0;
   auto handle = std::async(std::launch::async, [this]() {
     Init();
   });
 }
 
 void RawBlockIterator::Init() {
-  while (!stream_.eof()) {
-    vector_.push_back({stream_.Get(), stream_.Get()});
+  while (!stream_->eof()) {
+    Slice key;
+    stream_->Get(&key);
+    Slice value;
+    stream_->Get(&value);
+    vector_.push_back({key, value});
   }
 }
 
 bool RawBlockIterator::Valid() const {
-  return iterator_ != vector_.end();
+  return count < vector_.size();
 }
 
 void RawBlockIterator::SeekToFirst() {
+  count = 0;
 }
 
 void RawBlockIterator::SeekToLast() {
+  count = vector_.size() - 1;
 }
 
 void RawBlockIterator::Seek(const Slice &target) {
 }
 
 void RawBlockIterator::Next() {
-  iterator_++;
+  count++;
 }
 
 void RawBlockIterator::Prev() {
-  iterator_--;
+  count--;
 }
 
 Slice RawBlockIterator::key() const {
-  return iterator_->first;
+  return vector_[count].first;
 }
 
 Slice RawBlockIterator::value() const {
-  return iterator_->second;
+  return vector_[count].second;
 }
 
 Status RawBlockIterator::status() const {
-  return stream_.status();
+  return stream_->status();
 }
 
 }

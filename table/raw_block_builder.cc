@@ -4,7 +4,6 @@ namespace leveldb {
 
 RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options)
     : options_(options),
-      counter_(0),
       finished_(false) {
 
 }
@@ -12,7 +11,6 @@ RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options)
 void RawBlockBuilder::Reset() {
   buffer_.clear();
   finished_ = false;
-  counter_ = 0;
 }
 
 void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
