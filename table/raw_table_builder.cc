@@ -38,7 +38,7 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   GlobalIndex* index = r->global_index;
   assert(!r->closed);
   if (!ok()) return;
-  Slice pref_key(key.data(), key.size() - 8);
+  Slice pref_key(key.data(), key.size());
   r->last_key.assign(pref_key.data(), pref_key.size());
   r->num_entries++;
   r->data_block.Add(pref_key, value);

@@ -102,14 +102,14 @@ static bool AfterFile(const Comparator* ucmp,
                       const Slice* user_key, const FileMetaData* f) {
   // NULL user_key occurs before all keys and is therefore never after *f
   return (user_key != NULL &&
-          ucmp->Compare(*user_key, f->largest.user_key()) > 0);
+          ucmp->Compare(*user_key, f->largest.Encode()) > 0);
 }
 
 static bool BeforeFile(const Comparator* ucmp,
                        const Slice* user_key, const FileMetaData* f) {
   // NULL user_key occurs after all keys and is therefore never before *f
   return (user_key != NULL &&
-          ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
+          ucmp->Compare(*user_key, f->smallest.Encode()) < 0);
 }
 
 bool SomeFileOverlapsRange(
@@ -289,8 +289,8 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
   tmp.reserve(files_[0].size());
   for (uint32_t i = 0; i < files_[0].size(); i++) {
     FileMetaData* f = files_[0][i];
-    if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&
-        ucmp->Compare(user_key, f->largest.user_key()) <= 0) {
+    if (ucmp->Compare(user_key, f->smallest.Encode()) >= 0 &&
+        ucmp->Compare(user_key, f->largest.Encode()) <= 0) {
       tmp.push_back(f);
     }
   }
@@ -312,7 +312,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
     uint32_t index = FindFile(vset_->icmp_, files_[level], internal_key);
     if (index < num_files) {
       FileMetaData* f = files_[level][index];
-      if (ucmp->Compare(user_key, f->smallest.user_key()) < 0) {
+      if (ucmp->Compare(user_key, f->smallest.Encode()) < 0) {
         // All of "f" is past any data for user_key
       } else {
         if (!(*func)(arg, level, f)) {
@@ -532,16 +532,16 @@ void Version::GetOverlappingInputs(
   inputs->clear();
   Slice user_begin, user_end;
   if (begin != NULL) {
-    user_begin = begin->user_key();
+    user_begin = begin->Encode();
   }
   if (end != NULL) {
-    user_end = end->user_key();
+    user_end = end->Encode();
   }
   const Comparator* user_cmp = vset_->icmp_.user_comparator();
   for (size_t i = 0; i < files_[level].size(); ) {
     FileMetaData* f = files_[level][i++];
-    const Slice file_start = f->smallest.user_key();
-    const Slice file_limit = f->largest.user_key();
+    const Slice file_start = f->smallest.Encode();
+    const Slice file_limit = f->largest.Encode();
     if (begin != NULL && user_cmp->Compare(file_limit, user_begin) < 0) {
       // "f" is completely before specified range; skip it
     } else if (end != NULL && user_cmp->Compare(file_start, user_end) > 0) {
@@ -1251,9 +1251,9 @@ bool Compaction::IsBaseLevelForKey(const Slice& user_key) {
     const std::vector<FileMetaData*>& files = input_version_->files_[lvl];
     for (; level_ptrs_[lvl] < files.size(); ) {
       FileMetaData* f = files[level_ptrs_[lvl]];
-      if (user_cmp->Compare(user_key, f->largest.user_key()) <= 0) {
+      if (user_cmp->Compare(user_key, f->largest.Encode()) <= 0) {
         // We've advanced far enough
-        if (user_cmp->Compare(user_key, f->smallest.user_key()) >= 0) {
+        if (user_cmp->Compare(user_key, f->smallest.Encode()) >= 0) {
           // Key falls in this file's range, so definitely not base level
           return false;
         }

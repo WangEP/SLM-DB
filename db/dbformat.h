@@ -125,6 +125,8 @@ class InternalKeyComparator : public Comparator {
   const Comparator* user_comparator() const { return user_comparator_; }
 
   int Compare(const InternalKey& a, const InternalKey& b) const;
+
+  int CompareMem(const Slice &akey, const Slice &bkey) const;
 };
 
 // Filter policy wrapper that converts from internal keys to user keys

@@ -34,9 +34,9 @@ Status BuildTable(const std::string& dbname,
     }
 
     RawTableBuilder* builder = new RawTableBuilder(options, file, meta->number);
-    meta->smallest.DecodeFrom(iter->key());
+    meta->smallest.DecodeFrom(ExtractUserKey(iter->key()));
     for (; iter->Valid(); iter->Next()) {
-      Slice key = iter->key();
+      Slice key = ExtractUserKey(iter->key());
       meta->largest.DecodeFrom(key);
       builder->Add(key, iter->value());
     }

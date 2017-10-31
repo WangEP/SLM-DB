@@ -724,7 +724,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     input = nullptr;
     for (auto iterator : iterators) {
       if (iterator->Valid() && (input == nullptr ||
-          strcmp(input->key().data(), iterator->key().data()) > 0)) {
+          internal_comparator_.Compare(input->key(), iterator->key()) > 0)){
         input = iterator;
       }
     }

@@ -34,7 +34,7 @@ int MemTable::KeyComparator::operator()(const char* aptr, const char* bptr)
   // Internal keys are encoded as length-prefixed strings.
   Slice a = GetLengthPrefixedSlice(aptr);
   Slice b = GetLengthPrefixedSlice(bptr);
-  return comparator.Compare(a, b);
+  return comparator.CompareMem(a, b);
 }
 
 // Encode a suitable internal key target for "target" and return it.
