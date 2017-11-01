@@ -19,7 +19,7 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
 
 include_directories(${Boost_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}                                                              f
         include)
 
 if(MSVC)

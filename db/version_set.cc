@@ -500,8 +500,10 @@ int Version::PickLevelForMemTableOutput(
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
-    InternalKey start(smallest_user_key, kMaxSequenceNumber, kValueTypeForSeek);
-    InternalKey limit(largest_user_key, 0, static_cast<ValueType>(0));
+    InternalKey start;
+    start.DecodeFrom(smallest_user_key);
+    InternalKey limit;
+    limit.DecodeFrom(largest_user_key);
     std::vector<FileMetaData*> overlaps;
     while (level < config::kMaxMemCompactLevel) {
       if (OverlapInLevel(level + 1, &smallest_user_key, &largest_user_key)) {
