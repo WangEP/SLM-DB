@@ -916,6 +916,7 @@ Status DBImpl::Get(const ReadOptions& options,
           if (!s.ok()) {
             return s;
           }
+          file_map.insert({file_number, file});
         }
         stats = current->CollectStats(file_number);
         file->Read(data_meta->offset, data_meta->size, &result, p);
