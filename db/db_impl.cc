@@ -890,6 +890,8 @@ Status DBImpl::Get(const ReadOptions& options,
   MemTable* mem = mem_;
   MemTable* imm = imm_;
 
+  static std::map<int64_t, RandomAccessFile*> file_map;
+
   mem->Ref();
   if (imm != NULL) imm->Ref();
   {
@@ -905,13 +907,17 @@ Status DBImpl::Get(const ReadOptions& options,
         char *p = new char[data_meta->size];
         Slice result(p, data_meta->size);
         uint64_t file_number = data_meta->file_number;
-        std::string fname = TableFileName(dbname_, file_number);
-        stats = current->CollectStats(file_number);
         RandomAccessFile *file;
-        s = env_->NewRandomAccessFile(fname, &file);
-        if (!s.ok()) {
-          return s;
+        try {
+          file = file_map.at(file_number);
+        } catch (exception e) {
+          std::string fname = TableFileName(dbname_, file_number);
+          s = env_->NewRandomAccessFile(fname, &file);
+          if (!s.ok()) {
+            return s;
+          }
         }
+        stats = current->CollectStats(file_number);
         file->Read(data_meta->offset, data_meta->size, &result, p);
         have_stat_update = true;
         if (!result.empty()) value->assign(result.ToString());
