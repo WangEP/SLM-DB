@@ -719,13 +719,19 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     iterators.push_back(iter);
   }
   Status status;
-  Iterator *input;
+  Iterator *input = nullptr;
+  Slice prev_key;
   while (true) {
     input = nullptr;
     for (auto iterator : iterators) {
       if (iterator->Valid() && (input == nullptr ||
           internal_comparator_.Compare(input->key(), iterator->key()) > 0)){
-        input = iterator;
+        if (!prev_key.empty() &&
+            internal_comparator_.Compare(prev_key, iterator->key()) == 0) {
+          iterator->Next();
+        } else {
+          input = iterator;
+        }
       }
     }
     if (input == nullptr) break;
@@ -768,6 +774,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         break;
       }
     }
+    prev_key = input->key();
     input->Next();
   }
 
