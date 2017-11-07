@@ -907,6 +907,8 @@ Status DBImpl::Get(const ReadOptions& options,
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // in memory
+    } if (imm != NULL && imm->Get(lkey, value, &s)) {
+      // in compaction 
     } else {
       // in disk
       const DataMeta *data_meta = global_index_->Get(key.ToString());
