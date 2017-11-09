@@ -28,7 +28,7 @@ class Streamer {
   }
 
   bool eof() {
-    return buffer_ == nullptr;
+    return buffer_ == nullptr || buffer_->size() == 0 ;
   }
 
   void Get(Slice* result) {

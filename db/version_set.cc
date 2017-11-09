@@ -601,6 +601,7 @@ Version::GetStats Version::CollectStats(uint64_t file_number) {
         GetStats stats;
         stats.seek_file_level = level;
         stats.seek_file = list[i];
+        return stats;
       }
     }
   }
