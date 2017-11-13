@@ -35,14 +35,10 @@ inline void clflush(char *data, int len) {
   volatile char *ptr = (char *)((unsigned long)data &~(CACHE_LINE_SIZE-1));
   mfence();
   for (; ptr<data+len; ptr+=CACHE_LINE_SIZE) {
-//#if WRITE_LATENCY_IN_NS != 0
     unsigned long etsc = read_tsc() + (unsigned long)(WRITE_LATENCY_IN_NS*CPU_FREQ_MHZ/1000);
-//#endif
     asm volatile("clflush %0" : "+m" (*(volatile char *)ptr));
-//#if WRITE_LATENCY_IN_NS != 0
     while (read_tsc() < etsc)
       cpu_pause();
-//#endif
     clflush_cnt++;
   }
   mfence();

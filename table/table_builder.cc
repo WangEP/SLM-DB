@@ -108,9 +108,6 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->pending_handle.EncodeTo(&handle_encoding);
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
-    // global index building
-//    r->global_index->Add(r->last_key, r->pending_handle.offset(),
-//                        r->pending_handle.size(), false);
   }
 
   if (r->filter_block != NULL) {

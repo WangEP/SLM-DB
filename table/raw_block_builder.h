@@ -9,7 +9,9 @@ namespace leveldb {
 
 class RawBlockBuilder {
  public:
-  RawBlockBuilder(const Options *options);
+  RawBlockBuilder(const Options *options, uint64_t max_size);
+
+  ~RawBlockBuilder();
 
   void Reset();
 
@@ -23,12 +25,14 @@ class RawBlockBuilder {
 
 
   bool empty() const {
-    return buffer_.empty();
+    return size_ == 0;
   }
 
  private:
   const Options* options_;
-  std::string buffer_;
+  uint64_t size_;
+  uint64_t max_size_;
+  char* buffer_;
   bool finished_;
 
   RawBlockBuilder(const RawBlockBuilder&);

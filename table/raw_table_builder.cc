@@ -17,26 +17,29 @@ struct RawTableBuilder::Rep {
   bool closed;
   GlobalIndex* global_index;
 
-  Rep(const Options& opt, WritableFile* f, uint64_t number)
+  Rep(const Options& opt, WritableFile* f, uint64_t number, uint64_t block_size)
       : options(opt),
         file(f),
         file_number(number),
         num_entries(0),
         closed(false),
         global_index(opt.global_index),
-        data_block(&options) {}
+        data_block(&options, block_size) {}
 };
 
-RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number)
-    : rep_(new Rep(options, file, file_number)) { }
+RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number, uint64_t block_size)
+    : rep_(new Rep(options, file, file_number, block_size)) { }
 
 RawTableBuilder::~RawTableBuilder() {
   delete rep_;
 }
 
 void RawTableBuilder::Add(const Slice &key, const Slice &value) {
-
   Rep* r = rep_;
+  assert(!r->closed);
+  if (r->num_entries > 0) {
+    assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
+  }
   GlobalIndex* index = r->global_index;
   assert(!r->closed);
   if (!ok()) return;
@@ -45,13 +48,21 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->num_entries++;
   r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  auto handler = std::async([index](std::string key, uint64_t offset, uint64_t size, uint64_t file_number) {
+  if (index->Get(pref_key.ToString()) == NULL) {
+    index->Add(pref_key.ToString(), offset, value.size(), r->file_number);
+  } else {
+    index->Update(pref_key.ToString(), offset, value.size(), r->file_number);
+  }
+  /*
+  auto runner = std::async([index](std::string key, uint64_t offset, uint64_t size, uint64_t file_number) {
     if (index->Get(key) == NULL) {
       index->Add(key, offset, size, file_number);
     } else {
       index->Update(key, offset, size, file_number);
     }
   }, pref_key.ToString(), offset, value.size(), r->file_number);
+  handler.push(runner.share());
+   */
 }
 
 void RawTableBuilder::Flush() {

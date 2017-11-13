@@ -10,7 +10,7 @@ struct IndexFileMeta;
 
 class RawTableBuilder {
  public:
-  RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number);
+  RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number, uint64_t block_size);
 
   ~RawTableBuilder();
 
