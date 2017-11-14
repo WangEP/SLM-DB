@@ -703,6 +703,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   // get files for compaction
 
   std::vector<SequentialFile*> files;
+  std::vector<uint64_t> files_number;
   for (int which = 0; which < 2; which++) {
     for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
       uint64_t file_number = compact->compaction->input(which, i)->number;
@@ -711,6 +712,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       Status s = env_->NewSequentialFile(name, &new_file);
       if (s.ok()) {
         files.push_back(new_file);
+        files_number.push_back(file_number);
       }
     }
   }
@@ -813,6 +815,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   VersionSet::LevelSummaryStorage tmp;
   Log(options_.info_log,
       "compacted to: %s", versions_->LevelSummary(&tmp));
+  for (auto number : files_number) {
+    file_map.erase(number);
+  }
   return status;
 }
 
@@ -893,12 +898,9 @@ Status DBImpl::Get(const ReadOptions& options,
   Version* current = versions_->current();
   current->Ref();
 
-  bool have_stat_update = false;
-  Version::GetStats stats;
   MemTable* mem = mem_;
   MemTable* imm = imm_;
 
-  static std::map<int64_t, RandomAccessFile*> file_map;
 
   mem->Ref();
   if (imm != NULL) imm->Ref();
@@ -928,18 +930,13 @@ Status DBImpl::Get(const ReadOptions& options,
           }
           file_map.insert({file_number, file});
         }
-        stats = current->CollectStats(file_number);
         file->Read(data_meta->offset, data_meta->size, &result, p);
-        have_stat_update = true;
         if (!result.empty()) value->assign(result.ToString());
       }
     }
     mutex_.Lock();
   }
 
-  if (have_stat_update && current->UpdateStats(stats)) {
-    MaybeScheduleCompaction();
-  }
 
   mem->Unref();
   if (imm != NULL) imm->Unref();

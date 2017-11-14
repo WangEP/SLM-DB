@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   struct timespec start, end;
-  int numData = 1000000;
+  int numData = 10000000;
   leveldb::DB* db;
   leveldb::Options options;
   options.global_index = new leveldb::GlobalIndex();
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     std::stringstream key;
     key << "key0key" << i ;
     std::stringstream value;
-    value << "value" << i ;
+    value << "valuevalue" << i ;
     status = db->Put(leveldb::WriteOptions(), key.str(), value.str());
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
 
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = 0; i < numData; i++) {
-    std::string v = "value" + to_string(i);
+    std::string v = "valuevalue" + to_string(i);
     std::stringstream key;
     key << "key0key" << i;
     std::string value;

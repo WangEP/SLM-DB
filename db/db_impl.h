@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <set>
+#include <map>
 #include "db/dbformat.h"
 #include "db/snapshot.h"
 #include "leveldb/db.h"
@@ -137,13 +138,17 @@ class DBImpl : public DB {
   MemTable* imm_;                // Memtable being compacted
   port::AtomicPointer has_imm_;  // So bg thread can detect non-NULL imm_
   uint32_t seed_;                // For sampling.
-  GlobalIndex* global_index_;            // For indexing
+
+  // For indexing
+  GlobalIndex* global_index_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;
   WriteBatch* tmp_batch_;
 
   SnapshotList snapshots_;
+  // file map
+  std::map<int64_t, RandomAccessFile*> file_map;
 
   // Set of table files to protect from deletion because they are
   // part of ongoing compactions.
