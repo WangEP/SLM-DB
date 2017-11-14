@@ -17,18 +17,18 @@ struct RawTableBuilder::Rep {
   bool closed;
   GlobalIndex* global_index;
 
-  Rep(const Options& opt, WritableFile* f, uint64_t number, uint64_t block_size)
+  Rep(const Options& opt, WritableFile* f, uint64_t number)
       : options(opt),
         file(f),
         file_number(number),
         num_entries(0),
         closed(false),
         global_index(opt.global_index),
-        data_block(&options, block_size) {}
+        data_block(&options) {}
 };
 
-RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number, uint64_t block_size)
-    : rep_(new Rep(options, file, file_number, block_size)) { }
+RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number)
+    : rep_(new Rep(options, file, file_number)) { }
 
 RawTableBuilder::~RawTableBuilder() {
   delete rep_;

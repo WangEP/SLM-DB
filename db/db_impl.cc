@@ -605,8 +605,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
-    compact->builder = new RawTableBuilder(options_, compact->outfile, file_number,
-                                           (uint64_t) (options_.max_file_size * 1.5));
+    compact->builder = new RawTableBuilder(options_, compact->outfile, file_number);
   }
   return s;
 }
@@ -816,7 +815,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   Log(options_.info_log,
       "compacted to: %s", versions_->LevelSummary(&tmp));
   for (auto number : files_number) {
-    file_map.erase(number);
+    //delete file_map_.at(number);
+    file_map_.erase(number);
   }
   return status;
 }
@@ -921,14 +921,14 @@ Status DBImpl::Get(const ReadOptions& options,
         uint64_t file_number = data_meta->file_number;
         RandomAccessFile *file;
         try {
-          file = file_map.at(file_number);
+          file = file_map_.at(file_number);
         } catch (exception e) {
           std::string fname = TableFileName(dbname_, file_number);
           s = env_->NewRandomAccessFile(fname, &file);
           if (!s.ok()) {
             return s;
           }
-          file_map.insert({file_number, file});
+          file_map_.insert({file_number, file});
         }
         file->Read(data_meta->offset, data_meta->size, &result, p);
         if (!result.empty()) value->assign(result.ToString());

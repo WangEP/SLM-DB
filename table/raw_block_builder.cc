@@ -2,48 +2,38 @@
 
 namespace leveldb {
 
-RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options, uint64_t max_size)
+RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options)
     : options_(options),
       finished_(false) {
-  size_ = 0;
-  max_size_ = max_size;
-  buffer_ = new char[max_size_];
 }
 
 
 RawBlockBuilder::~RawBlockBuilder() {
-  delete buffer_;
+  buffer_.clear();
 }
 
 void RawBlockBuilder::Reset() {
-  delete buffer_;
-  size_ = 0;
-  buffer_ = nullptr;
-  buffer_ = new char[max_size_];
+  buffer_.clear();
   finished_ = false;
 }
 
 void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
-  strncpy(buffer_ + size_, key.data(), key.size());
-  size_ += key.size();
-  strcpy(buffer_ + size_, "\t");
-  size_++;
-  strncpy(buffer_ + size_, value.data(), value.size());
-  size_ += value.size();
-  strcpy(buffer_ + size_, "\t");
-  size_++;
+  buffer_.append(key.data(), key.size());
+  buffer_.append("\t");
+  buffer_.append(value.data(), value.size());
+  buffer_.append("\t");
 }
 
 Slice RawBlockBuilder::Finish() {
-  return Slice(buffer_, size_);
+  return Slice(buffer_);
 }
 
 size_t RawBlockBuilder::CurrentSizeEstimate() const {
-  return size_ + sizeof(int);
+  return buffer_.size();
 }
 
 uint64_t RawBlockBuilder::GetBufferSize() {
-  return size_;
+  return buffer_.size();
 }
 
 

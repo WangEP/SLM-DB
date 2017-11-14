@@ -148,7 +148,7 @@ class DBImpl : public DB {
 
   SnapshotList snapshots_;
   // file map
-  std::map<int64_t, RandomAccessFile*> file_map;
+  std::map<int64_t, RandomAccessFile*> file_map_;
 
   // Set of table files to protect from deletion because they are
   // part of ongoing compactions.
