@@ -22,6 +22,9 @@ RandomAccessFile::~RandomAccessFile() {
 WritableFile::~WritableFile() {
 }
 
+ReadAppendFile::~ReadAppendFile() {
+}
+
 Logger::~Logger() {
 }
 

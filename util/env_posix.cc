@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -19,6 +20,11 @@
 #include <deque>
 #include <limits>
 #include <set>
+#include <map>
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <bits/ios_base.h>
+#include <fstream>
 #include "leveldb/env.h"
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -26,6 +32,9 @@
 #include "util/mutexlock.h"
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
+#include "persist.h"
+
+namespace bip = boost::interprocess;
 
 namespace leveldb {
 
@@ -292,6 +301,66 @@ class PosixWritableFile : public WritableFile {
   }
 };
 
+class PosixReadAppendFile : public ReadAppendFile {
+ private:
+  bip::mapped_region region_;
+  bip::file_mapping file_;
+  std::string filename_;
+  uint64_t max_size_;
+  void* addr_;
+  volatile uint64_t current_;
+
+ public:
+  PosixReadAppendFile(const std::string& fname, uint64_t size)
+      : filename_(fname) {
+    {  //Create a file
+      bip::file_mapping::remove(fname.c_str());
+      std::filebuf fbuf;
+      fbuf.open(fname.c_str(), std::ios_base::in | std::ios_base::out
+                               | std::ios_base::trunc | std::ios_base::binary);
+      //Set the size
+      fbuf.pubseekoff(size-1, std::ios_base::beg);
+      fbuf.sputc(0);
+    }
+    bip::file_mapping m_file(fname.c_str(), bip::read_write);
+    bip::mapped_region region(m_file, bip::read_write);
+    file_.swap(m_file);
+    region_.swap(region);
+    addr_ = region_.get_address();
+    max_size_ = region_.get_size();
+    current_ = 0;
+  }
+
+  ~PosixReadAppendFile() {
+    region_.flush(0, max_size_, true);
+  }
+
+  virtual bool IsWritable(uint64_t size) {
+    return size < max_size_ - current_;
+  }
+
+  virtual Status Append(const Slice& data) {
+    Status s;
+    memcpy((addr_ + current_), data.data(), data.size());
+    clflush((char *) (addr_ + current_), data.size());
+    current_ += data.size();
+    return s;
+  }
+
+  virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                      char* scratch) const {
+    Status s;
+    if (offset + n > current_) {
+      *result = Slice();
+      return PosixError(filename_, EINVAL);
+    }
+    memcpy(scratch, (addr_ + offset), n);
+    *result = Slice(scratch, n);
+    return s;
+  }
+
+};
+
 static int LockOrUnlock(int fd, bool lock) {
   errno = 0;
   struct flock f;
@@ -350,8 +419,13 @@ class PosixEnv : public Env {
 
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) {
-    *result = NULL;
     Status s;
+    try {
+      result = read_file_map.at(fname);
+      return s;
+    } catch (std::exception e) {
+      *result = NULL;
+    }
     int fd = open(fname.c_str(), O_RDONLY);
     // let the OS handle file caching
     if (fd < 0) {
@@ -363,6 +437,7 @@ class PosixEnv : public Env {
         void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
         if (base != MAP_FAILED) {
           *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
+          read_file_map.insert(std::make_pair(fname, result));
         } else {
           s = PosixError(fname, errno);
         }
@@ -373,6 +448,7 @@ class PosixEnv : public Env {
       }
     } else {
       *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
+      read_file_map.insert(std::make_pair(fname, result));
     }
     return s;
   }
@@ -400,6 +476,15 @@ class PosixEnv : public Env {
     } else {
       *result = new PosixWritableFile(fname, f);
     }
+    return s;
+  }
+
+  virtual Status NewReadAppendFile(const std::string& fname,
+                                  uint64_t size,
+                                  ReadAppendFile** result) {
+    // NVRAM mmaped file
+    Status s;
+    *result = new PosixReadAppendFile(fname, size);
     return s;
   }
 
@@ -560,6 +645,9 @@ class PosixEnv : public Env {
     reinterpret_cast<PosixEnv*>(arg)->BGThread();
     return NULL;
   }
+
+  // map for opened file descriptors
+  std::map<std::string, RandomAccessFile**> read_file_map;
 
   pthread_mutex_t mu_;
   pthread_cond_t bgsignal_;

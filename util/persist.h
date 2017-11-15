@@ -30,7 +30,7 @@ inline void mfence() {
   asm volatile("mfence":::"memory");
 }
 
-inline void clflush(char *data, int len) {
+inline void clflush(char *data, uint64_t len) {
   if (data == NULL) return;
   volatile char *ptr = (char *)((unsigned long)data &~(CACHE_LINE_SIZE-1));
   mfence();

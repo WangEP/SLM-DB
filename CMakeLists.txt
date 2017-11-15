@@ -182,3 +182,6 @@ INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINA
 
 add_executable(leveldbmain main.cc)
 target_link_libraries(leveldbmain PUBLIC leveldb)
+
+add_executable(file_io_test util/file_io_test.cc)
+target_link_libraries(file_io_test PUBLIC leveldb)

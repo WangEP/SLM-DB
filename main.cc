@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   struct timespec start, end;
-  int numData = 10000000;
+  int numData = 1000000;
   leveldb::DB* db;
   leveldb::Options options;
   options.global_index = new leveldb::GlobalIndex();

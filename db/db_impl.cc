@@ -920,16 +920,8 @@ Status DBImpl::Get(const ReadOptions& options,
         Slice result(p, data_meta->size);
         uint64_t file_number = data_meta->file_number;
         RandomAccessFile *file;
-        try {
-          file = file_map_.at(file_number);
-        } catch (exception e) {
-          std::string fname = TableFileName(dbname_, file_number);
-          s = env_->NewRandomAccessFile(fname, &file);
-          if (!s.ok()) {
-            return s;
-          }
-          file_map_.insert({file_number, file});
-        }
+        std::string fname = TableFileName(dbname_, file_number);
+        s = env_->NewRandomAccessFile(fname, &file);
         file->Read(data_meta->offset, data_meta->size, &result, p);
         if (!result.empty()) value->assign(result.ToString());
       }
