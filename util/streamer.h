@@ -10,6 +10,7 @@
 namespace leveldb {
 
 class Streamer {
+  // have to do this prettier
  public:
   Streamer(SequentialFile* file) : file_(file) {
     current_ = 0;
@@ -32,19 +33,19 @@ class Streamer {
   }
 
   void Get(Slice* result) {
-    std::ostringstream ss;
+    std::string ss;
+    ss.clear();
     char c;
     while (!eof() && buffer_->data()[current_] != '\t') {
       c = buffer_->data()[current_];
-      ss << c;
+      ss.append(1, c);
       current_++;
       MaybeSwap();
     }
     current_++;
-    size_t size = ss.str().size();
-    char *p = new char[size];
-    strcpy(p, ss.str().data());
-    *result = Slice(p, size);
+    char *p = new char[ss.size()];
+    strncpy(p, ss.data(), ss.size());
+    *result = Slice(p, ss.size());
     MaybeSwap();
   }
 
@@ -54,11 +55,17 @@ class Streamer {
 
  private:
   void MaybeSwap() {
-    if (current_ >= buffer_->size()) {
-      delete[] buffer_;
+    if (current_ < buffer_->size() && buffer_->data()[current_] == '\000') {
+      finished_ = true;
+      delete buffer_;
+      delete future_buffer_;
+      buffer_ = NULL;
+    }
+    else if (current_ >= buffer_->size()) {
+      delete buffer_;
       buffer_ = future_buffer_;
       current_ = 0;
-      future_buffer_ = nullptr;
+      future_buffer_ = NULL;
       if (!finished_) {
           auto handler = std::async(std::launch::async, [this](){
             future_buffer_ = new Slice();

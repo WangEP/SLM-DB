@@ -56,6 +56,8 @@ struct DBImpl::CompactionState {
   // State kept for output being generated
   WritableFile* outfile;
   RawTableBuilder* builder;
+  ReadAppendFile* iofile;
+  uint64_t current_entries;
 
   uint64_t total_bytes;
 
@@ -65,6 +67,7 @@ struct DBImpl::CompactionState {
       : compaction(c),
         outfile(NULL),
         builder(NULL),
+        iofile(NULL),
         total_bytes(0) {
   }
 };
@@ -534,6 +537,7 @@ void DBImpl::BackgroundCompaction() {
         versions_->LevelSummary(&tmp));
   } else {
     CompactionState* compact = new CompactionState(c);
+    current_compaction_ = compact;
     status = DoCompactionWork(compact);
     if (!status.ok()) {
       RecordBackgroundError(status);
@@ -570,14 +574,7 @@ void DBImpl::BackgroundCompaction() {
 
 void DBImpl::CleanupCompaction(CompactionState* compact) {
   mutex_.AssertHeld();
-  if (compact->builder != NULL) {
-    // May happen if we get a shutdown call in the middle of compaction
-    compact->builder->Abandon();
-    delete compact->builder;
-  } else {
-    assert(compact->outfile == NULL);
-  }
-  delete compact->outfile;
+  delete compact->iofile;
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     const CompactionState::Output& out = compact->outputs[i];
     pending_outputs_.erase(out.number);
@@ -587,7 +584,7 @@ void DBImpl::CleanupCompaction(CompactionState* compact) {
 
 Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   assert(compact != NULL);
-  assert(compact->builder == NULL);
+  assert(compact->iofile == NULL);
   uint64_t file_number;
   {
     mutex_.Lock();
@@ -603,55 +600,34 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
 
   // Make the output file
   std::string fname = TableFileName(dbname_, file_number);
-  Status s = env_->NewWritableFile(fname, &compact->outfile);
-  if (s.ok()) {
-    compact->builder = new RawTableBuilder(options_, compact->outfile, file_number);
-  }
+  Status s = env_->NewReadAppendFile(fname, options_.max_file_size, &compact->iofile);
+  compact->current_entries = 0;
   return s;
 }
 
-Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
-                                          Iterator* input) {
+Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   assert(compact != NULL);
-  assert(compact->outfile != NULL);
-  assert(compact->builder != NULL);
-
+  assert(compact->iofile != NULL);
   const uint64_t output_number = compact->current_output()->number;
   assert(output_number != 0);
 
   Status s;
-  if (input != NULL) {
-    s = input->status();
-  }
-  const uint64_t current_entries = compact->builder->NumEntries();
-  const uint64_t current_bytes = compact->builder->FileSize();
-  if (s.ok()) {
-    s = compact->builder->Finish();
-  } else {
-    compact->builder->Abandon();
-  }
+  const uint64_t current_entries = compact->current_entries;
+  const uint64_t current_bytes = compact->iofile->Size();
+  s = compact->iofile->Finish();
+
   compact->current_output()->file_size = current_bytes;
   compact->total_bytes += current_bytes;
-  delete compact->builder;
-  compact->builder = NULL;
-
-  // Finish and check for file errors
-  if (s.ok()) {
-    s = compact->outfile->Sync();
-  }
-  if (s.ok()) {
-    s = compact->outfile->Close();
-  }
-  delete compact->outfile;
-  compact->outfile = NULL;
-
+  delete compact->iofile;
+  compact->iofile = NULL;
+  current_compaction_ = NULL;
   if (s.ok() && current_entries > 0) {
-  Log(options_.info_log,
-        "Generated table #%llu@%d: %lld keys, %lld bytes",
-        (unsigned long long) output_number,
-        compact->compaction->level(),
-        (unsigned long long) current_entries,
-        (unsigned long long) current_bytes);
+    Log(options_.info_log,
+          "Generated table #%llu@%d: %lld keys, %lld bytes",
+          (unsigned long long) output_number,
+          compact->compaction->level(),
+          (unsigned long long) current_entries,
+          (unsigned long long) current_bytes);
   }
   return s;
 }
@@ -689,13 +665,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       compact->compaction->level() + 1);
 
   assert(versions_->NumLevelFiles(compact->compaction->level()) > 0);
-  assert(compact->builder == NULL);
-  assert(compact->outfile == NULL);
-  if (snapshots_.empty()) {
-    compact->smallest_snapshot = versions_->LastSequence();
-  } else {
-    compact->smallest_snapshot = snapshots_.oldest()->number_;
-  }
+  assert(compact->iofile == NULL);
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
@@ -749,33 +719,41 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
     Slice key = input->key();
     if (compact->compaction->ShouldStopBefore(key) &&
-        compact->builder != NULL) {
-      status = FinishCompactionOutputFile(compact, input);
-      if (!status.ok()) {
-        break;
-      }
+        compact->iofile != NULL) {
+      status = FinishCompactionOutputFile(compact);
     }
     // Open output file if necessary
-    if (compact->builder == NULL) {
+    if (compact->iofile == NULL) {
       status = OpenCompactionOutputFile(compact);
       if (!status.ok()) {
         break;
       }
-    }
-    if (compact->builder->NumEntries() == 0) {
       compact->current_output()->smallest.DecodeFrom(key);
     }
-    compact->current_output()->largest.DecodeFrom(key);
-    compact->builder->Add(key, input->value());
-
-    // Close output file if it is big enough
-    if (compact->builder->FileSize() >=
-        compact->compaction->MaxOutputFileSize()) {
-      status = FinishCompactionOutputFile(compact, input);
+    std::string input_data;
+    input_data.clear();
+    input_data.append(key.data(), key.size()).append("\t");
+    input_data.append(input->value().data(), input->value().size()).append("\t");
+    if (compact->iofile->IsWritable(input_data.size())) {
+      uint64_t offset = compact->iofile->Size() + key.size() + 1;
+      uint64_t number = compact->current_output()->number;
+      uint64_t size = input->value().size();
+      compact->iofile->Append(input_data);
+      global_index_->Update(std::string(key.data(), key.size()), offset, size, number);
+    } else {
+      status = FinishCompactionOutputFile(compact);
       if (!status.ok()) {
         break;
       }
+      status = OpenCompactionOutputFile(compact);
+      if (!status.ok()) {
+        break;
+      }
+      compact->current_output()->smallest.DecodeFrom(key);
+      compact->iofile->Append(input_data);
     }
+    compact->current_entries++;
+    compact->current_output()->largest.DecodeFrom(key);
     prev_key = input->key();
     input->Next();
   }
@@ -783,8 +761,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   if (status.ok() && shutting_down_.Acquire_Load()) {
     status = Status::IOError("Deleting DB during compaction");
   }
-  if (status.ok() && compact->builder != NULL) {
-    status = FinishCompactionOutputFile(compact, input);
+  if (status.ok() && compact->iofile != NULL) {
+    status = FinishCompactionOutputFile(compact);
   }
 
   for (auto iterator : iterators) {
@@ -815,7 +793,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   Log(options_.info_log,
       "compacted to: %s", versions_->LevelSummary(&tmp));
   for (auto number : files_number) {
-    //delete file_map_.at(number);
     file_map_.erase(number);
   }
   return status;
@@ -911,19 +888,28 @@ Status DBImpl::Get(const ReadOptions& options,
     if (mem->Get(lkey, value, &s)) {
       // in memory
     } if (imm != NULL && imm->Get(lkey, value, &s)) {
-      // in compaction 
+      // in memtable compaction
     } else {
-      // in disk
+      // in LSM-tree
       const DataMeta *data_meta = global_index_->Get(key.ToString());
       if (data_meta != nullptr) {
         char *p = new char[data_meta->size];
         Slice result(p, data_meta->size);
         uint64_t file_number = data_meta->file_number;
-        RandomAccessFile *file;
         std::string fname = TableFileName(dbname_, file_number);
-        s = env_->NewRandomAccessFile(fname, &file);
-        file->Read(data_meta->offset, data_meta->size, &result, p);
-        if (!result.empty()) value->assign(result.ToString());
+        RandomAccessFile *file = NULL;
+        if (current_compaction_ != NULL && current_compaction_->iofile != NULL &&
+            fname.compare(current_compaction_->iofile->Filename()) == 0) {
+          // in SSTs compaction stage
+          current_compaction_->iofile->Read(data_meta->offset, data_meta->size, &result, p);
+        } else {
+          s = env_->NewRandomAccessFile(fname, &file);
+          assert(env_->FileExists(fname));
+          if (!s.ok()) return s;
+          file->Read(data_meta->offset, data_meta->size, &result, p);
+          if (!result.empty()) value->assign(result.ToString());
+        }
+
       }
     }
     mutex_.Lock();

@@ -111,7 +111,7 @@ class DBImpl : public DB {
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
-  Status FinishCompactionOutputFile(CompactionState* compact, Iterator* input);
+  Status FinishCompactionOutputFile(CompactionState* compact);
   Status InstallCompactionResults(CompactionState* compact)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -141,6 +141,9 @@ class DBImpl : public DB {
 
   // For indexing
   GlobalIndex* global_index_;
+
+  // Ongoing compaction
+  CompactionState* current_compaction_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;

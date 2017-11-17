@@ -256,6 +256,9 @@ class ReadAppendFile {
   ReadAppendFile() { }
   virtual ~ReadAppendFile();
 
+  virtual Status Finish() = 0;
+  virtual std::string Filename() = 0;
+  virtual uint64_t Size() = 0;
   virtual bool IsWritable(uint64_t size) = 0;
   virtual Status Append(const Slice& data) = 0;
   virtual Status Read(uint64_t offset, size_t n, Slice* result,

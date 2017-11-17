@@ -26,5 +26,6 @@ int main() {
     printf("%s \n", result.data());
   }
   writer.wait();
+  delete file;
   return 0;
 }

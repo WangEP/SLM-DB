@@ -25,6 +25,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <bits/ios_base.h>
 #include <fstream>
+#include <unordered_map>
 #include "leveldb/env.h"
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -309,6 +310,7 @@ class PosixReadAppendFile : public ReadAppendFile {
   uint64_t max_size_;
   void* addr_;
   volatile uint64_t current_;
+  bool is_flushed;
 
  public:
   PosixReadAppendFile(const std::string& fname, uint64_t size)
@@ -329,10 +331,31 @@ class PosixReadAppendFile : public ReadAppendFile {
     addr_ = region_.get_address();
     max_size_ = region_.get_size();
     current_ = 0;
+    is_flushed = false;
   }
 
   ~PosixReadAppendFile() {
-    region_.flush(0, max_size_, true);
+    if (!is_flushed) {
+      region_.shrink_by(current_, true);
+      region_.flush(0, max_size_, true);
+    }
+  }
+
+  virtual Status Finish() {
+    Status s;
+    if (is_flushed) return s.IOError("already flushed", filename_);
+    region_.shrink_by(current_, true);
+    region_.flush(0, current_, true);
+    is_flushed = true;
+    return s;
+  }
+
+  virtual std::string Filename() {
+    return filename_;
+  }
+
+  virtual uint64_t Size() {
+    return current_;
   }
 
   virtual bool IsWritable(uint64_t size) {
@@ -341,6 +364,7 @@ class PosixReadAppendFile : public ReadAppendFile {
 
   virtual Status Append(const Slice& data) {
     Status s;
+    if (is_flushed) return s.IOError("not written", data);
     memcpy((addr_ + current_), data.data(), data.size());
     clflush((char *) (addr_ + current_), data.size());
     current_ += data.size();
@@ -354,7 +378,7 @@ class PosixReadAppendFile : public ReadAppendFile {
       *result = Slice();
       return PosixError(filename_, EINVAL);
     }
-    memcpy(scratch, (addr_ + offset), n);
+    strncpy(scratch, (const char *) (addr_ + offset), n);
     *result = Slice(scratch, n);
     return s;
   }
@@ -421,7 +445,7 @@ class PosixEnv : public Env {
                                      RandomAccessFile** result) {
     Status s;
     try {
-      result = read_file_map.at(fname);
+      *result = read_file_map.at(fname);
       return s;
     } catch (std::exception e) {
       *result = NULL;
@@ -437,7 +461,7 @@ class PosixEnv : public Env {
         void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
         if (base != MAP_FAILED) {
           *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
-          read_file_map.insert(std::make_pair(fname, result));
+          read_file_map.insert(std::make_pair(fname, *result));
         } else {
           s = PosixError(fname, errno);
         }
@@ -448,7 +472,7 @@ class PosixEnv : public Env {
       }
     } else {
       *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
-      read_file_map.insert(std::make_pair(fname, result));
+      read_file_map.insert(std::make_pair(fname, *result));
     }
     return s;
   }
@@ -647,7 +671,7 @@ class PosixEnv : public Env {
   }
 
   // map for opened file descriptors
-  std::map<std::string, RandomAccessFile**> read_file_map;
+  std::unordered_map<std::string, RandomAccessFile*> read_file_map;
 
   pthread_mutex_t mu_;
   pthread_cond_t bgsignal_;
