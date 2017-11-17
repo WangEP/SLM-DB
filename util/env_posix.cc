@@ -216,6 +216,7 @@ class PosixMmapReadableFile: public RandomAccessFile {
       s = PosixError(filename_, EINVAL);
     } else {
       *result = Slice(reinterpret_cast<char*>(mmapped_region_) + offset, n);
+      assert(result->size() > 0);
     }
     return s;
   }
@@ -378,8 +379,8 @@ class PosixReadAppendFile : public ReadAppendFile {
       *result = Slice();
       return PosixError(filename_, EINVAL);
     }
-    strncpy(scratch, (const char *) (addr_ + offset), n);
-    *result = Slice(scratch, n);
+    *result = Slice(reinterpret_cast<char*>(addr_) + offset, n);
+    assert(result->size() > 0);
     return s;
   }
 

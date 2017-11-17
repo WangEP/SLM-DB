@@ -143,7 +143,7 @@ class DBImpl : public DB {
   GlobalIndex* global_index_;
 
   // Ongoing compaction
-  CompactionState* current_compaction_;
+  volatile CompactionState* current_compaction_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;

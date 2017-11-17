@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   struct timespec start, end;
-  int numData = 1000000;
+  int numData = 5000000;
   leveldb::DB* db;
   leveldb::Options options;
   options.global_index = new leveldb::GlobalIndex();
@@ -45,6 +45,10 @@ int main(int argc, char** argv) {
     key << "key0key" << i;
     std::string value;
     status = db->Get(leveldb::ReadOptions(), key.str(), &value);
+    if (!status.ok()) {
+      printf("%s\n", status.ToString().data());
+      return 1;
+    }
     if (v.compare(value) != 0) {
       printf("%s %s %s\n", key.str().data(), v.data(), value.data());
     }

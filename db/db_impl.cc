@@ -739,7 +739,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       uint64_t number = compact->current_output()->number;
       uint64_t size = input->value().size();
       compact->iofile->Append(input_data);
-      global_index_->Update(std::string(key.data(), key.size()), offset, size, number);
+      global_index_->Update(key.ToString(), offset, size, number);
     } else {
       status = FinishCompactionOutputFile(compact);
       if (!status.ok()) {
@@ -750,7 +750,11 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         break;
       }
       compact->current_output()->smallest.DecodeFrom(key);
+      uint64_t offset = compact->iofile->Size() + key.size() + 1;
+      uint64_t number = compact->current_output()->number;
+      uint64_t size = input->value().size();
       compact->iofile->Append(input_data);
+      global_index_->Update(key.ToString(), offset, size, number);
     }
     compact->current_entries++;
     compact->current_output()->largest.DecodeFrom(key);
@@ -909,7 +913,7 @@ Status DBImpl::Get(const ReadOptions& options,
           file->Read(data_meta->offset, data_meta->size, &result, p);
           if (!result.empty()) value->assign(result.ToString());
         }
-
+        assert(result.size() > 0);
       }
     }
     mutex_.Lock();
