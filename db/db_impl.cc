@@ -537,7 +537,6 @@ void DBImpl::BackgroundCompaction() {
         versions_->LevelSummary(&tmp));
   } else {
     CompactionState* compact = new CompactionState(c);
-    current_compaction_ = compact;
     status = DoCompactionWork(compact);
     if (!status.ok()) {
       RecordBackgroundError(status);
@@ -601,6 +600,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   // Make the output file
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewReadAppendFile(fname, options_.max_file_size, &compact->iofile);
+  curr_compaction_file_ = compact->iofile;
   compact->current_entries = 0;
   return s;
 }
@@ -610,6 +610,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   assert(compact->iofile != NULL);
   const uint64_t output_number = compact->current_output()->number;
   assert(output_number != 0);
+  curr_compaction_file_ = NULL;
 
   Status s;
   const uint64_t current_entries = compact->current_entries;
@@ -620,7 +621,6 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   compact->total_bytes += current_bytes;
   delete compact->iofile;
   compact->iofile = NULL;
-  current_compaction_ = NULL;
   if (s.ok() && current_entries > 0) {
     Log(options_.info_log,
           "Generated table #%llu@%d: %lld keys, %lld bytes",
@@ -901,12 +901,12 @@ Status DBImpl::Get(const ReadOptions& options,
         Slice result(p, data_meta->size);
         uint64_t file_number = data_meta->file_number;
         std::string fname = TableFileName(dbname_, file_number);
-        RandomAccessFile *file = NULL;
-        if (current_compaction_ != NULL && current_compaction_->iofile != NULL &&
-            fname.compare(current_compaction_->iofile->Filename()) == 0) {
+        if (curr_compaction_file_ != NULL &&
+            fname.compare(curr_compaction_file_->Filename()) == 0) {
           // in SSTs compaction stage
-          current_compaction_->iofile->Read(data_meta->offset, data_meta->size, &result, p);
+          curr_compaction_file_->Read(data_meta->offset, data_meta->size, &result, p);
         } else {
+          RandomAccessFile *file = NULL;
           s = env_->NewRandomAccessFile(fname, &file);
           assert(env_->FileExists(fname));
           if (!s.ok()) return s;
