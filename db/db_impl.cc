@@ -911,9 +911,8 @@ Status DBImpl::Get(const ReadOptions& options,
           assert(env_->FileExists(fname));
           if (!s.ok()) return s;
           file->Read(data_meta->offset, data_meta->size, &result, p);
-          if (!result.empty()) value->assign(result.ToString());
         }
-        assert(result.size() > 0);
+        if (!result.empty()) value->assign(result.data(), result.size());
       }
     }
     mutex_.Lock();

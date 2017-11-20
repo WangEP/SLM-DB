@@ -379,8 +379,8 @@ class PosixReadAppendFile : public ReadAppendFile {
       *result = Slice();
       return PosixError(filename_, EINVAL);
     }
-    *result = Slice(reinterpret_cast<char*>(addr_) + offset, n);
-    assert(result->size() > 0);
+    memcpy(scratch, addr_ + offset, n);
+    *result = Slice(scratch, n);
     return s;
   }
 
