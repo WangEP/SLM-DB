@@ -48,21 +48,7 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->num_entries++;
   r->data_block.Add(pref_key, value);
   uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  if (index->Get(pref_key.ToString()) == NULL) {
-    index->Add(pref_key.ToString(), offset, value.size(), r->file_number);
-  } else {
-    index->Update(pref_key.ToString(), offset, value.size(), r->file_number);
-  }
-  /*
-  auto runner = std::async([index](std::string key, uint64_t offset, uint64_t size, uint64_t file_number) {
-    if (index->Get(key) == NULL) {
-      index->Add(key, offset, size, file_number);
-    } else {
-      index->Update(key, offset, size, file_number);
-    }
-  }, pref_key.ToString(), offset, value.size(), r->file_number);
-  handler.push(runner.share());
-   */
+  index->Add(pref_key.ToString(), offset, value.size(), r->file_number);
 }
 
 void RawTableBuilder::Flush() {

@@ -19,11 +19,13 @@ class GlobalIndex {
  public:
   GlobalIndex();
 
-  const DataMeta* Get(const std::string&);
+  const DataMeta* Get(const Slice& key);
 
-  void Add(const std::string&, const uint64_t&, const uint64_t&, const uint64_t&);
+  void Add(const Slice& key, const uint64_t& offset,
+           const uint64_t& size, const uint64_t& file_number);
 
-  void Update(const std::string&, const uint64_t&, const uint64_t&, const uint64_t&);
+  void Update(const Slice& key , const uint64_t& offset,
+              const uint64_t& size, const uint64_t& file_number);
 
   void Delete(const std::string&);
 

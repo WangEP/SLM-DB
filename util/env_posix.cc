@@ -26,6 +26,9 @@
 #include <bits/ios_base.h>
 #include <fstream>
 #include <unordered_map>
+#include <thread_pool.hpp>
+#include <future>
+#include <functional>
 #include "leveldb/env.h"
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -656,6 +659,8 @@ class PosixEnv : public Env {
     usleep(micros);
   }
 
+  virtual std::future<void> AddTask(std::function<void()> func);
+
  private:
   void PthreadCall(const char* label, int result) {
     if (result != 0) {
@@ -673,6 +678,8 @@ class PosixEnv : public Env {
 
   // map for opened file descriptors
   std::unordered_map<std::string, RandomAccessFile*> read_file_map;
+
+  tp::ThreadPool worker_pool;
 
   pthread_mutex_t mu_;
   pthread_cond_t bgsignal_;
@@ -751,6 +758,8 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
 }
 
 void PosixEnv::BGThread() {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
   while (true) {
     // Wait until there is an item that is ready to run
     PthreadCall("lock", pthread_mutex_lock(&mu_));
@@ -765,6 +774,7 @@ void PosixEnv::BGThread() {
     PthreadCall("unlock", pthread_mutex_unlock(&mu_));
     (*function)(arg);
   }
+#pragma clang diagnostic pop
 }
 
 namespace {
@@ -787,6 +797,16 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
   state->arg = arg;
   PthreadCall("start thread",
               pthread_create(&t, NULL,  &StartThreadWrapper, state));
+}
+
+std::future<void> PosixEnv::AddTask(std::function<void()> func) {
+  std::packaged_task<void()> t(func);
+  if (t.valid()) {
+    auto future  = t.get_future();
+    worker_pool.post(t);
+    return future;
+  }
+  return std::future<void>();
 }
 
 }  // namespace

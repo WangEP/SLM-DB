@@ -658,7 +658,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
 
-  Log(options_.info_log,  "Compacting %d@%d + %d@%d files",
+  Log(options_.info_log, "Compacting %d@%d + %d@%d files",
       compact->compaction->num_input_files(0),
       compact->compaction->level(),
       compact->compaction->num_input_files(1),
@@ -671,7 +671,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   mutex_.Unlock();
   // get files for compaction
 
-  std::vector<SequentialFile*> files;
+  std::vector<SequentialFile *> files;
   std::vector<uint64_t> files_number;
   for (int which = 0; which < 2; which++) {
     for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
@@ -685,9 +685,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
     }
   }
-  std::vector<RawBlockIterator*> iterators;
+  std::vector<RawBlockIterator *> iterators;
   for (auto file : files) {
-    RawBlockIterator* iter = new RawBlockIterator(file);
+    RawBlockIterator *iter = new RawBlockIterator(options_.max_file_size, file);
     iterators.push_back(iter);
   }
   Status status;
@@ -739,7 +739,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       uint64_t number = compact->current_output()->number;
       uint64_t size = input->value().size();
       compact->iofile->Append(input_data);
-      global_index_->Update(key.ToString(), offset, size, number);
+      global_index_->Update(key, offset, size, number);
     } else {
       status = FinishCompactionOutputFile(compact);
       if (!status.ok()) {
@@ -754,7 +754,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       uint64_t number = compact->current_output()->number;
       uint64_t size = input->value().size();
       compact->iofile->Append(input_data);
-      global_index_->Update(key.ToString(), offset, size, number);
+      global_index_->Update(key, offset, size, number);
     }
     compact->current_entries++;
     compact->current_output()->largest.DecodeFrom(key);
@@ -895,24 +895,25 @@ Status DBImpl::Get(const ReadOptions& options,
       // in memtable compaction
     } else {
       // in LSM-tree
-      const DataMeta *data_meta = global_index_->Get(key.ToString());
+      const DataMeta *data_meta = global_index_->Get(key);
       if (data_meta != nullptr) {
         char *p = new char[data_meta->size];
         Slice result(p, data_meta->size);
         uint64_t file_number = data_meta->file_number;
         std::string fname = TableFileName(dbname_, file_number);
+        RandomAccessFile *file = NULL;
         if (curr_compaction_file_ != NULL &&
             fname.compare(curr_compaction_file_->Filename()) == 0) {
           // in SSTs compaction stage
           curr_compaction_file_->Read(data_meta->offset, data_meta->size, &result, p);
+          if (!result.empty()) value->assign(result.data(), result.size());
         } else {
-          RandomAccessFile *file = NULL;
-          s = env_->NewRandomAccessFile(fname, &file);
           assert(env_->FileExists(fname));
+          s = env_->NewRandomAccessFile(fname, &file);
           if (!s.ok()) return s;
           file->Read(data_meta->offset, data_meta->size, &result, p);
         }
-        if (!result.empty()) value->assign(result.data(), result.size());
+        if (!result.empty()) value->assign(result.ToString());
       }
     }
     mutex_.Lock();

@@ -3,14 +3,9 @@
 
 namespace leveldb {
 
-RawBlockIterator::RawBlockIterator(SequentialFile* file) : stream_(new Streamer(file)) {
+RawBlockIterator::RawBlockIterator(uint64_t buffer_size, SequentialFile* file) {
+  stream_ = new Streamer(buffer_size, file);
   count = 0;
-  auto handle = std::async(std::launch::async, [this]() {
-    Init();
-  });
-}
-
-void RawBlockIterator::Init() {
   while (!stream_->eof()) {
     Slice key;
     stream_->Get(&key);
@@ -18,37 +13,46 @@ void RawBlockIterator::Init() {
     stream_->Get(&value);
     vector_.push_back({key, value});
   }
+  iterator_ = vector_.begin();
+}
+
+void RawBlockIterator::Init() {
+
 }
 
 bool RawBlockIterator::Valid() const {
-  return count < vector_.size();
+  return iterator_ != vector_.end();
 }
 
 void RawBlockIterator::SeekToFirst() {
+  iterator_ = vector_.begin();
   count = 0;
 }
 
 void RawBlockIterator::SeekToLast() {
-  count = vector_.size() - 1;
+  iterator_ = vector_.end();
+  count = vector_.size();
 }
 
 void RawBlockIterator::Seek(const Slice &target) {
 }
 
 void RawBlockIterator::Next() {
+  iterator_++;
   count++;
 }
 
 void RawBlockIterator::Prev() {
-  count--;
+  iterator_--;
+  count++;
 }
 
 Slice RawBlockIterator::key() const {
-  return vector_[count].first;
+  return iterator_->first;
 }
 
 Slice RawBlockIterator::value() const {
-  return vector_[count].second;
+  return iterator_->second;
 }
 
 Status RawBlockIterator::status() const {

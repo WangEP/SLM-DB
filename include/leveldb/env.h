@@ -17,6 +17,7 @@
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
+#include <future>
 #include "leveldb/status.h"
 
 namespace leveldb {
@@ -150,6 +151,8 @@ class Env {
   virtual void Schedule(
       void (*function)(void* arg),
       void* arg) = 0;
+
+  virtual std::future<void> AddTask(std::function<void()> func) = 0;
 
   // Start a new thread, invoking "function(arg)" within the new thread.
   // When "function(arg)" returns, the thread will be destroyed.
