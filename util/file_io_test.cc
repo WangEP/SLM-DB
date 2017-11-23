@@ -9,9 +9,11 @@ int main() {
   leveldb::ReadAppendFile* file;
   uint64_t file_size = 2 << 20; // 2Mb
   leveldb::Status s = env->NewReadAppendFile("/home/olzhas/Projects/test.ldb", file_size, &file);
-  auto writer = std::async(std::launch::async, [](leveldb::ReadAppendFile* f){
-    for (auto i = 0; i < 20; i++) {
+  std::vector<uint64_t> offsets;
+  auto writer = std::async(std::launch::async, [&offsets](leveldb::ReadAppendFile* f){
+    for (auto i = 0; i < 300; i++) {
       std::string s = "valuevalue";
+      offsets.push_back(f->Size());
       s.append(std::to_string(i));
       if (f->IsWritable(s.size()))
         f->Append(leveldb::Slice(s));
@@ -19,11 +21,11 @@ int main() {
   }, file);
 
   writer.wait_for(std::chrono::milliseconds(10));
-  for (auto i = 0; i < 3; i++) {
+  for (auto i = 0; i < 300; i++){
     char *scratch = new char[10];
     leveldb::Slice result;
-    file->Read(i*11, 11, &result, scratch);
-    printf("%s \n", result.data());
+    file->Read(offsets[i], 10, &result, scratch);
+    printf("%d %s \n", i, result.data());
   }
   writer.wait();
   delete file;
