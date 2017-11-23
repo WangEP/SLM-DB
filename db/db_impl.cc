@@ -730,15 +730,14 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
       compact->current_output()->smallest.DecodeFrom(key);
     }
-    std::string input_data;
-    input_data.clear();
-    input_data.append(key.data(), key.size()).append("\t");
-    input_data.append(input->value().data(), input->value().size()).append("\t");
-    if (compact->iofile->IsWritable(input_data.size())) {
-      uint64_t offset = compact->iofile->Size() + key.size() + 1;
+    if (compact->iofile->IsWritable(key.size() + input->value().size() + 2)) {
+      compact->iofile->Append(key);
+      compact->iofile->Append("\t");
+      uint64_t offset = compact->iofile->Size();
       uint64_t number = compact->current_output()->number;
       uint64_t size = input->value().size();
-      compact->iofile->Append(input_data);
+      compact->iofile->Append(input->value());
+      compact->iofile->Append("\t");
       global_index_->Update(key, offset, size, number);
     } else {
       status = FinishCompactionOutputFile(compact);
@@ -750,10 +749,13 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         break;
       }
       compact->current_output()->smallest.DecodeFrom(key);
-      uint64_t offset = compact->iofile->Size() + key.size() + 1;
+      compact->iofile->Append(key);
+      compact->iofile->Append("\t");
+      uint64_t offset = compact->iofile->Size();
       uint64_t number = compact->current_output()->number;
       uint64_t size = input->value().size();
-      compact->iofile->Append(input_data);
+      compact->iofile->Append(input->value());
+      compact->iofile->Append("\t");
       global_index_->Update(key, offset, size, number);
     }
     compact->current_entries++;
@@ -914,6 +916,14 @@ Status DBImpl::Get(const ReadOptions& options,
           file->Read(data_meta->offset, data_meta->size, &result, p);
         }
         if (!result.empty()) value->assign(result.ToString());
+        {
+          std::string v = "valuevalue";
+          v.append(key.ToString());
+          if (v.compare(*value) != 0) {
+            printf("degug\n");
+          }
+        }
+
       }
     }
     mutex_.Lock();
