@@ -686,10 +686,17 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
   }
   std::vector<RawBlockIterator *> iterators;
-  for (auto file : files) {
-    RawBlockIterator *iter = new RawBlockIterator(options_.max_file_size, file);
+  /*
+  std::function<void()> func = [&iterators](auto file_size, auto file) {
+    RawBlockIterator *iter = new RawBlockIterator(file_size, file);
+    static std::mutex mutex;
+    mutex.lock();
     iterators.push_back(iter);
+    mutex.unlock();
+  };
+  for (auto file : files) {
   }
+   */
   Status status;
   Iterator *input = nullptr;
   Slice prev_key;
@@ -908,11 +915,10 @@ Status DBImpl::Get(const ReadOptions& options,
             fname.compare(curr_compaction_file_->Filename()) == 0) {
           // in SSTs compaction stage
           curr_compaction_file_->Read(data_meta->offset, data_meta->size, &result, p);
-          if (!result.empty()) value->assign(result.data(), result.size());
+          if (!s.ok()) return s;
         } else {
           assert(env_->FileExists(fname));
           s = env_->NewRandomAccessFile(fname, &file);
-          if (!s.ok()) return s;
           file->Read(data_meta->offset, data_meta->size, &result, p);
         }
         if (!result.empty()) value->assign(result.ToString());

@@ -33,7 +33,7 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++11
+            -std=c++14
     )
 endif()
 
@@ -144,7 +144,11 @@ set(LEVEL_DB_FILES
         port/atomic_pointer.h
         table/raw_block_iter.cc
         table/raw_block_iter.h
-        util/streamer.h)
+        util/streamer.h
+        util/thread_pool.cc
+        util/thread_pool.hh
+        util/task.cc
+        util/task.hh)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

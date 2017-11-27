@@ -26,7 +26,6 @@
 #include <bits/ios_base.h>
 #include <fstream>
 #include <unordered_map>
-#include <thread_pool.hpp>
 #include <future>
 #include <functional>
 #include "leveldb/env.h"
@@ -37,6 +36,7 @@
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
 #include "persist.h"
+#include "thread_pool.hh"
 
 namespace bip = boost::interprocess;
 
@@ -659,7 +659,7 @@ class PosixEnv : public Env {
     usleep(micros);
   }
 
-  virtual std::future<void> AddTask(std::function<void()> func);
+  virtual void AddTask(Task* task);
 
  private:
   void PthreadCall(const char* label, int result) {
@@ -679,7 +679,7 @@ class PosixEnv : public Env {
   // map for opened file descriptors
   std::unordered_map<std::string, RandomAccessFile*> read_file_map;
 
-  tp::ThreadPool worker_pool;
+  ThreadPool worker_pool;
 
   pthread_mutex_t mu_;
   pthread_cond_t bgsignal_;
@@ -799,14 +799,8 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
               pthread_create(&t, NULL,  &StartThreadWrapper, state));
 }
 
-std::future<void> PosixEnv::AddTask(std::function<void()> func) {
-  std::packaged_task<void()> t(func);
-  if (t.valid()) {
-    auto future  = t.get_future();
-    worker_pool.post(t);
-    return future;
-  }
-  return std::future<void>();
+void PosixEnv::AddTask(Task* task) {
+  worker_pool.AddTask(task);
 }
 
 }  // namespace
