@@ -11,13 +11,6 @@
 namespace leveldb {
 namespace port {
 
-static void PthreadCall(const char* label, int result) {
-  if (result != 0) {
-    fprintf(stderr, "pthread %s: %s\n", label, strerror(result));
-    abort();
-  }
-}
-
 Mutex::Mutex() { PthreadCall("init mutex", pthread_mutex_init(&mu_, NULL)); }
 
 Mutex::~Mutex() { PthreadCall("destroy mutex", pthread_mutex_destroy(&mu_)); }

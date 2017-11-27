@@ -44,6 +44,7 @@
 #endif
 #include <stdint.h>
 #include <string>
+#include <cstring>
 #include "port/atomic_pointer.h"
 
 #ifndef PLATFORM_IS_LITTLE_ENDIAN
@@ -76,6 +77,13 @@ namespace port {
 
 static const bool kLittleEndian = PLATFORM_IS_LITTLE_ENDIAN;
 #undef PLATFORM_IS_LITTLE_ENDIAN
+
+static void PthreadCall(const char* label, int result) {
+  if (result != 0) {
+    fprintf(stderr, "pthread %s: %s\n", label, strerror(result));
+    abort();
+  }
+}
 
 class CondVar;
 
