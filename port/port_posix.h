@@ -45,6 +45,10 @@
 #include <stdint.h>
 #include <string>
 #include <cstring>
+#include <stdexcept>
+#include <future>
+#include <functional>
+#include <util/thread_pool.h>
 #include "port/atomic_pointer.h"
 
 #ifndef PLATFORM_IS_LITTLE_ENDIAN
@@ -84,6 +88,20 @@ static void PthreadCall(const char* label, int result) {
     abort();
   }
 }
+
+extern ThreadPool* thread_pool;
+
+static void InitThreadPool(int num = 0) {
+  size_t thread_num = num == 0 ? std::thread::hardware_concurrency() : num;
+  thread_pool = new ThreadPool(thread_num);
+}
+
+template<class F, class... Args>
+auto AddTask(F&& f, Args&&... args)
+-> std::future<typename std::result_of<F(Args...)>::type> {
+  return thread_pool->enqueue(f, args...);
+}
+
 
 class CondVar;
 

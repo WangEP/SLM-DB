@@ -8,6 +8,7 @@
 #include <deque>
 #include <set>
 #include <map>
+#include <table/raw_block_iter.h>
 #include "db/dbformat.h"
 #include "db/snapshot.h"
 #include "leveldb/db.h"
@@ -109,6 +110,7 @@ class DBImpl : public DB {
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status DoCompactionWork(CompactionState* compact)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void InitIterator(void* arg);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
   Status FinishCompactionOutputFile(CompactionState* compact);

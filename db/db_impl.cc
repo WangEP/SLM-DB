@@ -52,10 +52,10 @@ struct DBImpl::CompactionState {
     InternalKey smallest, largest;
   };
   std::vector<Output> outputs;
+  std::vector<SequentialFile*> input_files;
+  std::vector<RawBlockIterator*> input_iters;
 
   // State kept for output being generated
-  WritableFile* outfile;
-  RawTableBuilder* builder;
   ReadAppendFile* iofile;
   uint64_t current_entries;
 
@@ -65,8 +65,6 @@ struct DBImpl::CompactionState {
 
   explicit CompactionState(Compaction* c)
       : compaction(c),
-        outfile(NULL),
-        builder(NULL),
         iofile(NULL),
         total_bytes(0) {
   }
@@ -671,7 +669,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   mutex_.Unlock();
   // get files for compaction
 
-  std::vector<SequentialFile *> files;
   std::vector<uint64_t> files_number;
   for (int which = 0; which < 2; which++) {
     for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
@@ -680,29 +677,31 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       SequentialFile *new_file;
       Status s = env_->NewSequentialFile(name, &new_file);
       if (s.ok()) {
-        files.push_back(new_file);
+        compact->input_files.push_back(new_file);
         files_number.push_back(file_number);
       }
     }
   }
-  std::vector<RawBlockIterator *> iterators;
-  /*
-  std::function<void()> func = [&iterators](auto file_size, auto file) {
-    RawBlockIterator *iter = new RawBlockIterator(file_size, file);
-    static std::mutex mutex;
-    mutex.lock();
-    iterators.push_back(iter);
-    mutex.unlock();
-  };
-  for (auto file : files) {
+  std::vector<std::shared_future<void>> futures;
+  for (auto file : compact->input_files) {
+    auto future = port::AddTask([this, file, compact]() {
+      RawBlockIterator *iter = new RawBlockIterator(options_.max_file_size, file);
+      static std::mutex mutex;
+      mutex.lock();
+      compact->input_iters.push_back(iter);
+      mutex.unlock();
+    });
+    futures.push_back(future.share());
   }
-   */
+  for (auto future : futures) {
+    future.wait();
+  }
   Status status;
   Iterator *input = nullptr;
   Slice prev_key;
   while (true) {
     input = nullptr;
-    for (auto iterator : iterators) {
+    for (auto iterator : compact->input_iters) {
       if (iterator->Valid() && (input == nullptr ||
           internal_comparator_.Compare(input->key(), iterator->key()) > 0)){
         if (!prev_key.empty() &&
@@ -778,7 +777,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     status = FinishCompactionOutputFile(compact);
   }
 
-  for (auto iterator : iterators) {
+  for (auto iterator : compact->input_iters) {
     delete iterator;
   }
 

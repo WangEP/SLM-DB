@@ -36,7 +36,7 @@
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
 #include "persist.h"
-#include "thread_pool.hh"
+#include "thread_pool.h"
 
 namespace bip = boost::interprocess;
 
@@ -659,8 +659,6 @@ class PosixEnv : public Env {
     usleep(micros);
   }
 
-  virtual void AddTask(Task* task);
-
  private:
   void PthreadCall(const char* label, int result) {
     if (result != 0) {
@@ -679,7 +677,6 @@ class PosixEnv : public Env {
   // map for opened file descriptors
   std::unordered_map<std::string, RandomAccessFile*> read_file_map;
 
-  ThreadPool worker_pool;
 
   pthread_mutex_t mu_;
   pthread_cond_t bgsignal_;
@@ -799,15 +796,13 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
               pthread_create(&t, NULL,  &StartThreadWrapper, state));
 }
 
-void PosixEnv::AddTask(Task* task) {
-  worker_pool.AddTask(task);
-}
-
 }  // namespace
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
-static Env* default_env;
-static void InitDefaultEnv() { default_env = new PosixEnv; }
+static PosixEnv* default_env;
+static void InitDefaultEnv() {
+  default_env = new PosixEnv;
+}
 
 void EnvPosixTestHelper::SetReadOnlyFDLimit(int limit) {
   assert(default_env == NULL);
@@ -821,6 +816,7 @@ void EnvPosixTestHelper::SetReadOnlyMMapLimit(int limit) {
 
 Env* Env::Default() {
   pthread_once(&once, InitDefaultEnv);
+  port::InitThreadPool();
   return default_env;
 }
 

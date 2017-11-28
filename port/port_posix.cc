@@ -11,6 +11,8 @@
 namespace leveldb {
 namespace port {
 
+ThreadPool* thread_pool;
+
 Mutex::Mutex() { PthreadCall("init mutex", pthread_mutex_init(&mu_, NULL)); }
 
 Mutex::~Mutex() { PthreadCall("destroy mutex", pthread_mutex_destroy(&mu_)); }
