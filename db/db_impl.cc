@@ -1130,7 +1130,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Attempt to switch to a new memtable and trigger compaction of old
       imm_ = mem_;
       has_imm_.Release_Store(imm_);
-      mem_ = new MemTable(internal_comparator_, global_index_);
+      mem_ = new MemTable(internal_comparator_);
       mem_->Ref();
       force = false;   // Do not force another compaction if have room
       MaybeScheduleCompaction();
@@ -1267,7 +1267,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
     s = options.env->NewWritableFile(LogFileName(dbname, new_log_number),
                                      &lfile);
     if (s.ok()) {
-      impl->mem_ = new MemTable(impl->internal_comparator_, impl->global_index_);
+      impl->mem_ = new MemTable(impl->internal_comparator_);
       impl->mem_->Ref();
     }
   }

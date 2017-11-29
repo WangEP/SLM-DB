@@ -16,9 +16,8 @@ static Slice GetLengthPrefixedSlice(const char* data) {
   return Slice(p, len);
 }
 
-MemTable::MemTable(const InternalKeyComparator& cmp, GlobalIndex* index)
+MemTable::MemTable(const InternalKeyComparator& cmp)
     : comparator_(cmp),
-      index_(index),
       refs_(0),
       table_(comparator_, &arena_) {
 }

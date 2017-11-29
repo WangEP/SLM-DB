@@ -14,12 +14,17 @@ class Streamer {
  public:
   Streamer(uint64_t buffer_size, SequentialFile* file)
       :  file_(file) {
-    current_ = 0;
-    BUFFER_SIZE = buffer_size;
-    char* scratch = new char[BUFFER_SIZE];
     Status s;
-    buffer_ = new Slice();
-    s = file_->Read(BUFFER_SIZE, buffer_, scratch);
+    current_ = 0;
+    char p[32];
+    Slice* prefix = new Slice();
+    s = file->Read(64, prefix, p);
+    uint64_t hash = std::stoul(prefix->ToString());
+    if (BUFFER_SIZE > 0) {
+      char *scratch = new char[BUFFER_SIZE];
+      buffer_ = new Slice();
+      s = file_->Read(BUFFER_SIZE, buffer_, scratch);
+    }
   }
 
   ~Streamer() {
@@ -40,7 +45,7 @@ class Streamer {
       current_++;
     }
     current_++;
-    if (buffer_->data()[current_] == '\000') {
+    if (current_ >= buffer_->size() || buffer_->data()[current_] == '\000') {
       delete buffer_;
       buffer_ = NULL;
     }

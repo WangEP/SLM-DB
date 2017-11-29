@@ -23,7 +23,7 @@ class MemTable {
  public:
   // MemTables are reference counted.  The initial reference count
   // is zero and the caller must call Ref() at least once.
-  explicit MemTable(const InternalKeyComparator& comparator, GlobalIndex* index);
+  explicit MemTable(const InternalKeyComparator& comparator);
 
   // Increase reference count.
   void Ref() { ++refs_; }
@@ -79,7 +79,6 @@ class MemTable {
   int refs_;
   Arena arena_;
   Table table_;
-  GlobalIndex* index_;
 
   // No copying allowed
   MemTable(const MemTable&);

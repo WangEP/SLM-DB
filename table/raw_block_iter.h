@@ -14,8 +14,6 @@ class RawBlockIterator : public Iterator {
 
   ~RawBlockIterator() { delete stream_; }
 
-  void Init();
-
   bool Valid() const;
 
   void SeekToFirst();

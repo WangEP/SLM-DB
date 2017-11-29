@@ -311,9 +311,9 @@ class PosixReadAppendFile : public ReadAppendFile {
   bip::mapped_region region_;
   bip::file_mapping file_;
   std::string filename_;
-  uint64_t max_size_;
   void* addr_;
-  volatile uint64_t current_;
+  uint32_t max_size_;
+  volatile uint32_t current_;
   bool is_flushed;
 
  public:
@@ -334,21 +334,22 @@ class PosixReadAppendFile : public ReadAppendFile {
     region_.swap(region);
     addr_ = region_.get_address();
     max_size_ = region_.get_size();
-    current_ = 0;
+    current_ = 32;
     is_flushed = false;
   }
 
   ~PosixReadAppendFile() {
     if (!is_flushed) {
-      region_.shrink_by(current_, true);
-      region_.flush(0, max_size_, true);
+      Finish();
     }
   }
 
   virtual Status Finish() {
     Status s;
-    if (is_flushed) return s.IOError("already flushed", filename_);
-    region_.shrink_by(current_, true);
+    if (is_flushed) return s.IOError("already flushed", filename_);;
+    std::string prefix = std::to_string(current_-32);
+    memset(addr_, '0', 32);
+    memcpy(addr_ + 32 - prefix.size(), prefix.data(), prefix.size());
     region_.flush(0, current_, true);
     is_flushed = true;
     return s;

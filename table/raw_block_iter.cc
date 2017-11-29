@@ -16,10 +16,6 @@ RawBlockIterator::RawBlockIterator(uint64_t buffer_size, SequentialFile* file) {
   iterator_ = vector_.begin();
 }
 
-void RawBlockIterator::Init() {
-
-}
-
 bool RawBlockIterator::Valid() const {
   return iterator_ != vector_.end();
 }

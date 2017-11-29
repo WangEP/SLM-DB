@@ -6,7 +6,7 @@
 
 namespace leveldb {
 
-struct IndexFileMeta;
+// Saves int32 at the beginning, which is remaining size to read
 
 class RawTableBuilder {
  public:

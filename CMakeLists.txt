@@ -140,6 +140,8 @@ set(LEVEL_DB_FILES
         util/random.h
         util/status.cc
         util/persist.h
+        util/testharness.h
+        util/testharness.cc
         port/port.h
         port/atomic_pointer.h
         table/raw_block_iter.cc
@@ -187,3 +189,6 @@ target_link_libraries(leveldbmain PUBLIC leveldb)
 
 add_executable(file_io_test util/file_io_test.cc)
 target_link_libraries(file_io_test PUBLIC leveldb)
+
+add_executable(raw_table_test table/raw_table_test.cc)
+target_link_libraries(raw_table_test PUBLIC leveldb)

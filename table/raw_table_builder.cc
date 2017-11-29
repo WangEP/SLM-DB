@@ -47,7 +47,7 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->last_key.assign(pref_key.data(), pref_key.size());
   r->num_entries++;
   r->data_block.Add(pref_key, value);
-  uint64_t offset = r->data_block.GetBufferSize() - value.size() - 1;
+  uint64_t offset = 32 + r->data_block.GetBufferSize() - value.size() - 1;
   index->Add(pref_key.ToString(), offset, value.size(), r->file_number);
 }
 
