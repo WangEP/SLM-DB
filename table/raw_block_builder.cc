@@ -25,11 +25,6 @@ void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
 }
 
 Slice RawBlockBuilder::Finish() {
-  std::string size = std::to_string(buffer_.size());
-  char prefix[32];
-  memset(prefix, '0', 32-size.size());
-  memcpy(prefix+32-size.size(), size.data(), size.size());
-  buffer_.insert(0, prefix, 32);
   return Slice(buffer_);
 }
 
