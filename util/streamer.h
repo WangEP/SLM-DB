@@ -12,14 +12,14 @@ namespace leveldb {
 class Streamer {
   // have to do this prettier
  public:
-  Streamer(uint64_t buffer_size, SequentialFile* file)
+  Streamer(SequentialFile* file)
       :  file_(file) {
     Status s;
     current_ = 0;
     char p[32];
     Slice* prefix = new Slice();
-    s = file->Read(64, prefix, p);
-    uint64_t hash = std::stoul(prefix->ToString());
+    s = file->Read(32, prefix, p);
+    BUFFER_SIZE = std::stoul(prefix->ToString());
     if (BUFFER_SIZE > 0) {
       char *scratch = new char[BUFFER_SIZE];
       buffer_ = new Slice();
@@ -45,14 +45,9 @@ class Streamer {
       current_++;
     }
     current_++;
-    if (current_ >= buffer_->size() || buffer_->data()[current_] == '\000') {
-      delete buffer_;
-      buffer_ = NULL;
-    }
     char *p = new char[ss.size()];
     memcpy(p, ss.data(), ss.size());
     *result = Slice(p, ss.size());
-    assert(*(result->data()) != '\000');
   }
 
   Status status()const {

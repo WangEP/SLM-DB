@@ -3,8 +3,8 @@
 
 namespace leveldb {
 
-RawBlockIterator::RawBlockIterator(uint64_t buffer_size, SequentialFile* file) {
-  stream_ = new Streamer(buffer_size, file);
+RawBlockIterator::RawBlockIterator(SequentialFile* file) {
+  stream_ = new Streamer(file);
   count = 0;
   while (!stream_->eof()) {
     Slice key;

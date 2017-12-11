@@ -10,7 +10,7 @@ namespace leveldb {
 
 class RawBlockIterator : public Iterator {
  public:
-  RawBlockIterator(uint64_t buffer_size, SequentialFile* file);
+  RawBlockIterator(SequentialFile* file);
 
   ~RawBlockIterator() { delete stream_; }
 
