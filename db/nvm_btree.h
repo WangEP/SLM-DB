@@ -54,10 +54,10 @@ class Node {
       int32_t zero = 0;
       return CAS(&loc, &zero, 1);
     }
-    bool unlock() {
-      int32_t one = 1;
-      return CAS(&loc, &one, 0);
-    }
+  bool unlock() {
+    int32_t one = 1;
+    return CAS(&loc, &one, 0);
+  }
 #endif
 
  private:
