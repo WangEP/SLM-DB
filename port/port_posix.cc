@@ -4,14 +4,8 @@
 
 #include "port/port_posix.h"
 
-#include <cstdlib>
-#include <stdio.h>
-#include <string.h>
-
 namespace leveldb {
 namespace port {
-
-ThreadPool* thread_pool;
 
 Mutex::Mutex() { PthreadCall("init mutex", pthread_mutex_init(&mu_, NULL)); }
 

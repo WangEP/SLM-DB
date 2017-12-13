@@ -48,21 +48,7 @@ void RawTableBuilder::Add(const Slice &key, const Slice &value) {
   r->num_entries++;
   r->data_block.Add(pref_key, value);
   uint64_t offset = 32 + r->data_block.GetBufferSize() - value.size() - 1;
-  /*
-  static std::queue<std::shared_future<void>> queue;
-  if (!queue.empty()) {
-    queue.front().wait();
-    queue.pop();
-  }
-  auto future = port::AddTask([index](const Slice& key,
-                                      const uint64_t offset,
-                                      const uint64_t size,
-                                      const uint64_t number){
-    index->Add(key, offset, size, number);
-  }, pref_key, offset, value.size(), r->file_number);
-  queue.push(future.share());
-   */
-  index->Add(key, offset, value.size(), r->file_number);
+  index->Insert(key, offset, value.size(), r->file_number);
 }
 
 void RawTableBuilder::Flush() {

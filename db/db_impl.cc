@@ -4,9 +4,6 @@
 
 #include "db/db_impl.h"
 
-#include <algorithm>
-#include <table/raw_block_iter.h>
-#include <table/raw_table_builder.h>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/filename.h"
@@ -123,6 +120,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
+  global_index_->SetEnv(env_);
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
@@ -669,7 +667,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   mutex_.Unlock();
   // get files for compaction
 
-  std::vector<uint64_t> files_number;
+  std::vector<SequentialFile *> files;
   for (int which = 0; which < 2; which++) {
     for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
       uint64_t file_number = compact->compaction->input(which, i)->number;
@@ -677,31 +675,21 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       SequentialFile *new_file;
       Status s = env_->NewSequentialFile(name, &new_file);
       if (s.ok()) {
-        compact->input_files.push_back(new_file);
-        files_number.push_back(file_number);
+        files.push_back(new_file);
       }
     }
   }
-  std::vector<std::shared_future<void>> futures;
-  for (auto file : compact->input_files) {
-    auto future = port::AddTask([this, file, compact]() {
-      RawBlockIterator *iter = new RawBlockIterator(options_.max_file_size, file);
-      static std::mutex mutex;
-      mutex.lock();
-      compact->input_iters.push_back(iter);
-      mutex.unlock();
-    });
-    futures.push_back(future.share());
-  }
-  for (auto future : futures) {
-    future.wait();
+  std::vector<RawBlockIterator *> iterators;
+  for (auto file : files) {
+    RawBlockIterator *iter = new RawBlockIterator(file);
+    iterators.push_back(iter);
   }
   Status status;
   Iterator *input = nullptr;
   Slice prev_key;
   while (true) {
     input = nullptr;
-    for (auto iterator : compact->input_iters) {
+    for (auto iterator : iterators) {
       if (iterator->Valid() && (input == nullptr ||
           internal_comparator_.Compare(input->key(), iterator->key()) > 0)){
         if (!prev_key.empty() &&
@@ -724,6 +712,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       imm_micros += (env_->NowMicros() - imm_start);
     }
     Slice key = input->key();
+    Slice value = input->value();
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->iofile != NULL) {
       status = FinishCompactionOutputFile(compact);
@@ -736,15 +725,15 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
       compact->current_output()->smallest.DecodeFrom(key);
     }
-    if (compact->iofile->IsWritable(key.size() + input->value().size() + 2)) {
+    if (compact->iofile->IsWritable(key.size() + value.size() + 2)) {
       compact->iofile->Append(key);
       compact->iofile->Append("\t");
       uint64_t offset = compact->iofile->Size();
       uint64_t number = compact->current_output()->number;
-      uint64_t size = input->value().size();
-      compact->iofile->Append(input->value());
+      uint64_t size = value.size();
+      compact->iofile->Append(value);
       compact->iofile->Append("\t");
-      global_index_->Update(key, offset, size, number);
+      global_index_->Insert(key, offset, size, number);
     } else {
       status = FinishCompactionOutputFile(compact);
       if (!status.ok()) {
@@ -759,10 +748,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       compact->iofile->Append("\t");
       uint64_t offset = compact->iofile->Size();
       uint64_t number = compact->current_output()->number;
-      uint64_t size = input->value().size();
-      compact->iofile->Append(input->value());
+      uint64_t size = value.size();
+      compact->iofile->Append(value);
       compact->iofile->Append("\t");
-      global_index_->Update(key, offset, size, number);
+      global_index_->Insert(key, offset, size, number);
     }
     compact->current_entries++;
     compact->current_output()->largest.DecodeFrom(key);
@@ -777,7 +766,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     status = FinishCompactionOutputFile(compact);
   }
 
-  for (auto iterator : compact->input_iters) {
+  for (auto iterator : iterators) {
     delete iterator;
   }
 
@@ -804,9 +793,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   VersionSet::LevelSummaryStorage tmp;
   Log(options_.info_log,
       "compacted to: %s", versions_->LevelSummary(&tmp));
-  for (auto number : files_number) {
-    file_map_.erase(number);
-  }
   return status;
 }
 
@@ -907,28 +893,20 @@ Status DBImpl::Get(const ReadOptions& options,
       if (data_meta != nullptr) {
         char *p = new char[data_meta->size];
         Slice result(p, data_meta->size);
-        uint64_t file_number = data_meta->file_number;
+        const uint64_t file_number = data_meta->file_number;
+        assert(file_number == data_meta->file_number);
         std::string fname = TableFileName(dbname_, file_number);
         RandomAccessFile *file = NULL;
         if (curr_compaction_file_ != NULL &&
             fname.compare(curr_compaction_file_->Filename()) == 0) {
           // in SSTs compaction stage
-          curr_compaction_file_->Read(data_meta->offset, data_meta->size, &result, p);
-          if (!s.ok()) return s;
+          s = curr_compaction_file_->Read(data_meta->offset, data_meta->size, &result, p);
         } else {
           assert(env_->FileExists(fname));
           s = env_->NewRandomAccessFile(fname, &file);
           file->Read(data_meta->offset, data_meta->size, &result, p);
         }
         if (!result.empty()) value->assign(result.ToString());
-        {
-          std::string v = "valuevalue";
-          v.append(key.ToString());
-          if (v.compare(*value) != 0) {
-            printf("degug\n");
-          }
-        }
-
       }
     }
     mutex_.Lock();

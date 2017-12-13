@@ -15,7 +15,6 @@
 #define PAGESIZE (512)
  #define MULTITHREAD
 
-using namespace std;
 
 namespace leveldb {
 class BTree;
@@ -48,7 +47,7 @@ class Node {
     return ret;
   }
   void print();
-  void print(stringstream& ss);
+  void print(std::stringstream& ss);
 #ifdef MULTITHREAD
   bool lock() {
       int32_t zero = 0;
@@ -115,11 +114,11 @@ class lNode : public Node {
 
   // Debug
   int print();
-  int print(stringstream&);
-  void copy_debug(vector<int64_t> &);
+  int print(std::stringstream&);
+  void copy_debug(std::vector<int64_t> &);
 
  private:
-  array<LeafEntry,CARDINALITY> entry;
+  std::array<LeafEntry,CARDINALITY> entry;
 };
 
 class iNode : public Node {
@@ -164,9 +163,9 @@ class iNode : public Node {
   // Debug
   void print(void);
   void print(int32_t loc);
-  void print(stringstream&);
-  void print(int32_t loc, stringstream&);
-  void copy_debug(vector<int64_t> &, queue<Node*> &, int32_t pos);
+  void print(std::stringstream&);
+  void print(int32_t loc, std::stringstream&);
+  void copy_debug(std::vector<int64_t> &, std::queue<Node*> &, int32_t pos);
   int32_t getCnt(void) {
     return cnt;
   }
@@ -210,10 +209,10 @@ class iNode : public Node {
   void test_remove() {
     Node* lSib = (Node*)0x1;
     remove(10, 10, (Node*)111, lSib);
-    cout << (int64_t)lSib << endl;
+    std::cout << (int64_t)lSib << std::endl;
     print();
     remove(9, 7, (Node*)111, lSib);
-    cout << (int64_t)lSib << endl;
+    std::cout << (int64_t)lSib << std::endl;
     print();
   }
 
@@ -221,7 +220,7 @@ class iNode : public Node {
   int32_t root;
   int32_t cnt;
   int32_t deleteCnt;
-  array<InternalEntry,CARDINALITY> entry;
+  std::array<InternalEntry,CARDINALITY> entry;
 
   friend class BTree;
 };

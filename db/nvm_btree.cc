@@ -5,7 +5,6 @@
 
 // #define SplitTime
 // #define WritingTime
-using namespace std;
 
 namespace leveldb {
 
@@ -455,6 +454,7 @@ bool lNode::overflow(void) {
 
 void lNode::insert(int64_t key, void *ptr) {
   int32_t loc;
+  if (update(key, ptr)) return;
   for (loc = 0; loc < CARDINALITY; loc++) {
     if (entry[loc].ptr == NULL) break;
   }

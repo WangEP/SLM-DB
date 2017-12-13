@@ -3,19 +3,17 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <dirent.h>
-#include <errno.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <termios.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
+#include <ctime>
 #include <unistd.h>
 #include <deque>
 #include <limits>
@@ -29,14 +27,12 @@
 #include <future>
 #include <functional>
 #include "leveldb/env.h"
-#include "leveldb/slice.h"
 #include "port/port.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
 #include "persist.h"
-#include "thread_pool.h"
 
 namespace bip = boost::interprocess;
 
@@ -312,8 +308,8 @@ class PosixReadAppendFile : public ReadAppendFile {
   bip::file_mapping file_;
   std::string filename_;
   void* addr_;
-  uint32_t max_size_;
-  volatile uint32_t current_;
+  uint64_t max_size_;
+  volatile uint64_t current_;
   bool is_flushed;
 
  public:
@@ -334,6 +330,7 @@ class PosixReadAppendFile : public ReadAppendFile {
     region_.swap(region);
     addr_ = region_.get_address();
     max_size_ = region_.get_size();
+    memset(addr_, '0', 32);
     current_ = 32;
     is_flushed = false;
   }
@@ -348,7 +345,6 @@ class PosixReadAppendFile : public ReadAppendFile {
     Status s;
     if (is_flushed) return s.IOError("already flushed", filename_);;
     std::string prefix = std::to_string(current_-32);
-    memset(addr_, '0', 32);
     memcpy(addr_ + 32 - prefix.size(), prefix.data(), prefix.size());
     region_.flush(0, current_, true);
     is_flushed = true;
@@ -678,9 +674,8 @@ class PosixEnv : public Env {
   // map for opened file descriptors
   std::unordered_map<std::string, RandomAccessFile*> read_file_map;
 
-
-  pthread_mutex_t mu_;
-  pthread_cond_t bgsignal_;
+  port::Mutex* mu_;
+  port::CondVar* bgsignal_;
   pthread_t bgthread_;
   bool started_bgthread_;
 
@@ -725,13 +720,13 @@ static intptr_t MaxOpenFiles() {
 PosixEnv::PosixEnv()
     : started_bgthread_(false),
       mmap_limit_(MaxMmaps()),
-      fd_limit_(MaxOpenFiles()) {
-  PthreadCall("mutex_init", pthread_mutex_init(&mu_, NULL));
-  PthreadCall("cvar_init", pthread_cond_init(&bgsignal_, NULL));
+      fd_limit_(MaxOpenFiles()),
+      mu_(new port::Mutex),
+      bgsignal_(new port::CondVar(mu_)) {
 }
 
 void PosixEnv::Schedule(void (*function)(void*), void* arg) {
-  PthreadCall("lock", pthread_mutex_lock(&mu_));
+  mu_->Lock();
 
   // Start background thread if necessary
   if (!started_bgthread_) {
@@ -744,7 +739,7 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   // If the queue is currently empty, the background thread may currently be
   // waiting.
   if (queue_.empty()) {
-    PthreadCall("signal", pthread_cond_signal(&bgsignal_));
+    bgsignal_->Signal();
   }
 
   // Add to priority queue
@@ -752,7 +747,7 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   queue_.back().function = function;
   queue_.back().arg = arg;
 
-  PthreadCall("unlock", pthread_mutex_unlock(&mu_));
+  mu_->Unlock();
 }
 
 void PosixEnv::BGThread() {
@@ -760,16 +755,16 @@ void PosixEnv::BGThread() {
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
   while (true) {
     // Wait until there is an item that is ready to run
-    PthreadCall("lock", pthread_mutex_lock(&mu_));
+    mu_->Lock();
     while (queue_.empty()) {
-      PthreadCall("wait", pthread_cond_wait(&bgsignal_, &mu_));
+      bgsignal_->Wait();
     }
 
     void (*function)(void*) = queue_.front().function;
     void* arg = queue_.front().arg;
     queue_.pop_front();
 
-    PthreadCall("unlock", pthread_mutex_unlock(&mu_));
+    mu_->Unlock();
     (*function)(arg);
   }
 #pragma clang diagnostic pop
@@ -817,7 +812,6 @@ void EnvPosixTestHelper::SetReadOnlyMMapLimit(int limit) {
 
 Env* Env::Default() {
   pthread_once(&once, InitDefaultEnv);
-  port::InitThreadPool();
   return default_env;
 }
 

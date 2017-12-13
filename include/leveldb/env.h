@@ -15,7 +15,7 @@
 
 #include <string>
 #include <vector>
-#include <stdarg.h>
+#include <cstdarg>
 #include <stdint.h>
 #include <future>
 #include "leveldb/status.h"

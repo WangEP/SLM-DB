@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   struct timespec start, end;
-  int numData = 5 << 6;
+  int numData = 5000000;
   leveldb::DB* db;
   leveldb::Options options;
   options.filter_policy = NULL;
@@ -40,13 +40,13 @@ int main(int argc, char** argv) {
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = 0; i < numData; i++) {
     std::string key = std::to_string(i);
-    std::string value = gen_random(2 << 16);
+    std::string value = gen_random(1 << 16);
     status = db->Put(leveldb::WriteOptions(), key, value);
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
   int64_t elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(numData/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
-
+  /*
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = 0; i < numData; i++) {
     std::string v = "valuevalue" + std::to_string(i);
@@ -65,5 +65,5 @@ int main(int argc, char** argv) {
   clock_gettime(CLOCK_MONOTONIC, &end);
   elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(numData/(elapsed/1000.0))) << "\tOps/sec\tRead" << std::endl;
-
+*/
 }

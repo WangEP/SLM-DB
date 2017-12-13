@@ -110,7 +110,6 @@ class DBImpl : public DB {
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status DoCompactionWork(CompactionState* compact)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void InitIterator(void* arg);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
   Status FinishCompactionOutputFile(CompactionState* compact);
@@ -152,8 +151,6 @@ class DBImpl : public DB {
   WriteBatch* tmp_batch_;
 
   SnapshotList snapshots_;
-  // file map
-  std::map<int64_t, RandomAccessFile*> file_map_;
 
   // Set of table files to protect from deletion because they are
   // part of ongoing compactions.
