@@ -375,7 +375,7 @@ class PosixReadAppendFile : public ReadAppendFile {
   virtual Status Read(uint64_t offset, size_t n, Slice* result,
                       char* scratch) const {
     Status s;
-    if (offset + n > current_) {
+    if (is_flushed || offset + n > current_) {
       *result = Slice();
       return PosixError(filename_, EINVAL);
     }
@@ -452,7 +452,6 @@ class PosixEnv : public Env {
       *result = NULL;
     }
     int fd = open(fname.c_str(), O_RDONLY);
-    // let the OS handle file caching
     if (fd < 0) {
       s = PosixError(fname, errno);
     } else if (mmap_limit_.Acquire()) {

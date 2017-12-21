@@ -1,16 +1,21 @@
 #ifndef LEVELDB_THREAD_POOL_HH
 #define LEVELDB_THREAD_POOL_HH
 
-#include <port/port.h>
 #include <vector>
-#include <deque>
 #include <queue>
+#include <memory>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <future>
+#include <functional>
+#include <stdexcept>
 
 namespace leveldb {
 
 class ThreadPool {
  public:
-  ThreadPool(size_t);
+  explicit ThreadPool(size_t);
   template<class F, class... Args>
   auto enqueue(F&& f, Args&&... args)
   -> std::future<typename std::result_of<F(Args...)>::type>;
@@ -35,7 +40,7 @@ inline ThreadPool::ThreadPool(size_t threads)
     workers.emplace_back(
         [this]
         {
-          for(;;)
+          for (;;)
           {
             std::function<void()> task;
             {
@@ -89,7 +94,6 @@ inline ThreadPool::~ThreadPool()
   for(std::thread &worker: workers)
     worker.join();
 }
-
 }
 
 

@@ -711,8 +711,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       mutex_.Unlock();
       imm_micros += (env_->NowMicros() - imm_start);
     }
-    Slice key = input->key();
-    Slice value = input->value();
+    Slice key = std::move(input->key());
+    Slice value = std::move(input->value());
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->iofile != NULL) {
       status = FinishCompactionOutputFile(compact);
@@ -755,7 +755,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
     compact->current_entries++;
     compact->current_output()->largest.DecodeFrom(key);
-    prev_key = input->key();
+    prev_key = key;
     input->Next();
   }
 

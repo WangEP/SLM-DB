@@ -9,11 +9,12 @@
 #include <thread>
 #include <sstream>
 #include "util/persist.h"
+#include <unistd.h>
 
 #define CAS(_p, _u, _v)  (__atomic_compare_exchange_n (_p, _u, _v, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE))
 
-#define PAGESIZE (512)
- #define MULTITHREAD
+#define PAGESIZE (256)
+#define MULTITHREAD
 
 
 namespace leveldb {

@@ -19,7 +19,7 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
 
 include_directories(${Boost_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_SOURCE_DIR}                                                              f
+        ${CMAKE_CURRENT_SOURCE_DIR}
         include)
 
 if(MSVC)
@@ -42,9 +42,6 @@ add_definitions(-DOS_LINUX)
 add_definitions(-DLEVELDB_PLATFORM_POSIX)
 add_definitions(-fno-builtin-memcmp)
 add_definitions(-Wint-to-pointer-cast)
-if(QUARTZ)
-    add_definitions(-DQUARTZ)
-endif()
 
 set(LEVEL_DB_FILES
         include/leveldb/c.h
@@ -184,8 +181,14 @@ target_link_libraries(leveldb
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
 
-add_executable(leveldbmain main.cc)
-target_link_libraries(leveldbmain PUBLIC leveldb)
+add_executable(insert_bench bench/insert_bench.cc)
+target_link_libraries(insert_bench PUBLIC leveldb)
+
+add_executable(simple_bench bench/simple_bench.cc)
+target_link_libraries(simple_bench PUBLIC leveldb)
+
+add_executable(sanity_check bench/sanity_check.cc)
+target_link_libraries(sanity_check PUBLIC leveldb)
 
 add_executable(file_io_test util/file_io_test.cc)
 target_link_libraries(file_io_test PUBLIC leveldb)
