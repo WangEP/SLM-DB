@@ -1,6 +1,5 @@
-#ifndef STORAGE_LEVELDB_DB_NVM_BTREE_H
-#define STORAGE_LEVELDB_DB_NVM_BTREE_H
-
+#ifndef NVB
+#define NVB
 #include <cassert>
 #include <iostream>
 #include <array>
@@ -9,15 +8,19 @@
 #include <thread>
 #include <sstream>
 #include "util/persist.h"
-#include <unistd.h>
 
 #define CAS(_p, _u, _v)  (__atomic_compare_exchange_n (_p, _u, _v, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE))
 
+// #define SplitTime
+// #define WritingTime
+// #define MergeTime
+// #define RemoveTime
 #define PAGESIZE (256)
 #define MULTITHREAD
+// #define EXTRA
 
+using namespace std;
 
-namespace leveldb {
 class BTree;
 class Node;
 
@@ -41,19 +44,21 @@ class Node {
   Node(Type, int64_t);
   Node(Type, Node*);
   Node(Type, int64_t, Node*);
+  virtual ~Node();
 
   void *operator new(size_t size) {
     void *ret;
     posix_memalign(&ret, 64, size);
     return ret;
   }
+
   void print();
-  void print(std::stringstream& ss);
+  void print(stringstream& ss);
 #ifdef MULTITHREAD
   bool lock() {
-      int32_t zero = 0;
-      return CAS(&loc, &zero, 1);
-    }
+    int32_t zero = 0;
+    return CAS(&loc, &zero, 1);
+  }
   bool unlock() {
     int32_t one = 1;
     return CAS(&loc, &one, 0);
@@ -78,6 +83,10 @@ struct Split {
   Node* left;
   Node* right;
   int64_t splitKey;
+
+  ~Split(){
+    delete original;
+  }
 };
 
 
@@ -97,7 +106,9 @@ class lNode : public Node {
 
   // Core
   lNode();
+  ~lNode();
   void insert(int64_t, void*);
+  void sInsert(int32_t, int64_t, void*);
   Split* split(int64_t, void*);
   Merge* merge(void);
   void remove(int64_t);
@@ -115,11 +126,12 @@ class lNode : public Node {
 
   // Debug
   int print();
-  int print(std::stringstream&);
-  void copy_debug(std::vector<int64_t> &);
+  int print(stringstream&);
+  void copy_debug(vector<int64_t> &);
+  void sort();
 
  private:
-  std::array<LeafEntry,CARDINALITY> entry;
+  array<LeafEntry,CARDINALITY> entry;
 };
 
 class iNode : public Node {
@@ -127,13 +139,14 @@ class iNode : public Node {
   enum Direction : int32_t { None = -1, Left = 0, Right = 1 };
   constexpr static int32_t CARDINALITY
       = (PAGESIZE-sizeof(Node)-sizeof(int32_t)*3)/sizeof(InternalEntry);
-  // = 10;
 
   // Core
   iNode();
   iNode(Split*);
+  ~iNode();
   bool overflow(void);
   int32_t insert(int64_t, Node*, Node*);
+  int32_t sInsert(int64_t, Node*, Node*);
   Split* split(int64_t, Node*, Node*);
   void remove(int64_t, Node*);
   void remove(int32_t, int32_t, Node*, Node*);
@@ -154,19 +167,21 @@ class iNode : public Node {
   LeafEntry* transform(int32_t&, Node*&);
   void transform(LeafEntry*, int32_t&, int32_t&, Node*&, bool);
   bool balancedInsert(LeafEntry*, int32_t, int32_t, int32_t&, Node*);
+  void defragmentation(iNode* l, iNode* r, int16_t, int64_t);
   void block(int32_t, Direction);
   Node* getLeftSibling(int32_t, iNode::Direction);
   int32_t getParent(int32_t);
   int32_t getParent(Node*, Direction&);
   int32_t getCommonAncestor(int32_t);
   int32_t count(void);
+  void rebalance(void);
 
   // Debug
   void print(void);
   void print(int32_t loc);
-  void print(std::stringstream&);
-  void print(int32_t loc, std::stringstream&);
-  void copy_debug(std::vector<int64_t> &, std::queue<Node*> &, int32_t pos);
+  void print(stringstream&);
+  void print(int32_t loc, stringstream&);
+  void copy_debug(vector<int64_t> &, queue<Node*> &, int32_t pos);
   int32_t getCnt(void) {
     return cnt;
   }
@@ -210,10 +225,10 @@ class iNode : public Node {
   void test_remove() {
     Node* lSib = (Node*)0x1;
     remove(10, 10, (Node*)111, lSib);
-    std::cout << (int64_t)lSib << std::endl;
+    cout << (int64_t)lSib << endl;
     print();
     remove(9, 7, (Node*)111, lSib);
-    std::cout << (int64_t)lSib << std::endl;
+    cout << (int64_t)lSib << endl;
     print();
   }
 
@@ -221,7 +236,7 @@ class iNode : public Node {
   int32_t root;
   int32_t cnt;
   int32_t deleteCnt;
-  std::array<InternalEntry,CARDINALITY> entry;
+  array<InternalEntry,CARDINALITY> entry;
 
   friend class BTree;
 };
@@ -234,7 +249,7 @@ class BTree {
 
  public:
   BTree();
-  void* search(int64_t);
+  void *search(int64_t);
   void insert(int64_t, void*);
   bool update(int64_t, void*);
   void remove(int64_t);
@@ -243,16 +258,20 @@ class BTree {
   // Helper
   iNode* findParent(Node*);
   Node* findLeftSibling(Node*);
+  void time() {
+    cout << elapsed/1000 << "\tusec" << endl;
+  }
 
   // DEBUG
   void print();
   void sanityCheck();
   void sanityCheck(Node*);
 
+  // Perf test
+  void sort();
+  void rebal();
+
   int64_t failedSearch;
 };
 
-} // namespace leveldb
-
-
-#endif // STORAGE_LEVELDB_DB_NVM_BTREE_H
+#endif

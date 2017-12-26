@@ -1,56 +1,50 @@
-#include "nvm_btree.h"
-#include "logger.h"
+#include <iostream>
+#include <string>
 #include <algorithm>
-#include <cstdint>
+#include "nvm_btree.h"
 
-// #define SplitTime
-// #define WritingTime
-
-namespace leveldb {
-
-//Logger global(1);
+using namespace std;
 
 // BTree //
 BTree::BTree() {
-  //global.log("BTreeConstruction");
   root = new lNode();
   failedSearch = 0;
 }
 
-void BTree::insert(int64_t key, void *ptr) {
-  Node *p = root, *lSib = NULL;
-  Split *s = NULL;
+void BTree::insert(int64_t key, void* ptr) {
+  Node* node = root, *lSib = NULL;
+  Split* split = NULL;
   iNodeSearch:
-  while (p->type == Node::Internal) {
-    p = (Node *) ((iNode *) p)->search(key);
-    if (p == NULL) p = root;
+  while (node->type == Node::Internal) {
+    node = ((iNode*)node)->search(key);
+    if (node == NULL) node = root;
   }
 #ifdef MULTITHREAD
-  if (!p->lock()) {
-    p = root;
+  if (!node->lock()) {
+    node = root;
     goto iNodeSearch;
   }
 #endif
 
-  lNode *l = (lNode *) p;
-  if (!l->overflow()) {
+  lNode* leaf = (lNode*)node;
+  if (!leaf->overflow()) {
 #ifdef WritingTime
     clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
-    l->insert(key, ptr);
+    leaf->insert(key, ptr);
 #ifdef WritingTime
     clock_gettime(CLOCK_MONOTONIC, &end);
     elapsed += (end.tv_nsec - start.tv_nsec)
       + (end.tv_sec - start.tv_sec)*1000000000;
 #endif
 #ifdef MULTITHREAD
-    p->unlock();
+    node->unlock();
 #endif
   } else {
 #ifdef SplitTime
     clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
-    s = l->split(key, ptr);
+    split = leaf->split(key, ptr);
 #ifdef SplitTime
     clock_gettime(CLOCK_MONOTONIC, &end);
     elapsed += (end.tv_nsec - start.tv_nsec)
@@ -59,18 +53,18 @@ void BTree::insert(int64_t key, void *ptr) {
     // We don't have to unlock as we replace the page.
   }
 
-  while (s) {
+  while (split) {
     lSibAgain:
-    iNode *parent = findParent(s->original);
+    iNode* parent = findParent(split->original);
     if (parent != NULL) {
 #ifdef MULTITHREAD
       if (!parent->lock()) goto lSibAgain;
 #endif
       iNode::Direction dir;
-      int32_t pIdx = parent->getParent(s->original, dir);
+      int32_t pIdx = parent->getParent(split->original, dir);
       lSib = parent->getLeftSibling(pIdx, dir);
       if (lSib == NULL) {
-        lSib = findLeftSibling(s->original);
+        lSib = findLeftSibling(split->original);
       }
       if (lSib != NULL) {
 #ifdef MULTITHREAD
@@ -79,7 +73,7 @@ void BTree::insert(int64_t key, void *ptr) {
           goto lSibAgain;
           // To avoid deadlock.
         }
-        if ( lSib->sibling != s->original ) {
+        if ( lSib->sibling != split->original ) {
           parent->unlock();
           lSib->unlock();
           goto lSibAgain;
@@ -89,8 +83,8 @@ void BTree::insert(int64_t key, void *ptr) {
         clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
         parent->block(pIdx, dir);
-        lSib->sibling = s->left;
-        clflush((char *) &lSib->sibling, sizeof(void *));
+        lSib->sibling = split->left;
+        clflush((char*)&lSib->sibling, sizeof(void*));
 #ifdef SplitTime
         clock_gettime(CLOCK_MONOTONIC, &end);
     elapsed += (end.tv_nsec - start.tv_nsec)
@@ -101,7 +95,7 @@ void BTree::insert(int64_t key, void *ptr) {
 #endif
       } else {
 #ifdef MULTITHREAD
-        if (s->original->splitKey != -1) {
+        if (split->original->splitKey != -1) {
           parent->unlock();
           goto lSibAgain;
         }
@@ -112,7 +106,7 @@ void BTree::insert(int64_t key, void *ptr) {
 #ifdef WritingTime
         clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
-        parent->insert(s->splitKey, s->left, s->right);
+        parent->insert(split->splitKey, split->left, split->right);
 #ifdef WritingTime
         clock_gettime(CLOCK_MONOTONIC, &end);
     elapsed += (end.tv_nsec - start.tv_nsec)
@@ -121,14 +115,14 @@ void BTree::insert(int64_t key, void *ptr) {
 #ifdef MULTITHREAD
         parent->unlock();
 #endif
-        delete s;
-        s = NULL;
+        delete split;
+        split = NULL;
       } else {
 #ifdef SplitTime
         clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
-        Split *tmp = s;
-        s = parent->split(s->splitKey, s->left, s->right);
+        Split* tmp = split;
+        split = parent->split(split->splitKey, split->left, split->right);
         delete tmp;
 #ifdef SplitTime
         clock_gettime(CLOCK_MONOTONIC, &end);
@@ -137,11 +131,11 @@ void BTree::insert(int64_t key, void *ptr) {
 #endif
       }
     } else { // Height increased
-      if (s->original != root) continue;
-      root = (Node *) new iNode(s);
-      clflush((char *) &root, sizeof(void *));
-      delete s;
-      s = NULL;
+      if (split->original != root) continue;
+      root = (Node*) new iNode(split);
+      clflush((char*)&root, sizeof(void*));
+      delete split;
+      split = NULL;
     }
   }
 }
@@ -156,49 +150,59 @@ bool BTree::update(int64_t key, void *ptr) {
   return status;
 }
 
-void* BTree::search(int64_t key) {
-  Node *p = root;
+void *BTree::search(int64_t key) {
+  Node* p = root;
   while (p->type == Node::Internal) {
-    p = (Node *) ((iNode *) p)->search(key);
+    p = (Node*)((iNode*)p)->search(key);
     if (p == NULL) p = root;
   }
 
-  void* value = ((lNode *) p)->search(key);
-
-  if (value == NULL) {
-    /*
-    p->print();
-    p->sibling->print();
-    cout << key << " is missing." << endl;
-    exit(1);
-    */
+  void* result = ((lNode*)p)->search(key);
+  if (result == NULL) {
     failedSearch++;
   }
-  return value;
+  return result;
 }
 
 void BTree::remove(int64_t key) {
-  Node *p = root, *lSib = NULL;
-  iNode *parent = NULL, *grandParent = NULL;
+  Node* p = root, *lSib = NULL;
+  iNode* parent = NULL, *grandParent = NULL;
   iNode::Direction dir = iNode::None;
   int32_t pIdx = -1;
-  Merge *m = NULL;
+  Merge* m = NULL;
 
   while (p->type == Node::Internal) {
-    p = (Node *) ((iNode *) p)->search(key);
+    p = (Node*)((iNode*)p)->search(key);
     if (p == NULL) p = root;
   }
 
-  lNode *l = (lNode *) p;
+  lNode* l = (lNode*)p;
+#ifdef RemoveTime
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
   l->remove(key);
-  if (l != root && l->count() < (lNode::CARDINALITY / 2)) {
+#ifdef RemoveTime
+  clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed += (end.tv_nsec - start.tv_nsec)
+      + (end.tv_sec - start.tv_sec)*1000000000;
+#endif
+
+  if (l != root && l->count() < (lNode::CARDINALITY/2)) {
     parent = findParent(l);
-    pIdx = parent->getParent(l, dir);
+    pIdx   = parent->getParent(l, dir);
     if (dir == iNode::Right) {
-      l = (lNode *) parent->getLeftSibling(pIdx, dir);
+      l = (lNode*)parent->getLeftSibling(pIdx, dir);
       pIdx = parent->getParent(l, dir);
     }
+#ifdef MergeTime
+    clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
     m = l->merge();
+#ifdef MergeTime
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed += (end.tv_nsec - start.tv_nsec)
+      + (end.tv_sec - start.tv_sec)*1000000000;
+#endif
   }
 
   while (m != NULL) {
@@ -211,62 +215,122 @@ void BTree::remove(int64_t key) {
     if (m->right == NULL) {
       if (parent == root && parent->count() == 1) {
         root = m->left;
-        clflush((char *) &root, sizeof(void *));
+        clflush((char*)&root, sizeof(void*));
         break;
       } else {
+#ifdef RemoveTime
+        clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
         parent->remove(lpIdx, rpIdx, m->left, lSib);
+#ifdef RemoveTime
+        clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed += (end.tv_nsec - start.tv_nsec)
+      + (end.tv_sec - start.tv_sec)*1000000000;
+#endif
       }
     } else {
+#ifdef RemoveTime
+      clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
       parent->update(lpIdx, rpIdx, m->left, m->right, lSib);
+#ifdef RemoveTime
+      clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed += (end.tv_nsec - start.tv_nsec)
+      + (end.tv_sec - start.tv_sec)*1000000000;
+#endif
     }
     // delete m->_left;
     // delete m->_right;
     // delete m;
     m = NULL;
-    if (parent != root && parent->count() < (iNode::CARDINALITY / 2)) {
-      iNode *i = parent;
+    if (parent != root && parent->count() < (iNode::CARDINALITY/2)) {
+      iNode* i = parent;
       parent = findParent(i);
       pIdx = parent->getParent(i, dir);
       if (dir == iNode::Right) {
-        i = (iNode *) parent->getLeftSibling(pIdx, dir);
+        i = (iNode*)parent->getLeftSibling(pIdx, dir);
         pIdx = parent->getParent(i, dir);
       }
+#ifdef MergeTime
+      clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
       m = i->merge();
+#ifdef MergeTime
+      clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed += (end.tv_nsec - start.tv_nsec)
+      + (end.tv_sec - start.tv_sec)*1000000000;
+#endif
     }
   }
 }
 
-iNode *BTree::findParent(Node *child) {
-  Node *p = root, *parent = NULL;
+iNode* BTree::findParent(Node* child) {
+  Node* p = root, *parent = NULL;
   if (root == child) return NULL;
   while (p != child) {
     if (p->type == Node::Leaf) {
       return NULL;
     }
     parent = p;
-    p = ((iNode *) p)->search(child->splitKey);
+    p = ((iNode*)p)->search(child->splitKey);
     if (p == NULL) p = root;
   }
-  return (iNode *) parent;
+  return (iNode*)parent;
 }
 
-Node *BTree::findLeftSibling(Node *target) {
+Node* BTree::findLeftSibling(Node* target) {
   if (target == root) return NULL;
-  Node *lSib = NULL;
-  iNode *parent = findParent(target);
+  Node* lSib = NULL;
+  iNode* parent = findParent(target);
   if (!parent) return NULL;
   iNode::Direction dir = iNode::None;
   int32_t pIdx = parent->getParent(target, dir);
   lSib = parent->getLeftSibling(pIdx, dir);
   if (lSib == NULL) {
-    Node *lpSib = findLeftSibling(parent);
-    if (lpSib) lSib = ((iNode *) lpSib)->getRightmostPtr();
+    Node* lpSib = findLeftSibling(parent);
+    if (lpSib) lSib = ((iNode*)lpSib)->getRightmostPtr();
   }
   return lSib;
 }
 
+void lNode::sort() {
+  std::sort(entry.begin(), entry.end(),
+            [](LeafEntry a, LeafEntry b) {
+              return a.key < b.key;
+            } );
+}
+
+void BTree::sort() {
+  Node* p = root;
+  while (p->type == Node::Internal) {
+    p = (Node*)((iNode*)p)->getLeftmostPtr();
+  }
+  lNode* l = (lNode*)p;
+  while (l) {
+    l->sort();
+    l = (lNode*)l->sibling;
+  }
+}
+
+void BTree::rebal() {
+  Node* p = root;
+  vector<Node*> nodes;
+  while (p->type == Node::Internal) {
+    nodes.push_back(p);
+    p = (Node*)((iNode*)p)->getLeftmostPtr();
+  }
+
+  for (auto& left : nodes) {
+    iNode* i = (iNode*)left;
+    while (i) {
+      i->rebalance();
+      i = (iNode*)i->sibling;
+    }
+  }
+}
+
 void BTree::print(void) {
-  std::queue<Node *> ptrs;
+  std::queue<Node*> ptrs;
   ptrs.push(root);
   int64_t prev_key = INT32_MAX;
   int32_t level = 0;
@@ -300,6 +364,7 @@ void BTree::print(void) {
       cout << "|";
     }
   }
+  cout << "\n";
 }
 
 void BTree::sanityCheck(void) {
@@ -312,10 +377,10 @@ void BTree::sanityCheck(void) {
   sanityCheck(root);
 }
 
-void BTree::sanityCheck(Node *node) {
+void BTree::sanityCheck(Node* node) {
   if (node->type == Node::Leaf) return;
-  vector<Node *> nodes;
-  iNode *p = (iNode *) node;
+  vector<Node*> nodes;
+  iNode* p = (iNode*)node;
 
   int32_t stack[iNode::CARDINALITY] = {-1};
   int32_t top = 1;
@@ -323,7 +388,7 @@ void BTree::sanityCheck(Node *node) {
   int32_t last = -1;
 
   while (cur != -1) {
-    if (last == stack[top - 1]) {
+    if (last == stack[top-1]) {
       last = cur;
       if (p->entry[cur].left != -1) {
         stack[top++] = cur;
@@ -352,7 +417,7 @@ void BTree::sanityCheck(Node *node) {
     }
   }
 
-  Node *n = p->getLeftmostPtr();
+  Node* n = p->getLeftmostPtr();
   stringstream ss;
   for (auto e : nodes) {
     if (e != n) {
@@ -373,7 +438,7 @@ void BTree::sanityCheck(Node *node) {
     n = n->sibling;
   }
 
-  if (p->sibling && p->getRightmostPtr()->sibling != ((iNode *) p->sibling)->getLeftmostPtr()) {
+  if (p->sibling && p->getRightmostPtr()->sibling != ((iNode*)p->sibling)->getLeftmostPtr()) {
     ss << "WEIRD SIBLING" << endl;
     ss << "p" << endl;
     p->print(ss);
@@ -384,7 +449,7 @@ void BTree::sanityCheck(Node *node) {
     ss << "p->getRightmostPtr()->sibling" << endl;
     p->getRightmostPtr()->sibling->print(ss);
     ss << "p->sibling->getLeftmostPtr()" << endl;
-    ((iNode *) p->sibling)->getLeftmostPtr()->print(ss);
+    ((iNode*)p->sibling)->getLeftmostPtr()->print(ss);
     cout << ss.str();
     exit(1);
   }
@@ -395,7 +460,7 @@ void BTree::sanityCheck(Node *node) {
 }
 
 // Node //
-Node::Node(Type _type, int64_t _splitKey, Node *_sibling) {
+Node::Node(Type _type, int64_t _splitKey, Node* _sibling) {
   type = _type;
   splitKey = _splitKey;
   sibling = _sibling;
@@ -407,7 +472,7 @@ Node::Node(Type _type, int64_t _splitKey) {
   sibling = NULL;
 }
 
-Node::Node(Type _type, Node *_sibling) {
+Node::Node(Type _type, Node* _sibling) {
   type = _type;
   splitKey = -1;
   sibling = _sibling;
@@ -419,97 +484,104 @@ Node::Node(Type _type) {
   sibling = NULL;
 }
 
-void Node::print() {
-  if (type == Node::Leaf) {
-    ((lNode *) this)->print();
-  } else {
-    ((iNode *) this)->print();
-  }
+Node::~Node() {
 }
 
-void Node::print(stringstream &ss) {
+void Node::print() {
   if (type == Node::Leaf) {
-    ((lNode *) this)->print(ss);
+    ((lNode*)this)->print();
   } else {
-    ((iNode *) this)->print(ss);
+    ((iNode*)this)->print();
+  }
+}
+void Node::print(stringstream& ss) {
+  if (type == Node::Leaf) {
+    ((lNode*)this)->print(ss);
+  } else {
+    ((iNode*)this)->print(ss);
   }
 }
 
 
 // Leaf Node //
 lNode::lNode() : Node(Node::Leaf) {
-  //global.log("Leaf Node Constructed.");
   for (auto &e : entry) {
     e.key = 0;
     e.ptr = NULL;
   }
 }
 
+lNode::~lNode() {
+}
+
 bool lNode::overflow(void) {
-  for (int32_t i = 0; i < CARDINALITY; i++) {
+  for (int32_t i = 0; i < CARDINALITY; i++ ) {
     if (entry[i].ptr == NULL) return false;
   }
   return true;
 }
 
-void lNode::insert(int64_t key, void *ptr) {
+void lNode::insert(int64_t key, void* ptr) {
   int32_t loc;
-  if (update(key, ptr)) return;
   for (loc = 0; loc < CARDINALITY; loc++) {
     if (entry[loc].ptr == NULL) break;
   }
 
   entry[loc].key = key;
   entry[loc].ptr = ptr;
-  clflush((char *) &entry[loc], sizeof(LeafEntry));
+  clflush((char*)&entry[loc], sizeof(LeafEntry));
 }
 
-Split *lNode::split(int64_t key, void *ptr) {
-  Split *s = new Split;
-  array<LeafEntry, CARDINALITY> temp(entry);
-  sort(temp.begin(), temp.end(),
-       [](LeafEntry a, LeafEntry b) {
-         if (b.ptr == NULL) return true;
-         return a.key < b.key;
-       });
-  lNode *left, *right;
+void lNode::sInsert(int32_t idx, int64_t key, void* ptr) {
+  entry[idx].key = key;
+  entry[idx].ptr = ptr;
+}
 
-  int32_t mIdx = CARDINALITY / 2;
+Split* lNode::split(int64_t key, void* ptr) {
+  Split* split = new Split;
+  array<LeafEntry, CARDINALITY> temp(entry);
+  std::sort(temp.begin(), temp.end(),
+            [](LeafEntry a, LeafEntry b) {
+              if (b.ptr == NULL) return true;
+              return a.key < b.key;
+            } );
+
+  int32_t mIdx   = CARDINALITY/2;
   int64_t median = temp[mIdx].key;
 
-  left = new lNode();
-  right = new lNode();
+  lNode* left = new lNode();
+  lNode* right = new lNode();
 
-  left->sibling = right;
-  right->sibling = this->sibling;
-  left->splitKey = splitKey;
+  left->sibling   = right;
+  right->sibling  = this->sibling;
+  left->splitKey  = splitKey;
   right->splitKey = median;
 
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (i < mIdx)
-      left->insert(temp[i].key, temp[i].ptr);
+      left->sInsert(i, temp[i].key, temp[i].ptr);
     else
-      right->insert(temp[i].key, temp[i].ptr);
+      right->sInsert(i-mIdx, temp[i].key, temp[i].ptr);
   }
-  if (key < median) left->insert(key, ptr);
-  else right->insert(key, ptr);
+  if (key < median) left->sInsert(mIdx, key, ptr);
+  else right->sInsert(CARDINALITY-mIdx, key, ptr);
 
-  clflush((char *) &left, sizeof(lNode));
-  clflush((char *) &right, sizeof(lNode));
+  clflush((char*)left, sizeof(lNode));
+  clflush((char*)right, sizeof(lNode));
 
-  s->original = this;
-  s->left = left;
-  s->right = right;
-  s->splitKey = median;
+  split->original = this;
+  split->left = left;
+  split->right = right;
+  split->splitKey = median;
 
-  return s;
+  return split;
 }
 
-Merge *lNode::merge() {
-  Merge *m = new Merge;
-  lNode *_left = this;
-  lNode *_right = (lNode *) sibling;
-  array<LeafEntry, CARDINALITY * 2> temp;
+Merge* lNode::merge() {
+  Merge* m      = new Merge;
+  lNode* _left  = this;
+  lNode* _right = (lNode*)sibling;
+  array<LeafEntry, CARDINALITY*2> temp;
 
   int32_t cnt = 0;
   auto pred = [&cnt](LeafEntry e) {
@@ -518,44 +590,44 @@ Merge *lNode::merge() {
     return true;
   };
   copy_if(_left->entry.begin(), _left->entry.end(), temp.begin(), pred);
-  copy_if(_right->entry.begin(), _right->entry.end(), temp.begin() + cnt, pred);
+  copy_if(_right->entry.begin(), _right->entry.end(), temp.begin()+cnt, pred);
 
-  sort(temp.begin(), temp.begin() + cnt,
-       [](LeafEntry a, LeafEntry b) {
-         return a.key < b.key;
-       });
+  std::sort(temp.begin(), temp.begin()+cnt,
+            [](LeafEntry a, LeafEntry b) {
+              return a.key < b.key;
+            } );
 
   if (cnt <= CARDINALITY) { // Merge
-    lNode *merged = new lNode();
-    copy(temp.begin(), temp.begin() + cnt, merged->entry.begin());
+    lNode* merged = new lNode();
+    copy(temp.begin(), temp.begin()+cnt, merged->entry.begin());
     merged->splitKey = _left->splitKey;
-    merged->sibling = _right->sibling;
-    clflush((char *) &merged, sizeof(lNode));
+    merged->sibling  = _right->sibling;
+    clflush((char*)&merged, sizeof(lNode));
 
-    m->_left = _left;
+    m->_left  = _left;
     m->_right = _right;
-    m->left = merged;
-    m->right = NULL;
-  } else {
-    lNode *left = new lNode();
-    lNode *right = new lNode();
-    int32_t mIdx = cnt / 2;
+    m->left   = merged;
+    m->right  = NULL;
+  } else{
+    lNode* left    = new lNode();
+    lNode* right   = new lNode();
+    int32_t mIdx   = cnt/2;
     int64_t median = temp[mIdx].key;
 
-    copy(temp.begin(), temp.begin() + mIdx, left->entry.begin());
-    copy(temp.begin() + mIdx, temp.begin() + cnt, right->entry.begin());
+    copy(temp.begin(), temp.begin()+mIdx, left->entry.begin());
+    copy(temp.begin()+mIdx, temp.begin()+cnt, right->entry.begin());
 
-    left->splitKey = _left->splitKey;
-    left->sibling = right;
+    left->splitKey  = _left->splitKey;
+    left->sibling   = right;
     right->splitKey = median;
-    right->sibling = _right->sibling;
-    clflush((char *) &left, sizeof(lNode));
-    clflush((char *) &right, sizeof(lNode));
+    right->sibling  = _right->sibling;
+    clflush((char*)&left, sizeof(lNode));
+    clflush((char*)&right, sizeof(lNode));
 
-    m->_left = _left;
+    m->_left  = _left;
     m->_right = _right;
-    m->left = left;
-    m->right = right;
+    m->left   = left;
+    m->right  = right;
   }
   return m;
 }
@@ -564,11 +636,10 @@ void lNode::remove(int64_t key) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       entry[i].ptr = NULL;
-      clflush((char *) &entry[i].ptr, sizeof(char *));
+      clflush((char*)&entry[i].ptr, sizeof(char*));
       return;
     }
   }
-  //global.log("Deletion failed", 1);
 }
 
 bool lNode::update(int64_t key, void *ptr) {
@@ -587,14 +658,14 @@ bool lNode::update(int64_t key, void *ptr) {
   return false;
 }
 
-void *lNode::search(int64_t key) {
+void* lNode::search(int64_t key) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       return entry[i].ptr;
     }
   }
-  if (sibling && sibling->splitKey < key) {
-    return ((lNode *) sibling)->search(key);
+  if (sibling && sibling->splitKey < key)  {
+    return ((lNode*)sibling)->search(key);
   }
   return NULL;
 }
@@ -626,7 +697,7 @@ int lNode::print() {
   return cnt;
 }
 
-int lNode::print(stringstream &ss) {
+int lNode::print(stringstream& ss) {
 #ifdef MULTITHREAD
   if (loc == 1)
     ss << "LOCEKD" << endl;
@@ -656,7 +727,6 @@ void lNode::copy_debug(std::vector<int64_t> &keys) {
 
 // Internal Node //
 iNode::iNode() : Node(Node::Internal) {
-  //global.log("Internal Node Constructed");
   root = -1;
   cnt = 0;
   deleteCnt = 0;
@@ -669,8 +739,7 @@ iNode::iNode() : Node(Node::Internal) {
   }
 }
 
-iNode::iNode(Split *s) : Node(Node::Internal) {
-  //global.log("Internal Node Constructed");
+iNode::iNode(Split* s) : Node(Node::Internal) {
   root = -1;
   cnt = 0;
   deleteCnt = 0;
@@ -684,13 +753,16 @@ iNode::iNode(Split *s) : Node(Node::Internal) {
   insert(s->splitKey, s->left, s->right);
 }
 
+iNode::~iNode() {
+}
+
 bool iNode::overflow(void) {
   return cnt >= CARDINALITY;
 }
 
-Node *iNode::search(int64_t key) {
+Node* iNode::search(int64_t key) {
   if (sibling && sibling->splitKey < key) {
-    return ((iNode *) sibling)->search(key);
+    return ((iNode*)sibling)->search(key);
   }
   int32_t cur = root;
   while (cur >= 0) {
@@ -706,23 +778,22 @@ Node *iNode::search(int64_t key) {
       cur = entry[cur].right;
     }
   }
-  //global.log("iNode::search - SHOULD NOT REACH HERE", 10);
 }
 
-int32_t iNode::insert(int64_t key, Node *_left, Node *_right) {
+int32_t iNode::insert(int64_t key, Node* _left, Node* _right) {
   int32_t loc = cnt++;
-  clflush((char *) &cnt, sizeof(int32_t));
+  clflush((char*)&cnt, sizeof(int32_t));
 
   entry[loc].key = key;
   entry[loc].left = -1;
   entry[loc].right = -1;
   entry[loc].lPtr = _left;
   entry[loc].rPtr = _right;
-  clflush((char *) &entry[loc], sizeof(InternalEntry));
+  clflush((char*)&entry[loc], sizeof(InternalEntry));
 
   if (root == -1) {
     root = loc;
-    clflush((char *) &root, sizeof(int32_t));
+    clflush((char*)&root, sizeof(int32_t));
     return loc;
   }
 
@@ -731,9 +802,9 @@ int32_t iNode::insert(int64_t key, Node *_left, Node *_right) {
     if (key < entry[parent].key) {
       if (entry[parent].left == -1) {
         entry[parent].left = loc;
-        Node *tmp = entry[parent].lPtr;
+        Node* tmp = entry[parent].lPtr;
         entry[parent].lPtr = NULL;
-        clflush((char *) &entry[parent].left, 16);
+        clflush((char*)&entry[parent].left, 16);
         // delete tmp;
         return loc;
       }
@@ -741,53 +812,91 @@ int32_t iNode::insert(int64_t key, Node *_left, Node *_right) {
     } else {
       if (entry[parent].right == -1) {
         entry[parent].right = loc;
-        Node *tmp = entry[parent].rPtr;
+        Node* tmp = entry[parent].rPtr;
         entry[parent].rPtr = NULL;
-        clflush((char *) &entry[parent].right, 12);
+        clflush((char*)&entry[parent].right, 12);
         // delete tmp;
         return loc;
       }
       parent = entry[parent].right;
     }
   }
-  //global.log("iNode::insert - SHOULD NOT REACH HERE", 10);
 }
 
-Split *iNode::split(int64_t key, Node *_left, Node *_right) {
+int32_t iNode::sInsert(int64_t key, Node* _left, Node* _right) {
+  int32_t loc = cnt++;
+
+  entry[loc].key = key;
+  entry[loc].left = -1;
+  entry[loc].right = -1;
+  entry[loc].lPtr = _left;
+  entry[loc].rPtr = _right;
+
+  if (root == -1) {
+    root = loc;
+    return loc;
+  }
+
+  int32_t parent = root;
+  while (parent >= 0) {
+    if (key < entry[parent].key) {
+      if (entry[parent].left == -1) {
+        entry[parent].left = loc;
+        Node* tmp = entry[parent].lPtr;
+        entry[parent].lPtr = NULL;
+        // delete tmp;
+        return loc;
+      }
+      parent = entry[parent].left;
+    } else {
+      if (entry[parent].right == -1) {
+        entry[parent].right = loc;
+        Node* tmp = entry[parent].rPtr;
+        entry[parent].rPtr = NULL;
+        // delete tmp;
+        return loc;
+      }
+      parent = entry[parent].right;
+    }
+  }
+}
+
+Split* iNode::split(int64_t key, Node* _left, Node* _right) {
   int32_t cnt = 0;
-  Node *leftmost = NULL;
-  LeafEntry *sorted = transform(cnt, leftmost);
+  Node* leftmost = NULL;
+  LeafEntry* sorted = transform(cnt, leftmost);
 
   if (cnt == CARDINALITY) { // split
-    Split *s = new Split;
-    iNode *left = new iNode();
-    iNode *right = new iNode();
+    Split *s     = new Split;
+    iNode* left  = new iNode();
+    iNode* right = new iNode();
 
     int32_t ptrIdx = -1;
-    int32_t mIdx = cnt / 2;
+    int32_t mIdx   = cnt/2;
     int64_t median = sorted[mIdx].key;
 
-    left->balancedInsert(sorted, 0, mIdx - 1, ptrIdx, leftmost);
-    right->balancedInsert(sorted, mIdx + 1, CARDINALITY - 1, ptrIdx, (Node *) sorted[mIdx].ptr);
+    // defragmentation(left, right, root, median);
+    left->balancedInsert(sorted, 0, mIdx-1, ptrIdx, leftmost);
+    right->balancedInsert(sorted, mIdx+1, CARDINALITY-1, ptrIdx, (Node*)sorted[mIdx].ptr);
 
     if (key < median) {
-      left->insert(key, _left, _right);
+      left->sInsert(key, _left, _right);
     } else {
-      right->insert(key, _left, _right);
+      right->sInsert(key, _left, _right);
     }
 
-    left->sibling = right;
-    left->splitKey = splitKey;
-    right->sibling = this->sibling;
+    left->sibling   = right;
+    left->splitKey  = splitKey;
+    right->sibling  = this->sibling;
     right->splitKey = median;
 
     s->original = this;
-    s->left = left;
-    s->right = right;
+    s->left     = left;
+    s->right    = right;
     s->splitKey = median;
 
-    clflush((char *) &left, sizeof(iNode));
-    clflush((char *) &right, sizeof(iNode));
+    clflush((char*)left, 32+16+sizeof(InternalEntry)*mIdx);
+    clflush((char*)right, 32+16+sizeof(InternalEntry)*mIdx);
 
     return s;
   } else { // rebalance TODO
@@ -796,10 +905,10 @@ Split *iNode::split(int64_t key, Node *_left, Node *_right) {
 }
 
 // Both nodes share same parent entry
-void iNode::remove(int64_t key, Node *replacement) {
+void iNode::remove(int64_t key, Node* replacement) {
   int32_t cur = root;
   int32_t parent = root;
-  iNode::Direction dir = iNode::None; // 0-left, 1-right
+  iNode::Direction dir= iNode::None; // 0-left, 1-right
   while (key != entry[cur].key) {
     parent = cur;
     if (key < entry[cur].key) {
@@ -813,28 +922,26 @@ void iNode::remove(int64_t key, Node *replacement) {
 
   if (parent == -1) {
     // Height is reduced.
-    //global.log("iNode::remove - SOMETHING WRONG.", 10);
   } else {
     if (dir == iNode::Left) {
       entry[parent].lPtr = replacement;
       entry[parent].left = -1;
-      clflush((char *) &entry[parent].left, 16);
+      clflush((char*)&entry[parent].left, 16);
     } else {
       entry[parent].rPtr = replacement;
       entry[parent].right = -1;
-      clflush((char *) &entry[parent].right, 12);
+      clflush((char*)&entry[parent].right, 12);
     }
   }
 }
 
-void iNode::remove(int32_t leftParent, int32_t rightParent, Node *replacement, Node *lSib) {
-  //if (replacement == NULL) global.log("SOMETHING WRONG", 10);
+void iNode::remove(int32_t leftParent, int32_t rightParent, Node* replacement, Node* lSib) {
   if (leftParent == rightParent) {
     block(leftParent, iNode::Left);
     block(leftParent, iNode::Right); // FIXME LATER
     if (lSib) {
       lSib->sibling = replacement;
-      clflush((char *) &lSib->sibling, sizeof(void *));
+      clflush((char*)&lSib->sibling, sizeof(void*));
     }
     remove(entry[leftParent].key, replacement);
   } else {
@@ -843,91 +950,91 @@ void iNode::remove(int32_t leftParent, int32_t rightParent, Node *replacement, N
       int32_t parent = getParent(leftParent);
       if (lSib == NULL) { // leftmost
         entry[leftParent].lPtr->sibling = replacement;
-        clflush((char *) &entry[leftParent].lPtr->sibling, sizeof(void *));
+        clflush((char*)&entry[leftParent].lPtr->sibling, sizeof(void*));
         entry[rightParent].lPtr = replacement;
-        clflush((char *) &entry[rightParent].lPtr, sizeof(void *));
+        clflush((char*)&entry[rightParent].lPtr, sizeof(void*));
         // blocking left node
         if (parent == -1) { // leftParent is root
           root = entry[leftParent].right;
-          clflush((char *) &root, 4);
+          clflush((char*)&root, 4);
         } else { // because it's leftmost
           entry[parent].left = entry[leftParent].right;
-          clflush((char *) &entry[parent].left, 4);
+          clflush((char*)&entry[parent].left, 4);
         }
       } else {
         // blocking left node
         if (parent == -1) { // leftParent is root
           root = entry[leftParent].right;
-          clflush((char *) &root, 4);
+          clflush((char*)&root, 4);
         } else if (entry[parent].left == leftParent) {
           entry[parent].left = entry[leftParent].right;
-          clflush((char *) &entry[parent].left, 4);
+          clflush((char*)&entry[parent].left, 4);
         } else {
           entry[parent].right = entry[leftParent].right;
-          clflush((char *) &entry[parent].right, 4);
+          clflush((char*)&entry[parent].right, 4);
         }
         lSib->sibling = replacement;
-        clflush((char *) &lSib->sibling, sizeof(void *));
+        clflush((char*)&lSib->sibling, sizeof(void*));
         entry[rightParent].lPtr = replacement;
-        clflush((char *) &entry[rightParent].lPtr, sizeof(void *));
+        clflush((char*)&entry[rightParent].lPtr, sizeof(void*));
       }
     } else { // right is higher
       block(leftParent, iNode::Right);
       int32_t parent = getParent(rightParent);
       if (parent == -1) { // rightParent is root
         root = entry[rightParent].left;
-        clflush((char *) &root, 4);
+        clflush((char*)&root, 4);
       } else if (entry[parent].left == rightParent) {
         entry[parent].left = entry[rightParent].left;
-        clflush((char *) &entry[parent].left, 4);
+        clflush((char*)&entry[parent].left, 4);
       } else {
         entry[parent].right = entry[rightParent].left;
-        clflush((char *) &entry[parent].right, 4);
+        clflush((char*)&entry[parent].right, 4);
       }
       lSib->sibling = replacement;
-      clflush((char *) &lSib->sibling, sizeof(void *));
+      clflush((char*)&lSib->sibling, sizeof(void*));
       entry[leftParent].rPtr = replacement;
-      clflush((char *) &entry[leftParent].rPtr, sizeof(void *));
+      clflush((char*)&entry[leftParent].rPtr, sizeof(void*));
     }
   }
   deleteCnt++;
 }
 
-void iNode::update(int32_t leftParent, int32_t rightParent, Node *left, Node *right, Node *lSib) {
+void iNode::update(int32_t leftParent, int32_t rightParent, Node* left, Node* right, Node* lSib) {
   if (leftParent == rightParent) {
     block(leftParent, iNode::Right);
     if (lSib != NULL) {
       block(leftParent, iNode::Left);
       lSib->sibling = left;
-      clflush((char *) &lSib->sibling, sizeof(void *));
+      clflush((char*)&lSib->sibling, sizeof(void*));
     }
     entry[leftParent].key = right->splitKey;
     entry[leftParent].lPtr = left;
     entry[leftParent].rPtr = right;
-    clflush((char *) &entry[leftParent], sizeof(InternalEntry));
+    clflush((char*)&entry[leftParent], sizeof(InternalEntry));
   } else {
     if (entry[leftParent].right != -1) { // left is higher
       block(rightParent, iNode::Left);
       if (lSib != NULL) { // leftmost
         block(leftParent, iNode::Left);
         lSib->sibling = left;
-        clflush((char *) &lSib->sibling, sizeof(void *));
+        clflush((char*)&lSib->sibling, sizeof(void*));
       }
       entry[leftParent].key = right->splitKey;
       entry[leftParent].lPtr = left;
-      clflush((char *) &entry[leftParent], sizeof(InternalEntry));
+      clflush((char*)&entry[leftParent], sizeof(InternalEntry));
       entry[rightParent].lPtr = right;
-      clflush((char *) &entry[rightParent].lPtr, sizeof(void *));
+      clflush((char*)&entry[rightParent].lPtr, sizeof(void*));
     } else { // right is higher
       block(leftParent, iNode::Right);
       block(rightParent, iNode::Right);
       lSib->sibling = left;
-      clflush((char *) &lSib, sizeof(void *));
+      clflush((char*)&lSib, sizeof(void*));
       entry[rightParent].key = right->splitKey;
       entry[rightParent].rPtr = right;
-      clflush((char *) &entry[rightParent], sizeof(InternalEntry));
+      clflush((char*)&entry[rightParent], sizeof(InternalEntry));
       entry[leftParent].rPtr = left;
-      clflush((char *) &entry[leftParent].rPtr, sizeof(void *));
+      clflush((char*)&entry[leftParent].rPtr, sizeof(void*));
     }
   }
 }
@@ -935,14 +1042,14 @@ void iNode::update(int32_t leftParent, int32_t rightParent, Node *left, Node *ri
 void iNode::block(int32_t parent, iNode::Direction dir) {
   if (dir == iNode::Left) { // blocking left child
     entry[parent].lPtr = NULL;
-    clflush((char *) &entry[parent].lPtr, sizeof(void *));
+    clflush((char*)&entry[parent].lPtr,sizeof(void*));
   } else { // blocking right child
     entry[parent].rPtr = NULL;
-    clflush((char *) &entry[parent].rPtr, sizeof(void *));
+    clflush((char*)&entry[parent].rPtr,sizeof(void*));
   }
 }
 
-Node *iNode::getLeftSibling(int32_t parent, iNode::Direction dir) {
+Node* iNode::getLeftSibling(int32_t parent, iNode::Direction dir) {
   if (dir == iNode::Right) {
     if (entry[parent].left == -1) return entry[parent].lPtr;
     else return getRightmostPtr(entry[parent].left);
@@ -973,7 +1080,7 @@ int32_t iNode::getParent(int32_t childIdx) {
   return parent;
 }
 
-int32_t iNode::getParent(Node *childPtr, iNode::Direction &dir) {
+int32_t iNode::getParent(Node* childPtr, iNode::Direction& dir) {
   int32_t cur = root;
   int32_t parent = cur;
   while (cur != -1) {
@@ -1009,17 +1116,28 @@ int32_t iNode::count() {
   return cnt - deleteCnt;
 }
 
-// Merge function should be called from the left page.
-Merge *iNode::merge(void) {
-  iNode *_left = (iNode *) this;
-  iNode *_right = (iNode *) this->sibling;
-  Merge *m = new Merge;
+void iNode::rebalance() {
+  int32_t cnt = 0;
+  Node* leftmost = NULL;
+  LeafEntry* sorted = transform(cnt, leftmost);
 
-  LeafEntry *sorted = new LeafEntry[CARDINALITY * 2];
-  Node *leftmost = NULL;
+  int32_t ptrIdx = -1;
+  this->root = -1;
+  this->cnt = 0;
+  balancedInsert(sorted, 0, cnt-1, ptrIdx, leftmost);
+}
+
+// Merge function should be called from the left page.
+Merge* iNode::merge(void) {
+  iNode* _left  = (iNode*)this;
+  iNode* _right = (iNode*)this->sibling;
+  Merge* m = new Merge;
+
+  LeafEntry* sorted = new LeafEntry[CARDINALITY*2];
+  Node* leftmost = NULL;
   int32_t cnt = 0;
   int32_t ptrIdx = 0;
-  _left->transform(sorted, cnt, ptrIdx, leftmost, true);
+  _left-> transform(sorted, cnt, ptrIdx, leftmost, true);
   sorted[cnt].key = _right->splitKey;
   sorted[cnt].ptr = _right->getLeftmostPtr();
   cnt++;
@@ -1028,82 +1146,82 @@ Merge *iNode::merge(void) {
   ptrIdx = -1;
 
   if (!(cnt > CARDINALITY)) { // MERGE
-    iNode *left = new iNode();
-    left->balancedInsert(sorted, 0, cnt - 1, ptrIdx, leftmost);
+    iNode* left = new iNode();
+    left->balancedInsert(sorted, 0, cnt-1, ptrIdx, leftmost);
     left->sibling = _right->sibling;
     left->splitKey = splitKey;
-    clflush((char *) &left, sizeof(iNode));
+    clflush((char*)left, sizeof(iNode));
 
-    m->_left = this;
+    m->_left  = this;
     m->_right = _right;
-    m->left = left;
-    m->right = NULL;
+    m->left   = left;
+    m->right  = NULL;
   } else { // REDISTRIBUTION
-    iNode *left = new iNode();
-    iNode *right = new iNode();
-    int32_t mIdx = cnt / 2;
+    iNode* left  = new iNode();
+    iNode* right = new iNode();
+    int32_t mIdx   = cnt/2;
     int64_t median = sorted[mIdx].key;
 
-    left->balancedInsert(sorted, 0, mIdx - 1, ptrIdx, leftmost);
-    right->balancedInsert(sorted, mIdx + 1, cnt - 1, ptrIdx, (Node *) sorted[mIdx].ptr);
+    left->balancedInsert(sorted, 0, mIdx-1, ptrIdx, leftmost);
+    right->balancedInsert(sorted, mIdx+1, cnt-1, ptrIdx, (Node*)sorted[mIdx].ptr);
 
-    left->sibling = right;
-    left->splitKey = splitKey;
-    right->sibling = _right->sibling;
+    left->sibling   = right;
+    left->splitKey  = splitKey;
+    right->sibling  = _right->sibling;
     right->splitKey = median;
 
-    m->_left = this;
+    m->_left  = this;
     m->_right = _right;
-    m->left = left;
-    m->right = right;
+    m->left   = left;
+    m->right  = right;
 
-    clflush((char *) &left, sizeof(iNode));
-    clflush((char *) &right, sizeof(iNode));
+    clflush((char*)left, sizeof(iNode));
+    clflush((char*)right, sizeof(iNode));
   }
   delete sorted;
   return m;
 }
 
-Node *iNode::getLeftmostPtr(void) {
+Node* iNode::getLeftmostPtr(void) {
   return getLeftmostPtr(root);
 }
 
-Node *iNode::getLeftmostPtr(int32_t loc) {
+Node* iNode::getLeftmostPtr(int32_t loc) {
   int32_t cur = loc;
-  while (entry[cur].left != -1) {
+  while ( entry[cur].left != -1 ) {
     cur = entry[cur].left;
   }
   return entry[cur].lPtr;
 }
 
-Node *iNode::getRightmostPtr(void) {
+Node* iNode::getRightmostPtr(void) {
   return getRightmostPtr(root);
 }
 
-Node *iNode::getRightmostPtr(int32_t loc) {
+Node* iNode::getRightmostPtr(int32_t loc) {
   int32_t cur = loc;
-  while (entry[cur].right != -1) {
+  while ( entry[cur].right != -1 ) {
     cur = entry[cur].right;
   }
   return entry[cur].rPtr;
 }
 
-LeafEntry *iNode::transform(int32_t &cnt, Node *&leftmost) {
-  LeafEntry *transformed = new LeafEntry[CARDINALITY];
+LeafEntry* iNode::transform(int32_t& cnt, Node*& leftmost) {
+  LeafEntry* transformed = new LeafEntry[CARDINALITY];
   cnt = 0;
   int32_t ptrIdx = 0;
   transform(transformed, cnt, ptrIdx, leftmost, true);
   return transformed;
 }
 
-void iNode::transform(LeafEntry *transformed, int32_t &cnt, int32_t &ptrIdx, Node *&leftmost, bool first) {
+void iNode::transform(LeafEntry* transformed, int32_t &cnt, int32_t& ptrIdx, Node*& leftmost, bool first) {
   int32_t stack[CARDINALITY] = {-1};
   int32_t top = 1;
   int32_t cur = root;
   int32_t last = -1;
 
   while (cur != -1) {
-    if (last == stack[top - 1]) {
+    if (last == stack[top-1]) {
       last = cur;
       if (entry[cur].left != -1) {
         stack[top++] = cur;
@@ -1111,7 +1229,7 @@ void iNode::transform(LeafEntry *transformed, int32_t &cnt, int32_t &ptrIdx, Nod
       } else if (entry[cur].right != -1) {
         transformed[cnt++].key = entry[cur].key;
         if (!first) {
-          transformed[ptrIdx++].ptr = (void *) entry[cur].lPtr;
+          transformed[ptrIdx++].ptr = (void*)entry[cur].lPtr;
         } else {
           leftmost = entry[cur].lPtr;
           first = false;
@@ -1121,12 +1239,12 @@ void iNode::transform(LeafEntry *transformed, int32_t &cnt, int32_t &ptrIdx, Nod
       } else {
         transformed[cnt++].key = entry[cur].key;
         if (!first) {
-          transformed[ptrIdx++].ptr = (void *) entry[cur].lPtr;
+          transformed[ptrIdx++].ptr = (void*)entry[cur].lPtr;
         } else {
           leftmost = entry[cur].lPtr;
           first = false;
         }
-        transformed[ptrIdx++].ptr = (void *) entry[cur].rPtr;
+        transformed[ptrIdx++].ptr = (void*)entry[cur].rPtr;
         cur = stack[--top];
       }
     } else if (last == entry[cur].left) {
@@ -1136,7 +1254,7 @@ void iNode::transform(LeafEntry *transformed, int32_t &cnt, int32_t &ptrIdx, Nod
         stack[top++] = cur;
         cur = entry[cur].right;
       } else {
-        transformed[ptrIdx++].ptr = (void *) entry[cur].rPtr;
+        transformed[ptrIdx++].ptr = (void*)entry[cur].rPtr;
         cur = stack[--top];
       }
     } else if (last == entry[cur].right) {
@@ -1146,27 +1264,52 @@ void iNode::transform(LeafEntry *transformed, int32_t &cnt, int32_t &ptrIdx, Nod
   } // while
 }
 
-bool iNode::balancedInsert(LeafEntry *arr, int32_t from, int32_t to, int32_t &ptrIdx, Node *leftmost) {
+bool iNode::balancedInsert(LeafEntry* arr, int32_t from, int32_t to, int32_t& ptrIdx, Node* leftmost) {
   static int i = 0;
   if (from > to) return true;
-  int32_t mIdx = (from + to) / 2;
-  int32_t loc = insert(arr[mIdx].key, NULL, NULL);
-  if (balancedInsert(arr, from, mIdx - 1, ptrIdx, leftmost)) {
+  int32_t mIdx = (from + to)/2;
+  int32_t loc = sInsert(arr[mIdx].key, NULL, NULL);
+  if (balancedInsert(arr, from, mIdx-1, ptrIdx, leftmost)) {
     entry[loc].left = -1;
     if (ptrIdx == -1) {
       entry[loc].lPtr = leftmost;
       ptrIdx++;
     } else {
-      entry[loc].lPtr = (Node *) arr[ptrIdx++].ptr;
+      entry[loc].lPtr = (Node*) arr[ptrIdx++].ptr;
     }
   }
-  if (balancedInsert(arr, mIdx + 1, to, ptrIdx, leftmost)) {
+  if (balancedInsert(arr, mIdx+1, to, ptrIdx, leftmost)) {
     entry[loc].right = -1;
-    entry[loc].rPtr = (Node *) arr[ptrIdx++].ptr;
+    entry[loc].rPtr = (Node*) arr[ptrIdx++].ptr;
   }
   return false;
 }
 
+void iNode::defragmentation(iNode* left, iNode* right, int16_t idx, int64_t median) {
+  if (idx == -1) return;
+  if (entry[idx].key < median) left->sInsert(entry[idx].key, entry[idx].lPtr, entry[idx].rPtr);
+  else if (entry[idx].key > median) right->sInsert(entry[idx].key, entry[idx].lPtr, entry[idx].rPtr);
+  else {
+    if (entry[idx].left == -1) {
+      int32_t cur = left->root;
+      while (left->entry[cur].right != -1) {
+        cur = left->entry[cur].right;
+      }
+      if (left->entry[cur].rPtr == NULL)
+        left->entry[cur].rPtr = entry[idx].lPtr;
+    }
+    if (entry[idx].right == -1) {
+      int32_t cur = right->root;
+      while (right->entry[cur].left != -1) {
+        cur = right->entry[cur].left;
+      }
+      if (right->entry[cur].lPtr == NULL)
+        right->entry[cur].lPtr = entry[idx].rPtr;
+    }
+  }
+  defragmentation(left, right, entry[idx].left, median);
+  defragmentation(left, right, entry[idx].right, median);
+}
 
 void iNode::print(void) {
 #ifdef MULTITHREAD
@@ -1184,7 +1327,7 @@ void iNode::print(void) {
   cout << endl;
 }
 
-void iNode::print(stringstream &ss) {
+void iNode::print(stringstream& ss) {
 #ifdef MULTITHREAD
   if (loc == 1)
     ss << "LOCEKD" << endl;
@@ -1223,7 +1366,7 @@ void iNode::print(int32_t pos) {
   }
 }
 
-void iNode::print(int32_t pos, stringstream &ss) {
+void iNode::print(int32_t pos, stringstream& ss) {
   if (pos == -1) return;
   if (entry[pos].left != -1) {
     print(entry[pos].left, ss);
@@ -1246,7 +1389,7 @@ void iNode::print(int32_t pos, stringstream &ss) {
   }
 }
 
-void iNode::copy_debug(std::vector<int64_t> &keys, std::queue<Node *> &values, int32_t pos) {
+void iNode::copy_debug(std::vector<int64_t> &keys, std::queue<Node*> &values, int32_t pos) {
   if (root == -1) return;
   if (pos == -1) {
     copy_debug(keys, values, root);
@@ -1262,5 +1405,3 @@ void iNode::copy_debug(std::vector<int64_t> &keys, std::queue<Node *> &values, i
   if (entry[pos].right != -1)
     copy_debug(keys, values, entry[pos].right);
 }
-
-} // namespace leveldb
