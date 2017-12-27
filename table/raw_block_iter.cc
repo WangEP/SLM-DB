@@ -3,17 +3,23 @@
 
 namespace leveldb {
 
-RawBlockIterator::RawBlockIterator(SequentialFile* file) {
-  stream_ = new Streamer(file);
+RawBlockIterator::RawBlockIterator(SequentialFile* file): stream_(file) {
   count = 0;
-  while (!stream_->eof()) {
+  while (!stream_.eof()) {
     Slice key;
-    stream_->Get(&key);
+    stream_.Get(&key);
     Slice value;
-    stream_->Get(&value);
+    stream_.Get(&value);
     vector_.push_back({key, value});
   }
   iterator_ = vector_.begin();
+}
+
+RawBlockIterator::~RawBlockIterator() {
+  for (auto it : vector_) {
+    delete it.first.data();
+    delete it.second.data();
+  }
 }
 
 bool RawBlockIterator::Valid() const {
@@ -52,7 +58,7 @@ Slice RawBlockIterator::value() const {
 }
 
 Status RawBlockIterator::status() const {
-  return stream_->status();
+  return stream_.status();
 }
 
 }

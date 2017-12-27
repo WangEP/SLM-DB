@@ -144,7 +144,7 @@ class DBImpl : public DB {
   GlobalIndex* global_index_;
 
   // Ongoing compaction
-  ReadAppendFile* curr_compaction_file_;
+  MemoryIOFile* curr_compaction_file_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;

@@ -59,6 +59,7 @@ set(LEVEL_DB_FILES
         include/leveldb/table.h
         include/leveldb/table_builder.h
         include/leveldb/write_batch.h
+        include/leveldb/export.h
         include/leveldb/global_index.h
         db/c.cc
         db/builder.cc
@@ -90,6 +91,7 @@ set(LEVEL_DB_FILES
         db/version_set.cc
         db/version_set.h
         db/write_batch.cc
+        db/write_batch_internal.h
         db/global_index.cc
         db/nvm_btree.cc
         db/nvm_btree.h
@@ -158,7 +160,6 @@ else()
     list(APPEND LEVEL_DB_FILES
             port/port_posix.h
             port/port_posix.cc
-            port/port_posix_sse.cc
             util/posix_logger.h
             util/env_posix.cc)
 endif()
@@ -171,7 +172,7 @@ target_include_directories(leveldb
         )
 
 set_target_properties(leveldb PROPERTIES PUBLIC_HEADER
-        "include/leveldb/c.h;include/leveldb/cache.h;include/leveldb/comparator.h;include/leveldb/db.h;include/leveldb/dumpfile.h;include/leveldb/env.h;include/leveldb/iterator.h;include/leveldb/filter_policy.h;include/leveldb/iterator.h;include/leveldb/options.h;include/leveldb/slice.h;include/leveldb/status.h;include/leveldb/table.h;include/leveldb/table_builder.h;include/leveldb/write_batch.h;include/leveldb/global_index.h")
+        "include/leveldb/c.h;include/leveldb/cache.h;include/leveldb/comparator.h;include/leveldb/db.h;include/leveldb/dumpfile.h;include/leveldb/env.h;include/leveldb/iterator.h;include/leveldb/filter_policy.h;include/leveldb/iterator.h;include/leveldb/options.h;include/leveldb/slice.h;include/leveldb/status.h;include/leveldb/table.h;include/leveldb/table_builder.h;include/leveldb/write_batch.h;include/leveldb/export.h; include/leveldb/global_index.h")
 
 target_link_libraries(leveldb
         PRIVATE
@@ -183,6 +184,9 @@ INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINA
 
 add_executable(insert_bench bench/insert_bench.cc)
 target_link_libraries(insert_bench PUBLIC leveldb)
+
+add_executable(read_bench bench/read_bench.cc)
+target_link_libraries(read_bench PUBLIC leveldb)
 
 add_executable(simple_bench bench/simple_bench.cc)
 target_link_libraries(simple_bench PUBLIC leveldb)

@@ -8,11 +8,11 @@
 
 namespace leveldb {
 
-class RawBlockIterator : public Iterator {
+class LEVELDB_EXPORT RawBlockIterator : public Iterator {
  public:
   RawBlockIterator(SequentialFile* file);
 
-  ~RawBlockIterator() { delete stream_; }
+  ~RawBlockIterator();
 
   bool Valid() const;
 
@@ -33,7 +33,7 @@ class RawBlockIterator : public Iterator {
   Status status() const;
 
  private:
-  Streamer* stream_;
+  Streamer stream_;
   std::vector<std::pair<Slice, Slice>> vector_;
   std::vector<std::pair<Slice, Slice>>::iterator iterator_;
   uint64_t count;

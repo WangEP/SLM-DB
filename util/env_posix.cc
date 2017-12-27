@@ -352,40 +352,23 @@ class PosixWritableFile : public WritableFile {
   }
 };
 
-class PosixReadAppendFile : public ReadAppendFile {
+class PosixMemoryIOFile : public MemoryIOFile {
  private:
-  bip::mapped_region region_;
-  bip::file_mapping file_;
   std::string filename_;
   void* addr_;
   uint64_t max_size_;
   volatile uint64_t current_;
+  int fd_;
   bool is_flushed;
 
  public:
-  PosixReadAppendFile(const std::string& fname, uint64_t size)
-      : filename_(fname) {
-    {  //Create a file
-      bip::file_mapping::remove(fname.c_str());
-      std::filebuf fbuf;
-      fbuf.open(fname.c_str(), std::ios_base::in | std::ios_base::out
-                               | std::ios_base::trunc | std::ios_base::binary);
-      //Set the size
-      fbuf.pubseekoff(size-1, std::ios_base::beg);
-      fbuf.sputc(0);
-    }
-    bip::file_mapping m_file(fname.c_str(), bip::read_write);
-    bip::mapped_region region(m_file, bip::read_write);
-    file_.swap(m_file);
-    region_.swap(region);
-    addr_ = region_.get_address();
-    max_size_ = region_.get_size();
+  PosixMemoryIOFile(const std::string& fname, int fd, void* addr, uint64_t size)
+      : filename_(fname), fd_(fd), addr_(addr), max_size_(size), is_flushed(false) {
     memset(addr_, '0', 32);
     current_ = 32;
-    is_flushed = false;
   }
 
-  ~PosixReadAppendFile() {
+  ~PosixMemoryIOFile() {
     if (!is_flushed) {
       Finish();
     }
@@ -396,7 +379,8 @@ class PosixReadAppendFile : public ReadAppendFile {
     if (is_flushed) return s.IOError("already flushed", filename_);;
     std::string prefix = std::to_string(current_-32);
     memcpy(addr_ + 32 - prefix.size(), prefix.data(), prefix.size());
-    region_.flush(0, current_, true);
+    munmap(addr_, max_size_);
+    close(fd_);
     is_flushed = true;
     return s;
   }
@@ -553,12 +537,41 @@ class PosixEnv : public Env {
     return s;
   }
 
-  virtual Status NewReadAppendFile(const std::string& fname,
-                                  uint64_t size,
-                                  ReadAppendFile** result) {
+  virtual Status NewMemoryIOFile(const std::string &fname,
+                                 uint64_t size,
+                                 MemoryIOFile **result) {
     // NVRAM mmaped file
     Status s;
-    *result = new PosixReadAppendFile(fname, size);
+    int r;
+    int fd = open(fname.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0644);
+    if (fd < 0) {
+      *result = NULL;
+      s = PosixError(fname, errno);
+      return s;
+    }
+    r = lseek(fd, size-1, SEEK_SET);
+    if (r == -1) {
+      close(fd);
+      *result = NULL;
+      s = PosixError(fname, errno);
+      return s;
+    }
+    r = write(fd, "", 1);
+    if (r != 1) {
+      close(fd);
+      *result = NULL;
+      s = PosixError(fname, errno);
+      return s;
+    }
+    void* map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) {
+      close(fd);
+      *result = NULL;
+      s = PosixError(fname, errno);
+      return s;
+    } else {
+      *result = new PosixMemoryIOFile(fname, fd, map, size);
+    }
     return s;
   }
 

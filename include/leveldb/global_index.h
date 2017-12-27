@@ -32,6 +32,9 @@ class GlobalIndex {
   void Insert(const Slice &key, const uint64_t &offset,
               const uint64_t &size, const uint64_t &file_number);
 
+  void Update(const Slice& key , const uint64_t& offset,
+              const uint64_t& size, const uint64_t& file_number);
+
   void Delete(const std::string&);
 
   void Range(const std::string&, const std::string&);

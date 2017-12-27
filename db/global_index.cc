@@ -18,7 +18,7 @@ const DataMeta* GlobalIndex::Get(const Slice& key) {
 
 void GlobalIndex::Insert(const Slice &key, const uint64_t &offset,
                          const uint64_t &size, const uint64_t &file_number) {
-  DataMeta *meta = new DataMeta;
+  DataMeta* meta = new DataMeta;
   meta->offset = offset;
   meta->size = size;
   meta->file_number = file_number;
@@ -27,6 +27,24 @@ void GlobalIndex::Insert(const Slice &key, const uint64_t &offset,
   int64_t hash = std::hash<std::string>{}(s);
   hash = hash < 0 ? -hash : hash;
   tree_->insert(hash, meta);
+}
+
+void GlobalIndex::Update(const Slice& key, const uint64_t& offset,
+                         const uint64_t& size, const uint64_t& file_number) {
+  DataMeta* meta = new DataMeta;
+  meta->offset = offset;
+  meta->size = size;
+  meta->file_number = file_number;
+  clflush((char *) meta, sizeof(DataMeta));
+  std::string s(key.data(), key.size());
+  int64_t hash = std::hash<std::string>{}(s);
+  hash = hash < 0 ? -hash : hash;
+  DataMeta* old_meta = static_cast<DataMeta *>(tree_->update(hash, meta));
+  if (!old_meta) {
+    tree_->insert(hash, meta);
+  } else {
+    delete old_meta;
+  }
 }
 
 void GlobalIndex::Delete(const std::string&) {

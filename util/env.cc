@@ -22,7 +22,7 @@ RandomAccessFile::~RandomAccessFile() {
 WritableFile::~WritableFile() {
 }
 
-ReadAppendFile::~ReadAppendFile() {
+MemoryIOFile::~MemoryIOFile() {
 }
 
 Logger::~Logger() {

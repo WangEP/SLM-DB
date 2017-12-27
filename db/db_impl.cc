@@ -53,7 +53,7 @@ struct DBImpl::CompactionState {
   std::vector<RawBlockIterator*> input_iters;
 
   // State kept for output being generated
-  ReadAppendFile* iofile;
+  MemoryIOFile* iofile;
   uint64_t current_entries;
 
   uint64_t total_bytes;
@@ -595,7 +595,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
 
   // Make the output file
   std::string fname = TableFileName(dbname_, file_number);
-  Status s = env_->NewReadAppendFile(fname, options_.max_file_size, &compact->iofile);
+  Status s = env_->NewMemoryIOFile(fname, options_.max_file_size, &compact->iofile);
   curr_compaction_file_ = compact->iofile;
   compact->current_entries = 0;
   return s;
@@ -666,120 +666,117 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
   // get files for compaction
-
-  std::vector<SequentialFile *> files;
-  for (int which = 0; which < 2; which++) {
-    for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
-      uint64_t file_number = compact->compaction->input(which, i)->number;
-      std::string name = TableFileName(dbname_, file_number);
-      SequentialFile *new_file;
-      Status s = env_->NewSequentialFile(name, &new_file);
-      if (s.ok()) {
-        files.push_back(new_file);
-      }
-    }
-  }
-  std::vector<RawBlockIterator *> iterators;
-  for (auto file : files) {
-    RawBlockIterator *iter = new RawBlockIterator(file);
-    iterators.push_back(iter);
-  }
   Status status;
-  Iterator *input = nullptr;
-  Slice prev_key;
-  while (true) {
-    input = nullptr;
-    for (auto iterator : iterators) {
-      if (iterator->Valid() && (input == nullptr ||
-          internal_comparator_.Compare(input->key(), iterator->key()) > 0)){
-        if (!prev_key.empty() &&
-            internal_comparator_.Compare(prev_key, iterator->key()) == 0) {
-          iterator->Next();
-        } else {
-          input = iterator;
+  {
+
+    std::vector<SequentialFile *> files;
+    for (int which = 0; which < 2; which++) {
+      for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
+        uint64_t file_number = compact->compaction->input(which, i)->number;
+        std::string name = TableFileName(dbname_, file_number);
+        SequentialFile *new_file;
+        Status s = env_->NewSequentialFile(name, &new_file);
+        if (s.ok()) {
+          files.push_back(new_file);
         }
       }
     }
-    if (input == nullptr) break;
-    if (has_imm_.NoBarrier_Load() != NULL) {
-      const uint64_t imm_start = env_->NowMicros();
-      mutex_.Lock();
-      if (imm_ != NULL) {
-        CompactMemTable();
-        bg_cv_.SignalAll();
-      }
-      mutex_.Unlock();
-      imm_micros += (env_->NowMicros() - imm_start);
+    std::vector<std::shared_ptr<RawBlockIterator>> iterators;
+    for (auto file : files) {
+      iterators.push_back(std::make_shared<RawBlockIterator>(file));
     }
-    Slice key = std::move(input->key());
-    Slice value = std::move(input->value());
-    if (compact->compaction->ShouldStopBefore(key) &&
-        compact->iofile != NULL) {
+    std::shared_ptr<RawBlockIterator> input;
+    Slice prev_key;
+    while (true) {
+      input = nullptr;
+      for (auto iterator : iterators) {
+        if (iterator->Valid() && (input.get() == nullptr ||
+            internal_comparator_.Compare(input->key(), iterator->key()) > 0)) {
+          if (!prev_key.empty() &&
+              internal_comparator_.Compare(prev_key, iterator->key()) == 0) {
+            iterator->Next();
+          } else {
+            input = iterator;
+          }
+        }
+      }
+      if (input == nullptr) break;
+      if (has_imm_.NoBarrier_Load() != NULL) {
+        const uint64_t imm_start = env_->NowMicros();
+        mutex_.Lock();
+        if (imm_ != NULL) {
+          CompactMemTable();
+          bg_cv_.SignalAll();
+        }
+        mutex_.Unlock();
+        imm_micros += (env_->NowMicros() - imm_start);
+      }
+      Slice key = std::move(input->key());
+      Slice value = std::move(input->value());
+      if (compact->compaction->ShouldStopBefore(key) &&
+          compact->iofile != NULL) {
+        status = FinishCompactionOutputFile(compact);
+      }
+      // Open output file if necessary
+      if (compact->iofile == NULL) {
+        status = OpenCompactionOutputFile(compact);
+        if (!status.ok()) {
+          break;
+        }
+        compact->current_output()->smallest.DecodeFrom(key);
+      }
+      if (compact->iofile->IsWritable(key.size() + value.size() + 2)) {
+        compact->iofile->Append(key);
+        compact->iofile->Append("\t");
+        uint64_t offset = compact->iofile->Size();
+        uint64_t number = compact->current_output()->number;
+        uint64_t size = value.size();
+        compact->iofile->Append(value);
+        compact->iofile->Append("\t");
+        global_index_->Update(key, offset, size, number);
+      } else {
+        status = FinishCompactionOutputFile(compact);
+        if (!status.ok()) {
+          break;
+        }
+        status = OpenCompactionOutputFile(compact);
+        if (!status.ok()) {
+          break;
+        }
+        compact->current_output()->smallest.DecodeFrom(key);
+        compact->iofile->Append(key);
+        compact->iofile->Append("\t");
+        uint64_t offset = compact->iofile->Size();
+        uint64_t number = compact->current_output()->number;
+        uint64_t size = value.size();
+        compact->iofile->Append(value);
+        compact->iofile->Append("\t");
+        global_index_->Update(key, offset, size, number);
+      }
+      compact->current_entries++;
+      compact->current_output()->largest.DecodeFrom(key);
+      prev_key = key;
+      input->Next();
+    }
+
+    if (status.ok() && shutting_down_.Acquire_Load()) {
+      status = Status::IOError("Deleting DB during compaction");
+    }
+    if (status.ok() && compact->iofile != NULL) {
       status = FinishCompactionOutputFile(compact);
     }
-    // Open output file if necessary
-    if (compact->iofile == NULL) {
-      status = OpenCompactionOutputFile(compact);
-      if (!status.ok()) {
-        break;
-      }
-      compact->current_output()->smallest.DecodeFrom(key);
-    }
-    if (compact->iofile->IsWritable(key.size() + value.size() + 2)) {
-      compact->iofile->Append(key);
-      compact->iofile->Append("\t");
-      uint64_t offset = compact->iofile->Size();
-      uint64_t number = compact->current_output()->number;
-      uint64_t size = value.size();
-      compact->iofile->Append(value);
-      compact->iofile->Append("\t");
-      global_index_->Insert(key, offset, size, number);
-    } else {
-      status = FinishCompactionOutputFile(compact);
-      if (!status.ok()) {
-        break;
-      }
-      status = OpenCompactionOutputFile(compact);
-      if (!status.ok()) {
-        break;
-      }
-      compact->current_output()->smallest.DecodeFrom(key);
-      compact->iofile->Append(key);
-      compact->iofile->Append("\t");
-      uint64_t offset = compact->iofile->Size();
-      uint64_t number = compact->current_output()->number;
-      uint64_t size = value.size();
-      compact->iofile->Append(value);
-      compact->iofile->Append("\t");
-      global_index_->Insert(key, offset, size, number);
-    }
-    compact->current_entries++;
-    compact->current_output()->largest.DecodeFrom(key);
-    prev_key = key;
-    input->Next();
   }
 
-  if (status.ok() && shutting_down_.Acquire_Load()) {
-    status = Status::IOError("Deleting DB during compaction");
-  }
-  if (status.ok() && compact->iofile != NULL) {
-    status = FinishCompactionOutputFile(compact);
-  }
-
-  for (auto iterator : iterators) {
-    delete iterator;
-  }
-
-  CompactionStats stats;
-  stats.micros = env_->NowMicros() - start_micros - imm_micros;
-  for (int which = 0; which < 2; which++) {
-    for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
-      stats.bytes_read += compact->compaction->input(which, i)->file_size;
+    CompactionStats stats;
+    stats.micros = env_->NowMicros() - start_micros - imm_micros;
+    for (int which = 0; which < 2; which++) {
+      for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
+        stats.bytes_read += compact->compaction->input(which, i)->file_size;
+      }
     }
-  }
-  for (size_t i = 0; i < compact->outputs.size(); i++) {
-    stats.bytes_written += compact->outputs[i].file_size;
-  }
+    for (size_t i = 0; i < compact->outputs.size(); i++) {
+      stats.bytes_written += compact->outputs[i].file_size;
+    }
 
   mutex_.Lock();
   stats_[compact->compaction->level() + 1].Add(stats);

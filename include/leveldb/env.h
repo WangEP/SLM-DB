@@ -26,7 +26,7 @@ class FileLock;
 class Logger;
 class RandomAccessFile;
 class SequentialFile;
-class ReadAppendFile;
+class MemoryIOFile;
 class Slice;
 class WritableFile;
 
@@ -92,9 +92,9 @@ class LEVELDB_EXPORT Env {
   // Create read and append file that memory mapped to NVRAM.
   // Flushes from memory to file during destruction.
   // Ensures consistency flushing cache to NVRAM after each write.
-  virtual Status NewReadAppendFile(const std::string &fname,
-                                   uint64_t size,
-                                   ReadAppendFile **result) = 0;
+  virtual Status NewMemoryIOFile(const std::string &fname,
+                                 uint64_t size,
+                                 MemoryIOFile **result) = 0;
 
   // Returns true iff the named file exists.
   virtual bool FileExists(const std::string& fname) = 0;
@@ -252,10 +252,10 @@ class LEVELDB_EXPORT WritableFile {
   void operator=(const WritableFile&);
 };
 
-class ReadAppendFile {
+class LEVELDB_EXPORT MemoryIOFile {
  public:
-  ReadAppendFile() { }
-  virtual ~ReadAppendFile();
+  MemoryIOFile() { }
+  virtual ~MemoryIOFile();
 
   virtual Status Finish() = 0;
   virtual std::string Filename() = 0;
@@ -267,8 +267,8 @@ class ReadAppendFile {
 
  private:
   // No copying allowed
-  ReadAppendFile(const ReadAppendFile&);
-  void operator=(const ReadAppendFile&);
+  MemoryIOFile(const MemoryIOFile&);
+  void operator=(const MemoryIOFile&);
 };
 
 // An interface for writing log messages.

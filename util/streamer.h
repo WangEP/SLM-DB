@@ -18,7 +18,7 @@ class Streamer {
     current_ = 0;
     char p[32];
     Slice* prefix = new Slice();
-    s = file->Read(32, prefix, p);
+    s = file_->Read(32, prefix, p);
     BUFFER_SIZE = std::stoul(prefix->ToString());
     if (BUFFER_SIZE > 0) {
       char *scratch = new char[BUFFER_SIZE];
@@ -28,6 +28,8 @@ class Streamer {
   }
 
   ~Streamer() {
+    buffer_->clear();
+    delete buffer_;
     delete file_;
   }
 
