@@ -386,7 +386,7 @@ class PosixMemoryIOFile : public MemoryIOFile {
   }
 
   virtual std::string Filename() {
-    return filename_;
+    return std::move(filename_);
   }
 
   virtual uint64_t Size() {
@@ -479,10 +479,11 @@ class PosixEnv : public Env {
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) {
     Status s;
-    try {
-      *result = read_file_map.at(fname);
+    auto search = read_file_map.find(fname);
+    if (search != read_file_map.end()) {
+      *result = search->second;
       return s;
-    } catch (std::exception e) {
+    } else {
       *result = NULL;
     }
     int fd = open(fname.c_str(), O_RDONLY);
@@ -596,6 +597,11 @@ class PosixEnv : public Env {
 
   virtual Status DeleteFile(const std::string& fname) {
     Status result;
+    auto search = read_file_map.find(fname);
+    if (search != read_file_map.end()) {
+      delete search->second;
+      read_file_map.erase(search);
+    }
     if (unlink(fname.c_str()) != 0) {
       result = PosixError(fname, errno);
     }

@@ -5,12 +5,18 @@
 #include "db/version_set.h"
 
 #include <algorithm>
+#include <stdio.h>
 #include "db/filename.h"
+#include "db/log_reader.h"
+#include "db/log_writer.h"
 #include "db/memtable.h"
 #include "db/table_cache.h"
 #include "leveldb/env.h"
+#include "leveldb/table_builder.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
+#include "util/coding.h"
+#include "util/logging.h"
 
 namespace leveldb {
 
@@ -593,21 +599,6 @@ std::string Version::DebugString() const {
   return r;
 }
 
-Version::GetStats Version::CollectStats(uint64_t file_number) {
-  for (int level = 0; level < config::kNumLevels; level++) {
-    std::vector<FileMetaData*> list = files_[level];
-    for (int i = 0; i < list.size(); i++) {
-      if (list[i]->number == file_number) {
-        GetStats stats;
-        stats.seek_file_level = level;
-        stats.seek_file = list[i];
-        return stats;
-      }
-    }
-  }
-  return Version::GetStats();
-}
-
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
@@ -657,7 +648,7 @@ class VersionSet::Builder {
       std::vector<FileMetaData*> to_unref;
       to_unref.reserve(added->size());
       for (FileSet::const_iterator it = added->begin();
-          it != added->end(); ++it) {
+           it != added->end(); ++it) {
         to_unref.push_back(*it);
       }
       delete added;
@@ -735,7 +726,7 @@ class VersionSet::Builder {
            ++added_iter) {
         // Add all smaller files listed in base_
         for (std::vector<FileMetaData*>::const_iterator bpos
-                 = std::upper_bound(base_iter, base_end, *added_iter, cmp);
+            = std::upper_bound(base_iter, base_end, *added_iter, cmp);
              base_iter != bpos;
              ++base_iter) {
           MaybeAddFile(v, level, *base_iter);
@@ -795,6 +786,10 @@ VersionSet::VersionSet(const std::string& dbname,
       next_file_number_(2),
       manifest_file_number_(0),  // Filled by Recover()
       last_sequence_(0),
+      log_number_(0),
+      prev_log_number_(0),
+      descriptor_file_(NULL),
+      descriptor_log_(NULL),
       dummy_versions_(this),
       current_(NULL) {
   AppendVersion(new Version(this));
@@ -803,6 +798,8 @@ VersionSet::VersionSet(const std::string& dbname,
 VersionSet::~VersionSet() {
   current_->Unref();
   assert(dummy_versions_.next_ == &dummy_versions_);  // List must be empty
+  delete descriptor_log_;
+  delete descriptor_file_;
 }
 
 void VersionSet::AppendVersion(Version* v) {
@@ -823,6 +820,16 @@ void VersionSet::AppendVersion(Version* v) {
 }
 
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
+  if (edit->has_log_number_) {
+    assert(edit->log_number_ >= log_number_);
+    assert(edit->log_number_ < next_file_number_);
+  } else {
+    edit->SetLogNumber(log_number_);
+  }
+
+  if (!edit->has_prev_log_number_) {
+    edit->SetPrevLogNumber(prev_log_number_);
+  }
 
   edit->SetNextFile(next_file_number_);
   edit->SetLastSequence(last_sequence_);
@@ -834,29 +841,225 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     builder.SaveTo(v);
   }
   Finalize(v);
-  AppendVersion(v);
 
-  return Status::OK();
+  // Initialize new descriptor log file if necessary by creating
+  // a temporary file that contains a snapshot of the current version.
+  std::string new_manifest_file;
+  Status s;
+  if (descriptor_log_ == NULL) {
+    // No reason to unlock *mu here since we only hit this path in the
+    // first call to LogAndApply (when opening the database).
+    assert(descriptor_file_ == NULL);
+    new_manifest_file = DescriptorFileName(dbname_, manifest_file_number_);
+    edit->SetNextFile(next_file_number_);
+    s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
+    if (s.ok()) {
+      descriptor_log_ = new log::Writer(descriptor_file_);
+      s = WriteSnapshot(descriptor_log_);
+    }
+  }
+
+  // Unlock during expensive MANIFEST log write
+  {
+    mu->Unlock();
+
+    // Write new record to MANIFEST log
+    if (s.ok()) {
+      std::string record;
+      edit->EncodeTo(&record);
+      s = descriptor_log_->AddRecord(record);
+      if (s.ok()) {
+        s = descriptor_file_->Sync();
+      }
+      if (!s.ok()) {
+        Log(options_->info_log, "MANIFEST write: %s\n", s.ToString().c_str());
+      }
+    }
+
+    // If we just created a new descriptor file, install it by writing a
+    // new CURRENT file that points to it.
+    if (s.ok() && !new_manifest_file.empty()) {
+      s = SetCurrentFile(env_, dbname_, manifest_file_number_);
+    }
+
+    mu->Lock();
+  }
+
+  // Install the new version
+  if (s.ok()) {
+    AppendVersion(v);
+    log_number_ = edit->log_number_;
+    prev_log_number_ = edit->prev_log_number_;
+  } else {
+    delete v;
+    if (!new_manifest_file.empty()) {
+      delete descriptor_log_;
+      delete descriptor_file_;
+      descriptor_log_ = NULL;
+      descriptor_file_ = NULL;
+      env_->DeleteFile(new_manifest_file);
+    }
+  }
+
+  return s;
 }
 
 Status VersionSet::Recover(bool *save_manifest) {
-  VersionEdit edit;
-  edit.has_last_sequence_ = true;
-  edit.has_next_file_number_ = true;
-  edit.next_file_number_ = 1;
-  edit.last_sequence_ = 0;
-  Version *v = new Version(this);
-  {
-    Builder builder(this, current_);
-    builder.Apply(&edit);
-    builder.SaveTo(v);
-  }
-  Finalize(v);
-  AppendVersion(v);
+  struct LogReporter : public log::Reader::Reporter {
+    Status* status;
+    virtual void Corruption(size_t bytes, const Status& s) {
+      if (this->status->ok()) *this->status = s;
+    }
+  };
 
-  return Status::OK();
+  // Read "CURRENT" file, which contains a pointer to the current manifest file
+  std::string current;
+  Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
+  if (!s.ok()) {
+    return s;
+  }
+  if (current.empty() || current[current.size()-1] != '\n') {
+    return Status::Corruption("CURRENT file does not end with newline");
+  }
+  current.resize(current.size() - 1);
+
+  std::string dscname = dbname_ + "/" + current;
+  SequentialFile* file;
+  s = env_->NewSequentialFile(dscname, &file);
+  if (!s.ok()) {
+    if (s.IsNotFound()) {
+      return Status::Corruption(
+          "CURRENT points to a non-existent file", s.ToString());
+    }
+    return s;
+  }
+
+  bool have_log_number = false;
+  bool have_prev_log_number = false;
+  bool have_next_file = false;
+  bool have_last_sequence = false;
+  uint64_t next_file = 0;
+  uint64_t last_sequence = 0;
+  uint64_t log_number = 0;
+  uint64_t prev_log_number = 0;
+  Builder builder(this, current_);
+
+  {
+    LogReporter reporter;
+    reporter.status = &s;
+    log::Reader reader(file, &reporter, true/*checksum*/, 0/*initial_offset*/);
+    Slice record;
+    std::string scratch;
+    while (reader.ReadRecord(&record, &scratch) && s.ok()) {
+      VersionEdit edit;
+      s = edit.DecodeFrom(record);
+      if (s.ok()) {
+        if (edit.has_comparator_ &&
+            edit.comparator_ != icmp_.user_comparator()->Name()) {
+          s = Status::InvalidArgument(
+              edit.comparator_ + " does not match existing comparator ",
+              icmp_.user_comparator()->Name());
+        }
+      }
+
+      if (s.ok()) {
+        builder.Apply(&edit);
+      }
+
+      if (edit.has_log_number_) {
+        log_number = edit.log_number_;
+        have_log_number = true;
+      }
+
+      if (edit.has_prev_log_number_) {
+        prev_log_number = edit.prev_log_number_;
+        have_prev_log_number = true;
+      }
+
+      if (edit.has_next_file_number_) {
+        next_file = edit.next_file_number_;
+        have_next_file = true;
+      }
+
+      if (edit.has_last_sequence_) {
+        last_sequence = edit.last_sequence_;
+        have_last_sequence = true;
+      }
+    }
+  }
+  delete file;
+  file = NULL;
+
+  if (s.ok()) {
+    if (!have_next_file) {
+      s = Status::Corruption("no meta-nextfile entry in descriptor");
+    } else if (!have_log_number) {
+      s = Status::Corruption("no meta-lognumber entry in descriptor");
+    } else if (!have_last_sequence) {
+      s = Status::Corruption("no last-sequence-number entry in descriptor");
+    }
+
+    if (!have_prev_log_number) {
+      prev_log_number = 0;
+    }
+
+    MarkFileNumberUsed(prev_log_number);
+    MarkFileNumberUsed(log_number);
+  }
+
+  if (s.ok()) {
+    Version* v = new Version(this);
+    builder.SaveTo(v);
+    // Install recovered version
+    Finalize(v);
+    AppendVersion(v);
+    manifest_file_number_ = next_file;
+    next_file_number_ = next_file + 1;
+    last_sequence_ = last_sequence;
+    log_number_ = log_number;
+    prev_log_number_ = prev_log_number;
+
+    // See if we can reuse the existing MANIFEST file.
+    if (ReuseManifest(dscname, current)) {
+      // No need to save new manifest
+    } else {
+      *save_manifest = true;
+    }
+  }
+
+  return s;
 }
 
+bool VersionSet::ReuseManifest(const std::string& dscname,
+                               const std::string& dscbase) {
+  if (!options_->reuse_logs) {
+    return false;
+  }
+  FileType manifest_type;
+  uint64_t manifest_number;
+  uint64_t manifest_size;
+  if (!ParseFileName(dscbase, &manifest_number, &manifest_type) ||
+      manifest_type != kDescriptorFile ||
+      !env_->GetFileSize(dscname, &manifest_size).ok() ||
+      // Make new compacted MANIFEST if old one is too big
+      manifest_size >= TargetFileSize(options_)) {
+    return false;
+  }
+
+  assert(descriptor_file_ == NULL);
+  assert(descriptor_log_ == NULL);
+  Status r = env_->NewAppendableFile(dscname, &descriptor_file_);
+  if (!r.ok()) {
+    Log(options_->info_log, "Reuse MANIFEST: %s\n", r.ToString().c_str());
+    assert(descriptor_file_ == NULL);
+    return false;
+  }
+
+  Log(options_->info_log, "Reusing MANIFEST %s\n", dscname.c_str());
+  descriptor_log_ = new log::Writer(descriptor_file_, manifest_size);
+  manifest_file_number_ = manifest_number;
+  return true;
+}
 
 void VersionSet::MarkFileNumberUsed(uint64_t number) {
   if (next_file_number_ <= number) {
@@ -900,6 +1103,36 @@ void VersionSet::Finalize(Version* v) {
 
   v->compaction_level_ = best_level;
   v->compaction_score_ = best_score;
+}
+
+Status VersionSet::WriteSnapshot(log::Writer* log) {
+  // TODO: Break up into multiple records to reduce memory usage on recovery?
+
+  // Save metadata
+  VersionEdit edit;
+  edit.SetComparatorName(icmp_.user_comparator()->Name());
+
+  // Save compaction pointers
+  for (int level = 0; level < config::kNumLevels; level++) {
+    if (!compact_pointer_[level].empty()) {
+      InternalKey key;
+      key.DecodeFrom(compact_pointer_[level]);
+      edit.SetCompactPointer(level, key);
+    }
+  }
+
+  // Save files
+  for (int level = 0; level < config::kNumLevels; level++) {
+    const std::vector<FileMetaData*>& files = current_->files_[level];
+    for (size_t i = 0; i < files.size(); i++) {
+      const FileMetaData* f = files[i];
+      edit.AddFile(level, f->number, f->file_size, f->smallest, f->largest);
+    }
+  }
+
+  std::string record;
+  edit.EncodeTo(&record);
+  return log->AddRecord(record);
 }
 
 int VersionSet::NumLevelFiles(int level) const {
@@ -1235,8 +1468,8 @@ bool Compaction::IsTrivialMove() const {
   // Otherwise, the move could create a parent file that will require
   // a very expensive merge later on.
   return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
-          TotalFileSize(grandparents_) <=
-              MaxGrandParentOverlapBytes(vset->options_));
+      TotalFileSize(grandparents_) <=
+          MaxGrandParentOverlapBytes(vset->options_));
 }
 
 void Compaction::AddInputDeletions(VersionEdit* edit) {

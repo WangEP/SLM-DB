@@ -60,7 +60,7 @@ set(LEVEL_DB_FILES
         include/leveldb/table_builder.h
         include/leveldb/write_batch.h
         include/leveldb/export.h
-        include/leveldb/global_index.h
+        include/leveldb/index.h
         db/c.cc
         db/builder.cc
         db/builder.h
@@ -92,7 +92,7 @@ set(LEVEL_DB_FILES
         db/version_set.h
         db/write_batch.cc
         db/write_batch_internal.h
-        db/global_index.cc
+        db/index.cc
         db/nvm_btree.cc
         db/nvm_btree.h
         db/logger.cc

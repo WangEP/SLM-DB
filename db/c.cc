@@ -15,7 +15,7 @@
 #include "leveldb/options.h"
 #include "leveldb/status.h"
 #include "leveldb/write_batch.h"
-#include "leveldb/global_index.h"
+#include "leveldb/index.h"
 
 using leveldb::Cache;
 using leveldb::Comparator;
@@ -41,7 +41,7 @@ using leveldb::Status;
 using leveldb::WritableFile;
 using leveldb::WriteBatch;
 using leveldb::WriteOptions;
-using leveldb::GlobalIndex;
+using leveldb::Index;
 
 extern "C" {
 
@@ -457,7 +457,7 @@ void leveldb_options_set_compression(leveldb_options_t* opt, int t) {
 }
 
 void leveldb_options_create_global_index(leveldb_options_t* opt) {
-  opt->rep.global_index = new GlobalIndex();
+  opt->rep.index = new Index();
 }
 
 leveldb_comparator_t* leveldb_comparator_create(

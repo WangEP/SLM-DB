@@ -16,7 +16,7 @@ class Env;
 class FilterPolicy;
 class Logger;
 class Snapshot;
-class GlobalIndex;
+class Index;
 
 // DB contents are stored in a set of blocks, each of which holds a
 // sequence of key,value pairs.  Each block may be compressed before
@@ -156,7 +156,10 @@ struct LEVELDB_EXPORT Options {
   const FilterPolicy* filter_policy;
 
   // Global index
-  GlobalIndex* global_index;
+  Index* index;
+
+  // Disable lob option
+  bool disable_recovery_log;
 
   // Create an Options object with default values for all fields.
   Options();

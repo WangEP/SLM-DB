@@ -34,7 +34,7 @@
 #include "db/table_cache.h"
 #include "db/version_edit.h"
 #include "db/write_batch_internal.h"
-#include "include/leveldb/global_index.h"
+#include "include/leveldb/index.h"
 #include "leveldb/comparator.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
@@ -113,7 +113,7 @@ class Repairer {
   std::vector<uint64_t> logs_;
   std::vector<TableInfo> tables_;
   uint64_t next_file_number_;
-  GlobalIndex* global_index_;
+  Index* global_index_;
 
   Status FindFiles() {
     std::vector<std::string> filenames;
@@ -226,7 +226,7 @@ class Repairer {
     FileMetaData meta;
     meta.number = next_file_number_++;
     Iterator* iter = mem->NewIterator();
-    status = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    status = BuildTable(dbname_, env_, options_, iter, &meta);
     delete iter;
     mem->Unref();
     mem = NULL;

@@ -6,7 +6,7 @@
 
 #include "leveldb/comparator.h"
 #include "leveldb/env.h"
-#include "leveldb/global_index.h"
+#include "leveldb/index.h"
 
 namespace leveldb {
 
@@ -26,7 +26,8 @@ Options::Options()
       compression(kSnappyCompression),
       reuse_logs(false),
       filter_policy(NULL),
-      global_index(new GlobalIndex()){
+      disable_recovery_log(true),
+      index(new Index()){
 }
 
 }  // namespace leveldb

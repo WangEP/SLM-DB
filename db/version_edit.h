@@ -36,6 +36,14 @@ class VersionEdit {
     has_comparator_ = true;
     comparator_ = name.ToString();
   }
+  void SetLogNumber(uint64_t num) {
+    has_log_number_ = true;
+    log_number_ = num;
+  }
+  void SetPrevLogNumber(uint64_t num) {
+    has_prev_log_number_ = true;
+    prev_log_number_ = num;
+  }
   void SetNextFile(uint64_t num) {
     has_next_file_number_ = true;
     next_file_number_ = num;
@@ -79,9 +87,13 @@ class VersionEdit {
   typedef std::set< std::pair<int, uint64_t> > DeletedFileSet;
 
   std::string comparator_;
+  uint64_t log_number_;
+  uint64_t prev_log_number_;
   uint64_t next_file_number_;
   SequenceNumber last_sequence_;
   bool has_comparator_;
+  bool has_log_number_;
+  bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
 

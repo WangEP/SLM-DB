@@ -16,40 +16,33 @@ class Streamer {
       :  file_(file) {
     Status s;
     current_ = 0;
-    char p[32];
-    Slice* prefix = new Slice();
-    s = file_->Read(32, prefix, p);
-    BUFFER_SIZE = std::stoul(prefix->ToString());
-    if (BUFFER_SIZE > 0) {
-      char *scratch = new char[BUFFER_SIZE];
-      buffer_ = new Slice();
-      s = file_->Read(BUFFER_SIZE, buffer_, scratch);
+    char* p = new char[32];
+    Slice prefix;
+    s = file_->Read(32, &prefix, p);
+    buffer_size = std::stoul(prefix.ToString());
+    delete[] p;
+    ptr = new char[buffer_size];
+    if (buffer_size > 0) {
+      s = file_->Read(buffer_size, &buffer_, ptr);
     }
   }
 
   ~Streamer() {
-    buffer_->clear();
-    delete buffer_;
+    delete ptr;
     delete file_;
   }
 
   bool eof() {
-    return buffer_ == nullptr || buffer_->size() == 0 || buffer_->size() <= current_;
+    return ptr == nullptr || buffer_.size() == 0 || buffer_.size() <= current_;
   }
 
-  void Get(Slice* result) {
-    std::string ss;
-    ss.clear();
-    char c;
-    while (!eof() && buffer_->data()[current_] != '\t') {
-      c = buffer_->data()[current_];
-      ss.append(1, c);
+  Slice Get() {
+    size_t start = current_;
+    while (!eof() && buffer_[current_] != '\t') {
       current_++;
     }
     current_++;
-    char *p = new char[ss.size()];
-    memcpy(p, ss.data(), ss.size());
-    *result = Slice(p, ss.size());
+    return Slice(ptr+start, current_-start);
   }
 
   Status status()const {
@@ -58,10 +51,11 @@ class Streamer {
 
  private:
 
-  uint64_t BUFFER_SIZE;
+  uint64_t buffer_size;
   SequentialFile* file_;
   size_t current_;
-  Slice* buffer_;
+  char* ptr;
+  Slice buffer_;
   Status status_;
 };
 

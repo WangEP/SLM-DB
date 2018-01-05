@@ -14,7 +14,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
-#include "include/leveldb/global_index.h"
+#include "include/leveldb/index.h"
 
 namespace leveldb {
 
@@ -45,7 +45,6 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  GlobalIndex* global_index;
 
   Rep(const Options& opt, WritableFile* f)
       : options(opt),
@@ -58,8 +57,7 @@ struct TableBuilder::Rep {
         closed(false),
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
-        pending_index_entry(false),
-        global_index(opt.global_index) {
+        pending_index_entry(false) {
     index_block_options.block_restart_interval = 1;
   }
 };

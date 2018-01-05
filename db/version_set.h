@@ -22,7 +22,6 @@
 #include "db/version_edit.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
-#include "mock_log.h"
 
 namespace leveldb {
 
@@ -114,9 +113,6 @@ class Version {
   // Return a human readable string that describes this version's contents.
   std::string DebugString() const;
 
-  // Get stats
-  GetStats CollectStats(uint64_t file_number);
-
  private:
   friend class Compaction;
   friend class VersionSet;
@@ -180,7 +176,7 @@ class VersionSet {
   // REQUIRES: *mu is held on entry.
   // REQUIRES: no other thread concurrently calls LogAndApply()
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu)
-      EXCLUSIVE_LOCKS_REQUIRED(mu);
+  EXCLUSIVE_LOCKS_REQUIRED(mu);
 
   // Recover the last saved descriptor from persistent storage.
   Status Recover(bool *save_manifest);
@@ -220,6 +216,13 @@ class VersionSet {
 
   // Mark the specified file number as used.
   void MarkFileNumberUsed(uint64_t number);
+
+  // Return the current log file number.
+  uint64_t LogNumber() const { return log_number_; }
+
+  // Return the log file number for the log file that is currently
+  // being compacted, or zero if there is no such log file.
+  uint64_t PrevLogNumber() const { return prev_log_number_; }
 
   // Pick level and inputs for a new compaction.
   // Returns NULL if there is no compaction to be done.
@@ -286,6 +289,9 @@ class VersionSet {
 
   void SetupOtherInputs(Compaction* c);
 
+  // Save current contents to *log
+  Status WriteSnapshot(log::Writer* log);
+
   void AppendVersion(Version* v);
 
   Env* const env_;
@@ -296,8 +302,12 @@ class VersionSet {
   uint64_t next_file_number_;
   uint64_t manifest_file_number_;
   uint64_t last_sequence_;
+  uint64_t log_number_;
+  uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
+  WritableFile* descriptor_file_;
+  log::Writer* descriptor_log_;
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
   Version* current_;        // == dummy_versions_.prev_
 
@@ -372,7 +382,7 @@ class Compaction {
   size_t grandparent_index_;  // Index in grandparent_starts_
   bool seen_key_;             // Some output key has been seen
   int64_t overlapped_bytes_;  // Bytes of overlap between current output
-                              // and grandparent files
+  // and grandparent files
 
   // State for implementing IsBaseLevelForKey
 

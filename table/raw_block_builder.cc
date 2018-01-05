@@ -4,9 +4,8 @@ namespace leveldb {
 
 RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options)
     : options_(options),
-      finished_(false) {
-}
-
+      finished_(false),
+      buffer_(std::string(32, '0')) { }
 
 RawBlockBuilder::~RawBlockBuilder() {
   buffer_.clear();

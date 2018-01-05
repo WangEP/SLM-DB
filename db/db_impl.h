@@ -7,9 +7,8 @@
 
 #include <deque>
 #include <set>
-#include <map>
-#include <table/raw_block_iter.h>
 #include "db/dbformat.h"
+#include "db/log_writer.h"
 #include "db/snapshot.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
@@ -43,6 +42,7 @@ class DBImpl : public DB {
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes);
   virtual void CompactRange(const Slice* begin, const Slice* end);
 
+  Status CompactMemTableSynchronous();
   // Extra methods (for testing) that are not in the public DB interface
 
   // Compact any files in the named level that overlap [*begin,*end]
@@ -80,7 +80,7 @@ class DBImpl : public DB {
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
   Status Recover(VersionEdit* edit, bool* save_manifest)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void MaybeIgnoreError(Status* s) const;
 
@@ -92,12 +92,15 @@ class DBImpl : public DB {
   // Errors are recorded in bg_error_.
   void CompactMemTable() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  Status RecoverLogFile(uint64_t log_number, bool last_log, bool* save_manifest,
+                        VersionEdit* edit, SequenceNumber* max_sequence)
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   WriteBatch* BuildBatchGroup(Writer** last_writer);
 
   void RecordBackgroundError(const Status& s);
@@ -107,14 +110,14 @@ class DBImpl : public DB {
   void BackgroundCall();
   void  BackgroundCompaction() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void CleanupCompaction(CompactionState* compact)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status DoCompactionWork(CompactionState* compact)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
   Status FinishCompactionOutputFile(CompactionState* compact);
   Status InstallCompactionResults(CompactionState* compact)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Constant after construction
   Env* const env_;
@@ -138,13 +141,11 @@ class DBImpl : public DB {
   MemTable* mem_;
   MemTable* imm_;                // Memtable being compacted
   port::AtomicPointer has_imm_;  // So bg thread can detect non-NULL imm_
+  WritableFile* logfile_;
+  uint64_t logfile_number_;
+  log::Writer* log_;
   uint32_t seed_;                // For sampling.
-
-  // For indexing
-  GlobalIndex* global_index_;
-
-  // Ongoing compaction
-  MemoryIOFile* curr_compaction_file_;
+  Index* index;
 
   // Queue of writers.
   std::deque<Writer*> writers_;
