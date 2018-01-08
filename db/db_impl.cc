@@ -20,6 +20,7 @@
 #include "db/table_cache.h"
 #include "db/version_set.h"
 #include "db/write_batch_internal.h"
+#include "leveldb/index.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/status.h"
@@ -136,6 +137,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       seed_(0),
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
+      index_(options_.index),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
 
@@ -844,14 +846,14 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   // Check for iterator errors
   Status s;
   const uint64_t current_entries = compact->builder->NumEntries();
+  const uint64_t current_bytes = compact->builder->FileSize();
+  compact->current_output()->file_size = current_bytes;
+  compact->total_bytes += current_bytes;
   if (s.ok()) {
     s = compact->builder->Finish();
   } else {
     compact->builder->Abandon();
   }
-  const uint64_t current_bytes = compact->builder->FileSize();
-  compact->current_output()->file_size = current_bytes;
-  compact->total_bytes += current_bytes;
   delete compact->builder;
   compact->builder = NULL;
 
@@ -866,12 +868,6 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   compact->outfile = NULL;
 
   if (s.ok() && current_entries > 0) {
-    // Verify that the table is usable
-    Iterator* iter = table_cache_->NewIterator(ReadOptions(),
-                                               output_number,
-                                               current_bytes);
-    s = iter->status();
-    delete iter;
     if (s.ok()) {
       Log(options_.info_log,
           "Generated table #%llu@%d: %lld keys, %lld bytes",
@@ -1136,8 +1132,7 @@ Status DBImpl::Get(const ReadOptions& options,
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
     } else {
-      s = current->Get(options, lkey, value, &stats);
-      have_stat_update = true;
+      s = ReadFromTables(key, value);
     }
     mutex_.Lock();
   }
@@ -1149,6 +1144,22 @@ Status DBImpl::Get(const ReadOptions& options,
   if (imm != NULL) imm->Unref();
   current->Unref();
   return s;
+}
+
+Status DBImpl::ReadFromTables(const Slice& key, std::string* value) {
+  auto meta = index_->Get(key);
+  std::string fname = TableFileName(dbname_, meta->file_number);
+  RandomAccessFile* file;
+  Status s = env_->NewRandomAccessFile(fname, &file);
+  char* scratch = NULL;
+  Slice result;
+  s = file->Read(meta->offset, meta->size, &result, scratch);
+  if (s.ok() && !result.empty()) {
+    value->assign(result.data(), result.size());
+    return s;
+  } else {
+    return Status::NotFound(Slice());
+  }
 }
 
 Iterator* DBImpl::NewIterator(const ReadOptions& options) {

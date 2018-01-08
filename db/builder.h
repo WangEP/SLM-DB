@@ -16,7 +16,6 @@ class Env;
 class Iterator;
 class TableCache;
 class VersionEdit;
-struct IndexFileMeta;
 
 // Build a Table file from the contents of *iter.  The generated file
 // will be named according to meta->number.  On success, the rest of

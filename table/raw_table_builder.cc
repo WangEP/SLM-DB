@@ -38,7 +38,7 @@ RawTableBuilder::~RawTableBuilder() {
   delete rep_;
 }
 
-void RawTableBuilder::Add(const Slice &key, const Slice &value) {
+void RawTableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
   if (r->num_entries > 0) {

@@ -24,7 +24,7 @@ class Index {
 
   const IndexMeta* Get(const Slice& key);
 
-  void Insert(std::string key, IndexMeta* meta);
+  void Insert(const std::string& key, IndexMeta* meta);
 
   void Range(const std::string&, const std::string&);
 
@@ -52,7 +52,7 @@ class Index {
     Accepting, Ongoing, Finishing
   };
 
-  std::map<std::string, void*> tree_;
+  std::map<std::string, std::unique_ptr<IndexMeta>> tree_;
   bool bgstarted_;
   pthread_t thread_;
   port::Mutex* mutex_;

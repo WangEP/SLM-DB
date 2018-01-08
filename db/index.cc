@@ -13,20 +13,21 @@ Index::Index() {
 
 const IndexMeta* Index::Get(const Slice& key) {
   auto result = tree_.find(key.ToString());
-  return (result != tree_.end()) ? (IndexMeta*) result->second : NULL;
+  return (result != tree_.end()) ? result->second.get() : NULL;
 }
 
-void Index::Insert(std::string key, IndexMeta* meta) {
+void Index::Insert(const std::string& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
-  tree_.insert({key, m});
+  clflush((char *) &key, sizeof(std::string));
+  tree_.insert_or_assign(std::string(key), std::make_unique<IndexMeta>(*m));
 }
 
 void Index::Range(const std::string&, const std::string&) {
 }
 
-void Index::AsyncInsert(const Slice &key, const uint32_t &offset,
-                        const uint32_t &size, const uint32_t &file_number) {
+void Index::AsyncInsert(const Slice& key, const uint32_t& offset,
+                        const uint32_t& size, const uint32_t& file_number) {
   mutex_->Lock();
   if (!bgstarted_) {
     bgstarted_ = true;

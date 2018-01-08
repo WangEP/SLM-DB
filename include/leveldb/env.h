@@ -92,7 +92,7 @@ class LEVELDB_EXPORT Env {
   // Create read and append file that memory mapped to NVRAM.
   // Flushes from memory to file during destruction.
   // Ensures consistency flushing cache to NVRAM after each write.
-  virtual Status NewMemoryIOFile(const std::string &fname,
+  virtual Status NewMemoryIOFile(const std::string& fname,
                                  uint64_t size,
                                  MemoryIOFile **result) = 0;
 

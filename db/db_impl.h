@@ -76,6 +76,8 @@ class DBImpl : public DB {
 
   Status NewDB();
 
+  Status ReadFromTables(const Slice& key, std::string* value);
+
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
@@ -145,7 +147,7 @@ class DBImpl : public DB {
   uint64_t logfile_number_;
   log::Writer* log_;
   uint32_t seed_;                // For sampling.
-  Index* index;
+  Index* index_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;

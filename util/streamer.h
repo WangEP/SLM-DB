@@ -42,7 +42,7 @@ class Streamer {
       current_++;
     }
     current_++;
-    return Slice(ptr+start, current_-start);
+    return Slice(reinterpret_cast<char*>(ptr +start), current_-start-1);
   }
 
   Status status()const {

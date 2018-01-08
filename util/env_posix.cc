@@ -479,8 +479,8 @@ class PosixEnv : public Env {
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) {
     Status s;
-    auto search = read_file_map.find(fname);
-    if (search != read_file_map.end()) {
+    auto search = random_access_files.find(fname);
+    if (search != random_access_files.end()) {
       *result = search->second;
       return s;
     } else {
@@ -496,7 +496,7 @@ class PosixEnv : public Env {
         void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
         if (base != MAP_FAILED) {
           *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
-          read_file_map.insert(std::make_pair(fname, *result));
+          random_access_files.insert(std::make_pair(fname, *result));
         } else {
           s = PosixError(fname, errno);
         }
@@ -507,7 +507,7 @@ class PosixEnv : public Env {
       }
     } else {
       *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
-      read_file_map.insert(std::make_pair(fname, *result));
+      random_access_files.insert(std::make_pair(fname, *result));
     }
     return s;
   }
@@ -597,10 +597,10 @@ class PosixEnv : public Env {
 
   virtual Status DeleteFile(const std::string& fname) {
     Status result;
-    auto search = read_file_map.find(fname);
-    if (search != read_file_map.end()) {
+    auto search = random_access_files.find(fname);
+    if (search != random_access_files.end()) {
+      random_access_files.erase(search);
       delete search->second;
-      read_file_map.erase(search);
     }
     if (unlink(fname.c_str()) != 0) {
       result = PosixError(fname, errno);
@@ -740,7 +740,7 @@ class PosixEnv : public Env {
   }
 
   // map for opened file descriptors
-  std::unordered_map<std::string, RandomAccessFile*> read_file_map;
+  std::unordered_map<std::string, RandomAccessFile*> random_access_files;
 
   port::Mutex* mu_;
   port::CondVar* bgsignal_;
