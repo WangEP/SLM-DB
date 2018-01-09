@@ -147,7 +147,7 @@ set(LEVEL_DB_FILES
         table/raw_block_iter.h
         util/streamer.h
         util/thread_pool.h
-        )
+        db/persistent_skiplist.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
