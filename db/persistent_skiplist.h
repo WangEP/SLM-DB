@@ -1,123 +1,134 @@
 #ifndef STORAGE_LEVELDB_DB_PERSISTENT_SKIPLIST_H_
 #define STORAGE_LEVELDB_DB_PERSISTENT_SKIPLIST_H_
 
+#include "leveldb/comparator.h"
 #include "port/port_posix.h"
 #include "leveldb/iterator.h"
+#include "nvm_btree.h"
 
 namespace leveldb {
-template<typename Key, typename Value, class Comparator>
 class PersistentSkiplist {
-  class Node;
-  class Iterator;
-
  public:
-  explicit PersistentSkiplist(Comparator* cmp);
+  struct Node;
+
+  explicit PersistentSkiplist(const Comparator* cmp);
   ~PersistentSkiplist();
-  void Insert(const Key& key, const Value& value);
-  Value& Get(const Key& key) const;
-  Iterator Find(const Key& key);
-  Iterator Begin();
-  Iterator End();
+  Node* Insert(const Slice& key, const Slice& value);
+  Node* Find(const Slice& key);
 
  private:
   static const size_t max_level = 32;
-  static const float probability = 0.5;
 
-  Comparator comparator;
+  size_t current_level;
+
+  const Comparator* comparator;
 
   Node* head;
-  port::Mutex* mutex;
-  port::CondVar* signal;
+  Node* tail;;
 
-  int RandomLevel();
-  Node* MakeNode(Key key, Value value, size_t level);
-
+  bool Equal(const Slice& a, const Slice& b) const { return (comparator->Compare(a, b) == 0); }
+  size_t RandomLevel();
+  Node* FindGreaterOrEqual(Slice key);
+  Node* MakeNode(Slice key, Slice value, size_t level);
 };
 
-template <typename Key, typename Value, class Comparator>
-class PersistentSkiplist<Key, Value, Comparator>::Node {
- public:
-  // Initialize empty node
-  Node(Key k, Value v, int level) : max_level(level) {
+struct PersistentSkiplist::Node {
+  Slice key;
+  Slice value;
+  const size_t level;
+  std::vector<Node*> next;
+  std::vector<Node*> prev;
+
+  Node(Slice k, Slice v, size_t level) : level(level) {
     key = k;
     value = v;
-    next = NULL;
-    prev = NULL;
-    for (auto i = 0; i < max_level; i++) {
+    for (auto i = 0; i < level; i++) {
       next.push_back(NULL);
+      prev.push_back(NULL);
     }
   }
-  // Set pointer to next node on given level
-  void SetNext(int level, Node* node) { next[level] = node; }
-
-  // Set pointer to prev node on base level
-  void SetPrev(Node* node) { prev = node; }
-
-  // Get pointer to next node on given level
-  Node* Next(int level) { return next[level]; }
-
-  // Get pointer to prev node on base level
-  Node* Prev() { return prev; }
-
-  // Return key
-  Key GetKey() { return key; };
-
-  // Return value
-  Value GetValue() { return value; }
-
- private:
-  Key key;
-  Value value;
-  const int max_level;
-  std::vector<Node*> next;
-  Node* prev;
 };
 
-template <typename Key, typename Value, class Comparator>
-class PersistentSkiplist<Key, Value, Comparator>::Iterator {
- public:
-  // Initialize iterator
-  Iterator(Node* node) : node(node) { }
-
-  // Iterate to next node on base level
-  void Next() { node = node->Next(0); }
-
-  // Iterate to prev node on base level
-  void Prev() { node = node->Prev(); };
-
-  // Check if iterator is valid
-  bool Valid() const { return node != NULL; }
-
-  // Return the node
-  Node* GetNode() { return node; }
-
-  // Return key of the node
-  const Key& GetKey() { return node->GetKey(); }
-
-  // Return value of the node
-  const Value& GetValue() { return node->GetValue(); }
- private:
-  Node* node;
-};
-
-template<typename Key, typename Value, class Comparator>
-PersistentSkiplist<Key, Value, Comparator>::PersistentSkiplist(Comparator* cmp)
+PersistentSkiplist::PersistentSkiplist(const Comparator* cmp)
     : comparator(cmp),
-      mutex(new port::Mutex),
-      signal(new port::CondVar(mutex)),
-      head(MakeNode(Key(), Value(), max_level)) {
+      head(MakeNode(Slice(), Slice(), max_level)),
+      tail(MakeNode(Slice(), Slice(), max_level)),
+      current_level(0) {
+  for (auto i = 0; i < max_level; i++) {
+    head->next[i] = tail;
+    tail->prev[i] = head;
+  }
+  clflush((char*)head->next[0], sizeof(Node));
+  srand(std::time(NULL));
 }
 
-template<typename Key, typename Value, class Comparator>
-PersistentSkiplist<Key, Value, Comparator>::~PersistentSkiplist() {
-  delete mutex;
-  delete signal;
-  auto iterator = Begin();
-  while (iterator.Valid()) {
-    auto node = iterator.GetNode();
+PersistentSkiplist::~PersistentSkiplist() {
+  auto node = head;
+  while (node != NULL) {
+    auto next = node->next[0];
     delete node;
-    iterator.Next();
+    node = next;
   }
+}
+
+PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice &key, const Slice &value) {
+  Node* node = FindGreaterOrEqual(key);
+  if (Equal(node->key, key)) {
+    return node;
+  }
+  auto level = RandomLevel();
+  Node* next_node = node;
+  Node* prev_node = node->prev[0];
+  auto new_node = new Node(key, value, level);
+  if (level > current_level) current_level = level;
+  for (auto i = 0; i < level; i++) {
+    while (next_node->level <= i) next_node = next_node->next[i-1];
+    while (prev_node->level <= i) prev_node = prev_node->prev[i-1];
+    // making forward linking
+    new_node->next[i] = next_node;
+    next_node->prev[i] = new_node;
+    // making backward linking
+    new_node->prev[i] = prev_node;
+    prev_node->next[i] = new_node;
+    if (i == 0) {
+      clflush((char*)new_node->next[0], sizeof(void*));
+      clflush((char*)next_node->next[0], sizeof(void*));
+    }
+  }
+}
+
+PersistentSkiplist::Node* PersistentSkiplist::Find(const Slice &key) {
+  Node* node = FindGreaterOrEqual(key);
+  if (Equal(key, node->key)) {
+    return node;
+  } else {
+    return NULL;
+  }
+}
+
+PersistentSkiplist::Node* PersistentSkiplist::FindGreaterOrEqual(Slice key) {
+  Node* node = head;
+  for (auto i = current_level; i-- > 0;) {
+    while (node->next[i] != tail && comparator->Compare(node->next[i]->key, key) < 0) {
+      node = node->next[i];
+    }
+  }
+  return node->next[0];
+}
+
+size_t PersistentSkiplist::RandomLevel() {
+  static const int level_probability = RAND_MAX / 4;
+  size_t result = 1;
+  while (rand() < level_probability && result < max_level)
+    ++result;
+  return result;
+}
+
+PersistentSkiplist::Node* PersistentSkiplist::MakeNode(Slice key, Slice value, size_t level) {
+  Node* node = new Node(key, value, level);
+  clflush((char*)node->key.data(), key.size());
+  clflush((char*)node->value.data(), value.size());
+  return node;
 }
 
 }

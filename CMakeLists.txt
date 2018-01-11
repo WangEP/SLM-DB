@@ -199,3 +199,6 @@ target_link_libraries(file_io_test PUBLIC leveldb)
 
 add_executable(raw_table_test table/raw_table_test.cc)
 target_link_libraries(raw_table_test PUBLIC leveldb)
+
+add_executable(persistent_skiplist_test db/persistent_skiplist_test.cc)
+target_link_libraries(persistent_skiplist_test PUBLIC leveldb)

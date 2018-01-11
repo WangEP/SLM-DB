@@ -5,6 +5,7 @@
 #include <map>
 #include <port/port.h>
 #include <deque>
+#include "db/nvm_btree.h"
 #include "leveldb/env.h"
 
 namespace leveldb {
@@ -52,7 +53,7 @@ class Index {
     Accepting, Ongoing, Finishing
   };
 
-  std::map<std::string, std::unique_ptr<IndexMeta>> tree_;
+  BTree tree_; // Temporary
   bool bgstarted_;
   pthread_t thread_;
   port::Mutex* mutex_;

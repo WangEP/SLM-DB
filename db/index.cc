@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
 #include "port/port_posix.h"
@@ -12,15 +13,15 @@ Index::Index() {
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
-  auto result = tree_.find(key.ToString());
-  return (result != tree_.end()) ? result->second.get() : NULL;
+  auto result = tree_.search(atoi(key.data()));
+  return reinterpret_cast<const IndexMeta *>(result);
 }
 
 void Index::Insert(const std::string& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
   clflush((char *) &key, sizeof(std::string));
-  tree_.insert_or_assign(std::string(key), std::make_unique<IndexMeta>(*m));
+  tree_.insert(atoi(key.data()), m);
 }
 
 void Index::Range(const std::string&, const std::string&) {
