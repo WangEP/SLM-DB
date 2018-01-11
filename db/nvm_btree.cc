@@ -32,6 +32,7 @@ void BTree::insert(int64_t key, void* ptr) {
   if (leaf->search(key)!= NULL) {
     leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, ptr));
     delete meta;
+    return;
   }
   if (!leaf->overflow()) {
 #ifdef WritingTime
