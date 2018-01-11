@@ -5,7 +5,10 @@ namespace leveldb {
 RawBlockBuilder::RawBlockBuilder(const leveldb::Options *options)
     : options_(options),
       finished_(false),
-      buffer_(std::string(32, '0')) { }
+      buffer_(std::string(32, '0')) {
+  // reserving big chunk size
+  buffer_.reserve(options->max_file_size + (1<<18));
+}
 
 RawBlockBuilder::~RawBlockBuilder() {
   buffer_.clear();
@@ -24,7 +27,7 @@ void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
 }
 
 Slice RawBlockBuilder::Finish() {
-  return Slice(buffer_);
+  return Slice(buffer_.c_str(), buffer_.size());
 }
 
 size_t RawBlockBuilder::CurrentSizeEstimate() const {

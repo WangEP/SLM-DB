@@ -15,7 +15,7 @@ struct IndexMeta {
   uint32_t size;
   uint32_t file_number;
 
-  IndexMeta(const uint32_t& offset, const uint32_t& size, const uint32_t& file_number) :
+  IndexMeta(uint32_t offset, uint32_t size, uint32_t file_number) :
       offset(offset), size(size), file_number(file_number) { }
 };
 
@@ -25,7 +25,7 @@ class Index {
 
   const IndexMeta* Get(const Slice& key);
 
-  void Insert(const std::string& key, IndexMeta* meta);
+  void Insert(const uint32_t& key, IndexMeta* meta);
 
   void Range(const std::string&, const std::string&);
 
@@ -49,8 +49,9 @@ class Index {
   static void* ThreadWrapper(void* index);
 
  private:
-  enum State {
-    Accepting, Ongoing, Finishing
+  struct KeyAndMeta{
+    uint32_t key;
+    IndexMeta* meta;
   };
 
   BTree tree_; // Temporary
@@ -60,7 +61,7 @@ class Index {
   port::CondVar* condvar_;
   bool free_;
 
-  std::deque<std::pair<std::string, IndexMeta*>> queue_;
+  std::deque<KeyAndMeta> queue_;
 
   Index(const Index&);
   void operator=(const Index&);

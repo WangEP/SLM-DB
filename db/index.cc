@@ -17,11 +17,11 @@ const IndexMeta* Index::Get(const Slice& key) {
   return reinterpret_cast<const IndexMeta *>(result);
 }
 
-void Index::Insert(const std::string& key, IndexMeta* meta) {
+void Index::Insert(const uint32_t& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
   clflush((char *) &key, sizeof(std::string));
-  tree_.insert(atoi(key.data()), m);
+  tree_.insert(key, m);
 }
 
 void Index::Range(const std::string&, const std::string&) {
@@ -37,7 +37,10 @@ void Index::AsyncInsert(const Slice& key, const uint32_t& offset,
   if (queue_.empty()) {
     condvar_->Signal();
   }
-  queue_.push_back({key.ToString(), new IndexMeta(offset, size, file_number)});
+  KeyAndMeta item;
+  item.key = stoi(key.ToString());
+  item.meta = new IndexMeta(offset, size, file_number);
+  queue_.push_back(item);
   mutex_->Unlock();
 }
 
@@ -49,10 +52,11 @@ void Index::Runner() {
     while (queue_.empty()) {
       condvar_->Wait();
     }
-    auto item = queue_.front();
+    auto key = queue_.front().key;
+    auto value = queue_.front().meta;
     queue_.pop_front();
     mutex_->Unlock();
-    Insert(item.first, item.second);
+    Insert(key, value);
   }
 #pragma clang diagnostic pop
 }

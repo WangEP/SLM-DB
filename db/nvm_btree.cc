@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include "leveldb/index.h"
 #include "nvm_btree.h"
 
 using namespace std;
@@ -27,6 +28,11 @@ void BTree::insert(int64_t key, void* ptr) {
 #endif
 
   lNode* leaf = (lNode*)node;
+  // update if key exists
+  if (leaf->search(key)!= NULL) {
+    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, ptr));
+    delete meta;
+  }
   if (!leaf->overflow()) {
 #ifdef WritingTime
     clock_gettime(CLOCK_MONOTONIC, &start);
