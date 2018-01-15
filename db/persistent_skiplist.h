@@ -11,8 +11,9 @@ class PersistentSkiplist {
  public:
   struct Node;
 
-  explicit PersistentSkiplist(const Comparator* cmp);
+  explicit PersistentSkiplist(const Comparator& cmp);
   ~PersistentSkiplist();
+  size_t ApproximateMemoryUsage();
   Node* Insert(const Slice& key, const Slice& value);
   Node* Find(const Slice& key);
 
@@ -20,28 +21,29 @@ class PersistentSkiplist {
   static const size_t max_level = 32;
 
   size_t current_level;
+  size_t current_size;
 
-  const Comparator* comparator;
+  const Comparator comparator;
 
   Node* head;
   Node* tail;;
 
-  bool Equal(const Slice& a, const Slice& b) const { return (comparator->Compare(a, b) == 0); }
+  bool Equal(const Slice& a, const Slice& b) const { return (comparator.Compare(a, b) == 0); }
   size_t RandomLevel();
   Node* FindGreaterOrEqual(Slice key);
   Node* MakeNode(Slice key, Slice value, size_t level);
 };
 
 struct PersistentSkiplist::Node {
-  Slice key;
-  Slice value;
+  std::string key;
+  std::string value;
   const size_t level;
   std::vector<Node*> next;
   std::vector<Node*> prev;
 
-  Node(Slice k, Slice v, size_t level) : level(level) {
-    key = k;
-    value = v;
+  Node(const Slice& k, const Slice& v, size_t level) : level(level) {
+    key.assign(k.data(), k.size());
+    value.assign(v.data(), v.size());
     for (auto i = 0; i < level; i++) {
       next.push_back(NULL);
       prev.push_back(NULL);
@@ -49,7 +51,7 @@ struct PersistentSkiplist::Node {
   }
 };
 
-PersistentSkiplist::PersistentSkiplist(const Comparator* cmp)
+PersistentSkiplist::PersistentSkiplist(const Comparator& cmp)
     : comparator(cmp),
       head(MakeNode(Slice(), Slice(), max_level)),
       tail(MakeNode(Slice(), Slice(), max_level)),
@@ -60,6 +62,7 @@ PersistentSkiplist::PersistentSkiplist(const Comparator* cmp)
   }
   clflush((char*)head->next[0], sizeof(Node));
   srand(std::time(NULL));
+  current_size = 0;
 }
 
 PersistentSkiplist::~PersistentSkiplist() {
@@ -69,17 +72,21 @@ PersistentSkiplist::~PersistentSkiplist() {
     delete node;
     node = next;
   }
+  current_size = 0;
 }
 
-PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice &key, const Slice &value) {
+size_t PersistentSkiplist::ApproximateMemoryUsage() {
+  return current_size;
+}
+
+PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice& key, const Slice& value) {
   Node* node = FindGreaterOrEqual(key);
-  if (Equal(node->key, key)) {
-    return node;
-  }
   auto level = RandomLevel();
   Node* next_node = node;
   Node* prev_node = node->prev[0];
-  auto new_node = new Node(key, value, level);
+  if (Equal(node->key, key))
+    next_node = next_node->next[0];
+  Node* new_node = new Node(key, value, level);
   if (level > current_level) current_level = level;
   for (auto i = 0; i < level; i++) {
     while (next_node->level <= i) next_node = next_node->next[i-1];
@@ -95,6 +102,8 @@ PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice &key, const Sli
       clflush((char*)next_node->next[0], sizeof(void*));
     }
   }
+  current_size += key.size() + value.size();
+  return new_node;
 }
 
 PersistentSkiplist::Node* PersistentSkiplist::Find(const Slice &key) {
@@ -109,7 +118,7 @@ PersistentSkiplist::Node* PersistentSkiplist::Find(const Slice &key) {
 PersistentSkiplist::Node* PersistentSkiplist::FindGreaterOrEqual(Slice key) {
   Node* node = head;
   for (auto i = current_level; i-- > 0;) {
-    while (node->next[i] != tail && comparator->Compare(node->next[i]->key, key) < 0) {
+    while (node->next[i] != tail && comparator.Compare(node->next[i]->key, key) < 0) {
       node = node->next[i];
     }
   }
