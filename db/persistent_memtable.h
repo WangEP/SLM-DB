@@ -8,8 +8,9 @@
 
 namespace leveldb {
 
+class MemtableIterator;
+
 class PersistentMemtable {
-  class MemtableIterator;
  public:
   explicit PersistentMemtable(const Comparator* cmp);
 
@@ -28,7 +29,7 @@ class PersistentMemtable {
 
   size_t ApproximateMemoryUsage() { return table_->ApproximateMemoryUsage(); }
 
-  size_t CompactionMemory() { return compaction_current_size; }
+  size_t CompactionSize() { return compaction_current_size; }
 
   Iterator* NewIterator();
 
@@ -39,39 +40,7 @@ class PersistentMemtable {
   // Get new memtable to from current one to make compaction
   PersistentMemtable* Compact();
 
-  class MemtableIterator : public Iterator {
-   public:
-    MemtableIterator(PersistentSkiplist* list, PersistentSkiplist::Node* node)
-        : list_(list), node_(node) { }
-
-    ~MemtableIterator() { }
-
-    bool Valid() const  { return node_ != NULL; }
-
-    void SeekToFirst() { node_ = list_->Head(); }
-
-    void SeekToLast() { node_ = list_->Tail(); }
-
-    void Seek(const Slice& target) { node_ = list_->Find(target); }
-
-    void Next() { node_ = node_->next[0]; }
-
-    void Prev() { node_ = node_->prev[0]; }
-
-    Slice key() const { return node_->key; }
-
-    Slice value() const { return node_->value; }
-
-    Status status() const { return Status::OK(); }
-
-    size_t GetSize() const { return node_->GetSize(); }
-
-    PersistentSkiplist::Node* GetNode() const { return node_; }
-
-   private:
-    PersistentSkiplist::Node* node_;
-    PersistentSkiplist* list_;
-  };
+  std::pair<const Slice&, const Slice&> GetRange();
 
  private:
   ~PersistentMemtable();
@@ -94,6 +63,40 @@ class PersistentMemtable {
   // no copy allowed
   PersistentMemtable(const PersistentMemtable&);
   void operator=(const PersistentMemtable&);
+};
+
+class MemtableIterator : public Iterator {
+ public:
+  MemtableIterator(PersistentSkiplist* list, PersistentSkiplist::Node* node)
+      : list_(list), node_(node) { }
+
+  ~MemtableIterator() { }
+
+  bool Valid() const  { return node_ != NULL; }
+
+  void SeekToFirst() { node_ = list_->Head(); }
+
+  void SeekToLast() { node_ = list_->Tail(); }
+
+  void Seek(const Slice& target) { node_ = list_->Find(target); }
+
+  void Next() { node_ = node_->next[0]; }
+
+  void Prev() { node_ = node_->prev[0]; }
+
+  Slice key() const { return node_->key; }
+
+  Slice value() const { return node_->value; }
+
+  Status status() const { return Status::OK(); }
+
+  size_t GetSize() const { return node_->GetSize(); }
+
+  PersistentSkiplist::Node* GetNode() const { return node_; }
+
+ private:
+  PersistentSkiplist::Node* node_;
+  PersistentSkiplist* list_;
 };
 
 } // namespace leveldb

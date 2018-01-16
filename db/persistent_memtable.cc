@@ -19,7 +19,7 @@ PersistentMemtable::~PersistentMemtable() {
 }
 
 Iterator* PersistentMemtable::NewIterator() {
-  return new MemtableIterator(table_->Head());
+  return new MemtableIterator(table_, table_->Head());
 }
 
 void PersistentMemtable::Add(const Slice& key, const Slice& value) {
@@ -43,7 +43,7 @@ void PersistentMemtable::Add(const Slice& key, const Slice& value) {
     compaction_current_size += node->GetSize() - compaction_end->GetSize();
     compaction_end->Prev();
   }
-  mutex->Unlock()
+  mutex->Unlock();
 }
 
 bool PersistentMemtable::Get(const Slice& key, std::string* value) {
@@ -69,5 +69,11 @@ PersistentMemtable* PersistentMemtable::Compact() {
   mutex->Unlock();
   return imm;
 }
+
+std::pair<const Slice&, const Slice&> PersistentMemtable::GetRange() {
+  Slice smallest = table_->Head()->next[0]->key;
+  Slice largest = table_->Tail()->prev[0]->key;
+  return {smallest, largest};
+};
 
 }
