@@ -2,9 +2,8 @@
 #define STORAGE_LEVELDB_DB_PERSISTENT_MEMTABLE_H_
 
 #include <assert.h>
-#include "leveldb/comparator.h"
-#include "leveldb/iterator.h"
 #include "persistent_skiplist.h"
+#include "port/port_posix.h"
 
 namespace leveldb {
 

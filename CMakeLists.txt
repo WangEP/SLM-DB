@@ -149,7 +149,8 @@ set(LEVEL_DB_FILES
         util/thread_pool.h
         db/persistent_skiplist.h
         db/persistent_memtable.cc
-        db/persistent_memtable.h)
+        db/persistent_memtable.h
+        db/persistent_skiplist.cc)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
