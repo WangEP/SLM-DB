@@ -17,6 +17,7 @@ RawBlockIterator::~RawBlockIterator() {
 }
 
 bool RawBlockIterator::Valid() const {
+  return count < vector_.size();
   return iterator_ != vector_.end();
 }
 
@@ -40,7 +41,7 @@ void RawBlockIterator::Next() {
 
 void RawBlockIterator::Prev() {
   iterator_--;
-  count++;
+  count--;
 }
 
 Slice RawBlockIterator::key() const {

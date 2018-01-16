@@ -19,6 +19,11 @@ struct IndexMeta {
       offset(offset), size(size), file_number(file_number) { }
 };
 
+struct KeyAndMeta{
+  uint32_t key;
+  IndexMeta* meta;
+};
+
 class Index {
  public:
   Index();
@@ -29,12 +34,15 @@ class Index {
 
   void Range(const std::string&, const std::string&);
 
-  void AsyncInsert(const Slice &key, const uint32_t &offset,
-                   const uint32_t &size, const uint32_t &file_number);
+  void AsyncInsert(const KeyAndMeta& key_and_meta);
+
+  void AddQueue(std::deque<KeyAndMeta>& queue);
 
   bool Acceptable() {
     return queue_.empty() && free_;
   }
+
+  bool IsQueueEmpty() { return queue_.empty(); }
 
   void CompactionFinished() {
     free_ = true;
@@ -49,10 +57,6 @@ class Index {
   static void* ThreadWrapper(void* index);
 
  private:
-  struct KeyAndMeta{
-    uint32_t key;
-    IndexMeta* meta;
-  };
 
   BTree tree_; // Temporary
   bool bgstarted_;

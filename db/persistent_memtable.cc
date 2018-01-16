@@ -10,9 +10,10 @@ PersistentMemtable::PersistentMemtable(const Comparator* cmp)
 
 PersistentMemtable::PersistentMemtable(const Comparator* cmp,
                                        MemtableIterator* begin,
-                                       MemtableIterator* end)
+                                       MemtableIterator* end,
+                                       size_t size)
     : cmp_(cmp) {
-  table_ = new PersistentSkiplist(cmp, begin->GetNode(), end->GetNode());
+  table_ = new PersistentSkiplist(cmp, begin->GetNode(), end->GetNode(), size);
 }
 
 PersistentMemtable::~PersistentMemtable() {
@@ -59,11 +60,12 @@ PersistentMemtable* PersistentMemtable::Compact() {
   mutex->Lock();
   auto node = compaction_start->GetNode()->next[0];
   table_->Erase(compaction_start->GetNode(), compaction_end->GetNode());
-  auto imm = new PersistentMemtable(cmp_, compaction_start, compaction_end);
+  auto imm = new PersistentMemtable(cmp_, compaction_start, compaction_end, compaction_current_size);
   // delete iterators
   delete compaction_start;
   delete compaction_end;
   // initialize new
+  compaction_current_size = node->GetSize();
   compaction_start = new MemtableIterator(table_, node);
   compaction_end = new MemtableIterator(table_, node);
   mutex->Unlock();

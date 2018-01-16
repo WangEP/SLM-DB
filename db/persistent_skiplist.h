@@ -12,7 +12,7 @@ class PersistentSkiplist {
   struct Node;
 
   explicit PersistentSkiplist(const Comparator* cmp);
-  PersistentSkiplist(const Comparator* cmp, Node* first, Node* last);
+  PersistentSkiplist(const Comparator* cmp, Node* first, Node* last, size_t size);
   ~PersistentSkiplist();
   size_t ApproximateMemoryUsage();
   Node* Insert(const Slice& key, const Slice& value);
@@ -73,8 +73,12 @@ PersistentSkiplist::PersistentSkiplist(const Comparator* cmp)
   current_size = 0;
 }
 
-PersistentSkiplist::PersistentSkiplist(const Comparator* cmp, Node* first, Node* last)
+PersistentSkiplist::PersistentSkiplist(const Comparator* cmp,
+                                       Node* first,
+                                       Node* last,
+                                       size_t size)
     : PersistentSkiplist(cmp) {
+  current_size = size;
   Node* left = first;
   Node* right = last;
   current_level = 0;

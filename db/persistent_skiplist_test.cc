@@ -80,7 +80,8 @@ TEST(SkiplistTest, Constructor) {
   auto left = skiplist.Find("41");
   auto right = skiplist.Find("49");
   skiplist.Erase(left, right);
-  PersistentSkiplist new_skiplist(cmp, left, right);
+  // do not care about size for test
+  PersistentSkiplist new_skiplist(cmp, left, right, 0);
   for (int i = 41; i <= 49; i++) {
     std::string key = std::to_string(i);
     auto node1 = new_skiplist.Find(key);

@@ -43,7 +43,7 @@ static double MaxBytesForLevel(const Options* options, int level) {
 
   // Result for both level-0 and level-1
   double result = 10. * 1048576.0;
-  while (level > 1) {
+  while (level > 0) {
     result *= 10;
     level--;
   }
@@ -556,19 +556,19 @@ void Version::GetOverlappingInputs(
       // "f" is completely after specified range; skip it
     } else {
       inputs->push_back(f);
-      if (level == 0) {
-        // Level-0 files may overlap each other.  So check if the newly
-        // added file has expanded the range.  If so, restart search.
-        if (begin != NULL && user_cmp->Compare(file_start, user_begin) < 0) {
-          user_begin = file_start;
-          inputs->clear();
-          i = 0;
-        } else if (end != NULL && user_cmp->Compare(file_limit, user_end) > 0) {
-          user_end = file_limit;
-          inputs->clear();
-          i = 0;
-        }
-      }
+//      if (level == 0) {
+//        // Level-0 files may overlap each other.  So check if the newly
+//        // added file has expanded the range.  If so, restart search.
+//        if (begin != NULL && user_cmp->Compare(file_start, user_begin) < 0) {
+//          user_begin = file_start;
+//          inputs->clear();
+//          i = 0;
+//        } else if (end != NULL && user_cmp->Compare(file_limit, user_end) > 0) {
+//          user_end = file_limit;
+//          inputs->clear();
+//          i = 0;
+//        }
+//      }
     }
   }
 }
@@ -1074,26 +1074,26 @@ void VersionSet::Finalize(Version* v) {
 
   for (int level = 0; level < config::kNumLevels-1; level++) {
     double score;
-    if (level == 0) {
-      // We treat level-0 specially by bounding the number of files
-      // instead of number of bytes for two reasons:
-      //
-      // (1) With larger write-buffer sizes, it is nice not to do too
-      // many level-0 compactions.
-      //
-      // (2) The files in level-0 are merged on every read and
-      // therefore we wish to avoid too many files when the individual
-      // file size is small (perhaps because of a small write-buffer
-      // setting, or very high compression ratios, or lots of
-      // overwrites/deletions).
-      score = v->files_[level].size() /
-          static_cast<double>(config::kL0_CompactionTrigger);
-    } else {
+//    if (level == 0) {
+//      // We treat level-0 specially by bounding the number of files
+//      // instead of number of bytes for two reasons:
+//      //
+//      // (1) With larger write-buffer sizes, it is nice not to do too
+//      // many level-0 compactions.
+//      //
+//      // (2) The files in level-0 are merged on every read and
+//      // therefore we wish to avoid too many files when the individual
+//      // file size is small (perhaps because of a small write-buffer
+//      // setting, or very high compression ratios, or lots of
+//      // overwrites/deletions).
+//      score = v->files_[level].size() /
+//          static_cast<double>(config::kL0_CompactionTrigger);
+//    } else {
       // Compute the ratio of current size to size limit.
       const uint64_t level_bytes = TotalFileSize(v->files_[level]);
       score =
           static_cast<double>(level_bytes) / MaxBytesForLevel(options_, level);
-    }
+//    }
 
     if (score > best_score) {
       best_level = level;
@@ -1294,6 +1294,24 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   return result;
 }
 
+Compaction* VersionSet::MemtableCompaction(const Slice& mem_begin, const Slice& mem_end) {
+  int level = 0;
+  Compaction* c = new Compaction(options_, 0);
+  const Comparator* user_cmp = icmp_.user_comparator();
+  for (size_t i = 0; i < current_->files_[level].size(); ) {
+    FileMetaData* f = current_->files_[level][i++];
+    const Slice file_start = f->smallest.Encode();
+    const Slice file_end = f->largest.Encode();
+    if (user_cmp->Compare(file_end, mem_begin) < 0) {
+      // "f" is completely before specified range; skip it
+    } else if (user_cmp->Compare(file_start, mem_end) > 0) {
+      // "f" is completely after specified range; skip it
+    } else {
+      c->inputs_[0].push_back(f);
+    }
+  }
+}
+
 Compaction* VersionSet::PickCompaction() {
   Compaction* c;
   int level;
@@ -1333,15 +1351,15 @@ Compaction* VersionSet::PickCompaction() {
   c->input_version_->Ref();
 
   // Files in level 0 may overlap each other, so pick up all overlapping ones
-  if (level == 0) {
-    InternalKey smallest, largest;
-    GetRange(c->inputs_[0], &smallest, &largest);
-    // Note that the next call will discard the file we placed in
-    // c->inputs_[0] earlier and replace it with an overlapping set
-    // which will include the picked file.
-    current_->GetOverlappingInputs(0, &smallest, &largest, &c->inputs_[0]);
-    assert(!c->inputs_[0].empty());
-  }
+//  if (level == 0) {
+//    InternalKey smallest, largest;
+//    GetRange(c->inputs_[0], &smallest, &largest);
+//    // Note that the next call will discard the file we placed in
+//    // c->inputs_[0] earlier and replace it with an overlapping set
+//    // which will include the picked file.
+//    current_->GetOverlappingInputs(0, &smallest, &largest, &c->inputs_[0]);
+//    assert(!c->inputs_[0].empty());
+//  }
 
   SetupOtherInputs(c);
 
@@ -1423,18 +1441,18 @@ Compaction* VersionSet::CompactRange(
   // But we cannot do this for level-0 since level-0 files can overlap
   // and we must not pick one file and drop another older file if the
   // two files overlap.
-  if (level > 0) {
-    const uint64_t limit = MaxFileSizeForLevel(options_, level);
-    uint64_t total = 0;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      uint64_t s = inputs[i]->file_size;
-      total += s;
-      if (total >= limit) {
-        inputs.resize(i + 1);
-        break;
-      }
-    }
-  }
+//  if (level > 0) {
+//    const uint64_t limit = MaxFileSizeForLevel(options_, level);
+//    uint64_t total = 0;
+//    for (size_t i = 0; i < inputs.size(); i++) {
+//      uint64_t s = inputs[i]->file_size;
+//      total += s;
+//      if (total >= limit) {
+//        inputs.resize(i + 1);
+//        break;
+//      }
+//    }
+//  }
 
   Compaction* c = new Compaction(options_, level);
   c->input_version_ = current_;

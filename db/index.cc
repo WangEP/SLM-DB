@@ -27,8 +27,7 @@ void Index::Insert(const uint32_t& key, IndexMeta* meta) {
 void Index::Range(const std::string&, const std::string&) {
 }
 
-void Index::AsyncInsert(const Slice& key, const uint32_t& offset,
-                        const uint32_t& size, const uint32_t& file_number) {
+void Index::AsyncInsert(const KeyAndMeta& key_and_meta) {
   mutex_->Lock();
   if (!bgstarted_) {
     bgstarted_ = true;
@@ -37,10 +36,7 @@ void Index::AsyncInsert(const Slice& key, const uint32_t& offset,
   if (queue_.empty()) {
     condvar_->Signal();
   }
-  KeyAndMeta item;
-  item.key = stoi(key.ToString());
-  item.meta = new IndexMeta(offset, size, file_number);
-  queue_.push_back(item);
+  queue_.push_back(key_and_meta);
   mutex_->Unlock();
 }
 
@@ -64,6 +60,16 @@ void Index::Runner() {
 void* Index::ThreadWrapper(void *index) {
   reinterpret_cast<Index*>(index)->Runner();
   return NULL;
+}
+void Index::AddQueue(std::deque<KeyAndMeta>& queue) {
+  mutex_->Lock();
+  queue_.swap(queue);
+  if (!bgstarted_) {
+    bgstarted_ = true;
+    port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));
+  }
+  condvar_->Signal();
+  mutex_->Unlock();
 }
 
 } // namespace leveldb

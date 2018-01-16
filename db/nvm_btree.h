@@ -16,7 +16,7 @@
 // #define MergeTime
 // #define RemoveTime
 #define PAGESIZE (256)
-#define MULTITHREAD
+// #define MULTITHREAD
 // #define EXTRA
 
 using namespace std;

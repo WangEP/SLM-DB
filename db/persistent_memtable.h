@@ -15,7 +15,9 @@ class PersistentMemtable {
   explicit PersistentMemtable(const Comparator* cmp);
 
   explicit PersistentMemtable(const Comparator* cmp,
-                              MemtableIterator* begin, MemtableIterator* end);
+                              MemtableIterator* begin,
+                              MemtableIterator* end,
+                              size_t size);
 
   void Ref() { ++refs_; }
 
@@ -72,7 +74,7 @@ class MemtableIterator : public Iterator {
 
   ~MemtableIterator() { }
 
-  bool Valid() const  { return node_ != NULL; }
+  bool Valid() const  { return node_ != list_->Tail(); }
 
   void SeekToFirst() { node_ = list_->Head(); }
 

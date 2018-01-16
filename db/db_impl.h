@@ -14,6 +14,7 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
+#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -98,7 +99,8 @@ class DBImpl : public DB {
                         VersionEdit* edit, SequenceNumber* max_sequence)
   EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
+  Status MakeMemtableCompaction(PersistentMemtable* mem, VersionEdit* edit);
+  Status WriteLevel0Table(PersistentMemtable* mem, VersionEdit* edit, Version* base)
   EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
@@ -140,8 +142,8 @@ class DBImpl : public DB {
   port::Mutex mutex_;
   port::AtomicPointer shutting_down_;
   port::CondVar bg_cv_;          // Signalled when background work finishes
-  MemTable* mem_;
-  MemTable* imm_;                // Memtable being compacted
+  PersistentMemtable* mem_;
+  PersistentMemtable* imm_;                // Memtable being compacted
   port::AtomicPointer has_imm_;  // So bg thread can detect non-NULL imm_
   WritableFile* logfile_;
   uint64_t logfile_number_;

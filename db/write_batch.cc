@@ -20,6 +20,7 @@
 #include "db/memtable.h"
 #include "db/write_batch_internal.h"
 #include "util/coding.h"
+#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -116,21 +117,21 @@ namespace {
 class MemTableInserter : public WriteBatch::Handler {
  public:
   SequenceNumber sequence_;
-  MemTable* mem_;
+  PersistentMemtable* mem_;
 
   virtual void Put(const Slice& key, const Slice& value) {
-    mem_->Add(sequence_, kTypeValue, key, value);
+    mem_->Add(key, value);
     sequence_++;
   }
   virtual void Delete(const Slice& key) {
-    mem_->Add(sequence_, kTypeDeletion, key, Slice());
+    //mem_->Add(sequence_, kTypeDeletion, key, Slice());
     sequence_++;
   }
 };
 }  // namespace
 
 Status WriteBatchInternal::InsertInto(const WriteBatch* b,
-                                      MemTable* memtable) {
+                                      PersistentMemtable* memtable) {
   MemTableInserter inserter;
   inserter.sequence_ = WriteBatchInternal::Sequence(b);
   inserter.mem_ = memtable;

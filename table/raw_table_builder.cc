@@ -29,9 +29,6 @@ struct RawTableBuilder::Rep {
 
 RawTableBuilder::RawTableBuilder(const Options& options, WritableFile* file, uint64_t file_number)
     : rep_(new Rep(options, file, file_number)) {
-  // wait if previous compaction indexing not finished
-  while (!rep_->index->Acceptable()) {  }
-  rep_->index->CompactionStarted();
 }
 
 RawTableBuilder::~RawTableBuilder() {
@@ -49,8 +46,6 @@ void RawTableBuilder::Add(const Slice& key, const Slice& value) {
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
-  uint32_t offset = r->data_block.GetBufferSize() - value.size() - 1;
-  r->index->AsyncInsert(key, offset, value.size(), r->file_number);
 }
 
 void RawTableBuilder::Flush() {
@@ -75,7 +70,6 @@ Status RawTableBuilder::Finish() {
   Flush();
   assert(!r->closed);
   r->closed = true;
-  r->index->CompactionFinished();
   return r->status;
 }
 

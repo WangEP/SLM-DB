@@ -7,6 +7,7 @@
 
 #include "db/dbformat.h"
 #include "leveldb/write_batch.h"
+#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -39,7 +40,7 @@ class WriteBatchInternal {
 
   static void SetContents(WriteBatch* batch, const Slice& contents);
 
-  static Status InsertInto(const WriteBatch* batch, MemTable* memtable);
+  static Status InsertInto(const WriteBatch* batch, PersistentMemtable* memtable);
 
   static void Append(WriteBatch* dst, const WriteBatch* src);
 };
