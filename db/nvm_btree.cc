@@ -170,6 +170,53 @@ void *BTree::search(int64_t key) {
   return result;
 }
 
+vector<LeafEntry*> BTree::range(int64_t min, int64_t max) {
+    vector<lNode*> leaves;
+    Node *p = root;
+    while (p->type == Node::Internal) {
+        p = (Node*)((iNode*)p)->search(min);
+        if (p == NULL) p == root;
+    }
+    lNode* l = (lNode*)p;
+    leaves.push_back(l);
+    while (l->sibling != NULL) {
+        l = (lNode*)l->sibling;
+        if (l->splitKey < max) leaves.push_back(l);
+        else break;
+    } // To ensure transactional property and efficient memory allocation.
+    vector<LeafEntry*> ret;
+    ret.reserve(leaves.size()*lNode::CARDINALITY);
+    for (int i = 0; i < leaves.size(); i++) {
+        if (i == 0) {
+            for (int j = 0; j < lNode::CARDINALITY; j++) {
+                if ((*leaves[i])[j].ptr != NULL 
+                        && (*leaves[i])[j].key >= min
+                        && (*leaves[i])[j].key <= max) {
+                    ret.push_back(&(*leaves[i])[j]);
+                }
+            }
+        } else if (i != leaves.size()-1) {
+            for (int j = 0; j < lNode::CARDINALITY; j++) {
+                // if i != 0, we don't have to check the min condition
+                if ((*leaves[i])[j].ptr != NULL 
+                        && (*leaves[i])[j].key <= max) {  
+                    ret.push_back(&(*leaves[i])[j]);
+                }
+            }
+        } else {
+            for (int j = 0; j < lNode::CARDINALITY; j++) {
+                if ((*leaves[i])[j].ptr != NULL) {
+                    ret.push_back(&(*leaves[i])[j]);
+                }
+            }
+        }
+    }
+    std::sort(std::begin(ret), std::end(ret), [](LeafEntry* a, LeafEntry* b){
+                return a->key < b->key;
+            });
+    return ret;
+}
+
 void BTree::remove(int64_t key) {
   Node* p = root, *lSib = NULL;
   iNode* parent = NULL, *grandParent = NULL;
