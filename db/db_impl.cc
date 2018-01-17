@@ -486,6 +486,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
 
 Status DBImpl::MakeMemtableCompaction(PersistentMemtable* mem, VersionEdit* edit) {
   const uint64_t start_micros = env_->NowMicros();
+  mem->Ref();
   auto range = mem->GetRange();
   Compaction* c = versions_->MemtableCompaction(range.first, range.second);
   std::shared_ptr<Iterator> mem_iterator(mem->NewIterator());
@@ -541,6 +542,7 @@ Status DBImpl::MakeMemtableCompaction(PersistentMemtable* mem, VersionEdit* edit
     if (compact->builder->FileSize() >= compact->compaction->MaxOutputFileSize()) {
       status = FinishCompactionOutputFile(compact);
     }
+    input->Next();
   }
   if (status.ok() && shutting_down_.Acquire_Load()) {
     status = Status::IOError("Deleting DB during compaction");
@@ -936,8 +938,10 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   if (s.ok()) {
     s = compact->outfile->Sync();
   }
-  // wait for previous indexing to finish to forward new queue
+  Log(options_.info_log, "indexing waiting");
+  // wait until indexing gets done
   while (!index_->IsQueueEmpty()) { }
+  Log(options_.info_log, "finished waiting");
   index_->AddQueue(compact->index_queue);
   if (s.ok()) {
     s = compact->outfile->Close();
@@ -977,8 +981,10 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
         level + 1,
         out.number, out.file_size, out.smallest, out.largest);
   }
+  Log(options_.info_log, "indexing waiting");
   // wait until indexing gets done
   while (!index_->IsQueueEmpty()) { }
+  Log(options_.info_log, "finished waiting");
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
@@ -1419,10 +1425,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
-    } else if (!force &&
-        (mem_->ApproximateMemoryUsage() <= options_.max_buffer_size)) {
-      // There is room in current memtable
-      break;
 //    } else if (imm_ != NULL) {
 //      // We have filled up the current memtable, but the previous
 //      // one is still being compacted, so we wait.
@@ -1458,6 +1460,10 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       has_imm_.Release_Store(imm_);
       force = false;   // Do not force another compaction if have room
       MaybeScheduleCompaction();
+    } else if (!force &&
+        (mem_->ApproximateMemoryUsage() <= options_.max_buffer_size)) {
+      // There is room in current memtable
+      break;
     }
   }
   return s;

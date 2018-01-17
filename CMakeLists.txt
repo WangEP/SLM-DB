@@ -150,7 +150,7 @@ set(LEVEL_DB_FILES
         db/persistent_skiplist.h
         db/persistent_memtable.cc
         db/persistent_memtable.h
-        db/persistent_skiplist.cc)
+        db/persistent_skiplist.cc util/int_based_comparator.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

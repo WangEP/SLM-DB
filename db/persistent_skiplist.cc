@@ -65,6 +65,7 @@ PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice& key, const Sli
     next_node = next_node->next[0];
   Node* new_node = new Node(key, value, level);
   if (level > current_level) current_level = level;
+  assert(current_level <= max_level);
   for (auto i = 0; i < level; i++) {
     while (next_node->level <= i) next_node = next_node->next[i-1];
     while (prev_node->level <= i) prev_node = prev_node->prev[i-1];
@@ -92,7 +93,8 @@ PersistentSkiplist::Node* PersistentSkiplist::Find(const Slice &key) {
   }
 }
 
-void PersistentSkiplist::Erase(Node* first, Node* last) {
+void PersistentSkiplist::Erase(Node* first, Node* last, size_t compaction_size) {
+  assert(comparator->Compare(first->key, last->key) < 0);
   Node* left = first->prev[0];
   Node* right = last->next[0];
   for (int level = 0; level < current_level; level++) {
@@ -104,8 +106,10 @@ void PersistentSkiplist::Erase(Node* first, Node* last) {
     while (left->level <= level+1) left = left->prev[level];
     while (right->level <= level+1) right = right->next[level];
   }
+  current_size -= compaction_size;
   while (head->next[current_level] == tail &&
-      tail->prev[current_level] == head) {
+      tail->prev[current_level] == head &&
+      current_level > 0) {
     current_level--;
   }
 
@@ -126,10 +130,12 @@ size_t PersistentSkiplist::RandomLevel() {
   size_t result = 1;
   while (rand() < level_probability && result < max_level)
     ++result;
+  assert(result < max_level);
   return result;
 }
 
 PersistentSkiplist::Node* PersistentSkiplist::MakeNode(Slice key, Slice value, size_t level) {
+  assert(level <= max_level);
   Node* node = new Node(key, value, level);
   clflush((char*)node->key.data(), key.size());
   clflush((char*)node->value.data(), value.size());

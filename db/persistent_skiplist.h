@@ -16,10 +16,15 @@ class PersistentSkiplist {
   PersistentSkiplist(const Comparator* cmp, Node* first, Node* last, size_t size);
   ~PersistentSkiplist();
   size_t ApproximateMemoryUsage();
+
+  // insert key value, return node holding it
   Node* Insert(const Slice& key, const Slice& value);
+
+  // find node with given key
   Node* Find(const Slice& key);
 
-  void Erase(Node* first, Node* last); // erase nodes in range [first, last]
+  // erase nodes in range [first, last]
+  void Erase(Node* first, Node* last, size_t compaction_size);
 
   Node* Head() { return head; }
   Node* Tail() { return tail; }
@@ -42,15 +47,16 @@ class PersistentSkiplist {
 };
 
 struct PersistentSkiplist::Node {
-  std::string key;
-  std::string value;
+  const std::string key;
+  const std::string value;
   const size_t level;
   std::vector<Node*> next;
   std::vector<Node*> prev;
 
-  Node(const Slice& k, const Slice& v, size_t level) : level(level) {
-    key.assign(k.data(), k.size());
-    value.assign(v.data(), v.size());
+  Node(const Slice& k, const Slice& v, size_t level)
+      : key(k.data(), k.size()),
+        value(v.data(), v.size()),
+        level(level) {
     for (auto i = 0; i < level; i++) {
       next.push_back(NULL);
       prev.push_back(NULL);

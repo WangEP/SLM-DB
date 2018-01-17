@@ -81,9 +81,9 @@ class MemtableIterator : public Iterator {
 
   void Seek(const Slice& target) { node_ = list_->Find(target); }
 
-  void Next() { node_ = node_->next[0]; }
+  void Next() { assert(node_->next[0] != NULL); node_ = node_->next[0]; }
 
-  void Prev() { node_ = node_->prev[0]; }
+  void Prev() { assert(node_->prev[0] != NULL); node_ = node_->prev[0]; }
 
   Slice key() const { return node_->key; }
 

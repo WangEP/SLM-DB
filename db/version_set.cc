@@ -1310,6 +1310,7 @@ Compaction* VersionSet::MemtableCompaction(const Slice& mem_begin, const Slice& 
       c->inputs_[0].push_back(f);
     }
   }
+  return c;
 }
 
 Compaction* VersionSet::PickCompaction() {
