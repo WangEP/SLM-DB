@@ -8,7 +8,7 @@
 
 namespace leveldb {
 
-class LEVELDB_EXPORT RawBlockIterator : Iterator{
+class LEVELDB_EXPORT RawBlockIterator : public Iterator{
  public:
   RawBlockIterator(SequentialFile* file);
 
@@ -32,11 +32,16 @@ class LEVELDB_EXPORT RawBlockIterator : Iterator{
 
   Status status() const;
 
+  void SetFileNumber(uint64_t);
+
+  uint64_t GetFileNumber();
+
  private:
   Streamer stream_;
   std::vector<std::pair<Slice, Slice>> vector_;
   std::vector<std::pair<Slice, Slice>>::iterator iterator_;
   uint64_t count;
+  uint64_t fnumber;
 };
 
 } // namespace leveldb

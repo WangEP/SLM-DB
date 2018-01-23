@@ -30,7 +30,7 @@ void BTree::insert(int64_t key, void* ptr) {
   lNode* leaf = (lNode*)node;
   // update if key exists
   if (leaf->search(key)!= NULL) {
-    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, ptr));
+    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, 0, ptr));
     delete meta;
     return;
   }
@@ -147,13 +147,13 @@ void BTree::insert(int64_t key, void* ptr) {
   }
 }
 
-void* BTree::update(int64_t key, void *ptr) {
+void* BTree::update(int64_t key, int64_t fnumber, void *ptr) {
   Node *p = root;
   while (p->type == Node::Internal) {
     p = (Node *) ((iNode*) p)->search(key);
     if (p == NULL) p = root;
   }
-  return ((lNode *) p)->update(key, ptr);
+  return ((lNode *) p)->update(key, fnumber, ptr);
 }
 
 void *BTree::search(int64_t key) {
@@ -648,17 +648,21 @@ void lNode::remove(int64_t key) {
   }
 }
 
-void* lNode::update(int64_t key, void *ptr) {
+void* lNode::update(int64_t key, int64_t fnumber, void *ptr) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       void *p = entry[i].ptr;
-      entry[i].ptr = ptr;
-      clflush((char *) &entry[i].ptr, sizeof(void*));
-      return p;
+      leveldb::IndexMeta* m = reinterpret_cast<leveldb::IndexMeta*>(p);
+      if (m->file_number == fnumber || fnumber == 0) {
+        entry[i].ptr = ptr;
+        clflush((char*) &entry[i].ptr, sizeof(void*));
+        return p;
+      } else
+        break;
     }
   }
   if (sibling && sibling->splitKey < key) {
-    return ((lNode*) sibling)->update(key, ptr);
+    return ((lNode*) sibling)->update(key, fnumber, ptr);
   }
   return nullptr;
 }

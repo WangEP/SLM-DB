@@ -6,6 +6,7 @@
 uint64_t clflush_cnt = 0;
 uint64_t WRITE_LATENCY_IN_NS = 1000;
 int data_cnt = 5000000;
+int data_begin = 0;
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -13,6 +14,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   struct timespec start, end;
+  uint64_t tsize = 0;
   leveldb::DB* db;
   leveldb::Options options;
   options.filter_policy = NULL;
@@ -23,17 +25,19 @@ int main(int argc, char** argv) {
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
   assert(status.ok());
   clock_gettime(CLOCK_MONOTONIC, &start);
-  for (auto i = 0; i < data_cnt; i++) {
+  for (auto i = data_begin; i < data_begin+data_cnt; i++) {
     std::string key = std::to_string(i);
     std::string value = "valuevalue" + std::to_string(i);
+    tsize += key.size() + value.size();
     status = db->Put(leveldb::WriteOptions(), key, value);
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
   int64_t elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(data_cnt/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
   std::cout << clflush_cnt << "\tclflush count" << std::endl;
+  std::cout << tsize << "\tbytes written" << std::endl;
   clock_gettime(CLOCK_MONOTONIC, &start);
-  for (auto i = 0; i < data_cnt; i++) {
+  for (auto i = data_begin; i < data_begin+data_cnt; i++) {
     std::string v = "valuevalue" + std::to_string(i);
     std::string key = std::to_string(i);
     std::string value;

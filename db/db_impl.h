@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <set>
+#include <memory>
 #include "db/dbformat.h"
 #include "db/log_writer.h"
 #include "db/snapshot.h"
@@ -99,8 +100,8 @@ class DBImpl : public DB {
                         VersionEdit* edit, SequenceNumber* max_sequence)
   EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status MakeMemtableCompaction(PersistentMemtable* mem, VersionEdit* edit);
-  Status WriteLevel0Table(PersistentMemtable* mem, VersionEdit* edit, Version* base)
+  Status MakeMemtableCompaction(PersistentMemtable* mem);
+  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
   EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
@@ -142,8 +143,8 @@ class DBImpl : public DB {
   port::Mutex mutex_;
   port::AtomicPointer shutting_down_;
   port::CondVar bg_cv_;          // Signalled when background work finishes
-  PersistentMemtable* mem_;
-  PersistentMemtable* imm_;                // Memtable being compacted
+  MemTable* mem_;
+  MemTable* imm_;                // Memtable being compacted
   port::AtomicPointer has_imm_;  // So bg thread can detect non-NULL imm_
   WritableFile* logfile_;
   uint64_t logfile_number_;

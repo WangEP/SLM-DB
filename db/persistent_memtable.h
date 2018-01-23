@@ -14,8 +14,8 @@ class PersistentMemtable {
   explicit PersistentMemtable(const Comparator* cmp);
 
   explicit PersistentMemtable(const Comparator* cmp,
-                              MemtableIterator* begin,
-                              MemtableIterator* end,
+                              PersistentSkiplist::Node* begin,
+                              PersistentSkiplist::Node* end,
                               size_t size);
 
   void Ref() { ++refs_; }
@@ -29,8 +29,6 @@ class PersistentMemtable {
   }
 
   size_t ApproximateMemoryUsage() { return table_->ApproximateMemoryUsage(); }
-
-  size_t CompactionSize() { return compaction_current_size; }
 
   Iterator* NewIterator();
 
@@ -56,10 +54,7 @@ class PersistentMemtable {
   const static size_t compaction_target_size = 1 << 21; // 2mb
 
   // compaction iterator ranges
-  MemtableIterator* compaction_start;
-  MemtableIterator* compaction_end;
-  // compaction size
-  size_t compaction_current_size;
+  MemtableIterator* compaction_iter;
 
   // no copy allowed
   PersistentMemtable(const PersistentMemtable&);

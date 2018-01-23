@@ -11,6 +11,7 @@ RawBlockIterator::RawBlockIterator(SequentialFile* file): stream_(file) {
     vector_.push_back({key, value});
   }
   iterator_ = vector_.begin();
+  fnumber = 0;
 }
 
 RawBlockIterator::~RawBlockIterator() {
@@ -54,6 +55,13 @@ Slice RawBlockIterator::value() const {
 
 Status RawBlockIterator::status() const {
   return stream_.status();
+}
+void RawBlockIterator::SetFileNumber(uint64_t number) {
+  fnumber = number;
+}
+
+uint64_t RawBlockIterator::GetFileNumber() {
+  return fnumber;
 }
 
 }

@@ -5,8 +5,8 @@
 
 uint64_t clflush_cnt = 0;
 uint64_t WRITE_LATENCY_IN_NS = 1000;
-uint64_t data_cnt = 5000000;
-uint64_t val_size = 1 << 12;
+uint64_t data_cnt = 1000000;
+uint64_t val_size = 4 << 10; // 1kb
 
 std::string gen_random(const uint64_t len) {
   std::string s;

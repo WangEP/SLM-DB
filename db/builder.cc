@@ -37,8 +37,7 @@ Status BuildTable(const std::string& dbname,
     meta->smallest.DecodeFrom(ExtractUserKey(iter->key()));
     // wait if previous compaction indexing not finished
     Index* index = options.index;
-    while (!index->Acceptable()) {  }
-    index->CompactionStarted();
+    std::deque<KeyAndMeta> queue;
     for (; iter->Valid(); iter->Next()) {
       Slice key = ExtractUserKey(iter->key());
       meta->largest.DecodeFrom(key);
@@ -46,9 +45,10 @@ Status BuildTable(const std::string& dbname,
       // prep
       KeyAndMeta key_and_meta;
       key_and_meta.key = stoi(key.data());
+      key_and_meta.fnumber = 0;
       key_and_meta.meta = new IndexMeta(builder->FileSize() - iter->value().size() - 1,
                                 iter->value().size(), meta->number);
-      index->AsyncInsert(key_and_meta);
+      queue.push_back(key_and_meta);
     }
 
     if (s.ok()) {
@@ -61,7 +61,11 @@ Status BuildTable(const std::string& dbname,
     if (s.ok()) {
       s = file->Sync();
     }
-    index->CompactionFinished();
+    Log(options.info_log, "indexing waiting");
+    // wait until indexing gets done
+    while (!index->IsQueueEmpty()) { }
+    Log(options.info_log, "finished waiting");
+    index->AddQueue(queue);
     if (s.ok()) {
       s = file->Close();
     }

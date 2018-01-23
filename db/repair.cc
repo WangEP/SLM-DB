@@ -199,7 +199,7 @@ class Repairer {
     std::string scratch;
     Slice record;
     WriteBatch batch;
-    PersistentMemtable* mem = new PersistentMemtable(&icmp_);
+    MemTable* mem = new MemTable(icmp_);
     mem->Ref();
     int counter = 0;
     while (reader.ReadRecord(&record, &scratch)) {

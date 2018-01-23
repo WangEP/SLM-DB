@@ -1,8 +1,7 @@
 #include <stdlib.h>
+#include "util/fast_atoi.h"
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
-#include "port/port_posix.h"
-#include "util/persist.h"
 
 namespace leveldb {
 
@@ -13,15 +12,22 @@ Index::Index() {
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
-  auto result = tree_.search(atoi(key.data()));
+  auto result = tree_.search(fast_atoi(key.data()));
   return reinterpret_cast<const IndexMeta *>(result);
 }
 
 void Index::Insert(const uint32_t& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
-  clflush((char *) &key, sizeof(std::string));
+  clflush((char *) &key, sizeof(uint32_t));
   tree_.insert(key, m);
+}
+
+void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta) {
+  IndexMeta* m = meta;
+  clflush((char *) m, sizeof(IndexMeta));
+  clflush((char *) &key, sizeof(uint32_t));
+  tree_.update(key, fnumber, meta);
 }
 
 void Index::Range(const std::string&, const std::string&) {
@@ -49,10 +55,14 @@ void Index::Runner() {
       condvar_->Wait();
     }
     auto key = queue_.front().key;
+    auto fnumber = queue_.front().fnumber;
     auto value = queue_.front().meta;
     queue_.pop_front();
     mutex_->Unlock();
-    Insert(key, value);
+    if (fnumber == 0)
+      Insert(key, value);
+    else
+      Update(key, fnumber, value);
   }
 #pragma clang diagnostic pop
 }

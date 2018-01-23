@@ -60,7 +60,7 @@ TEST(SkiplistTest, Erase) {
     auto node = skiplist.Find(std::to_string(i));
     assert(node != NULL);
   }
-  skiplist.Erase(left, right);
+  skiplist.Erase(left, right, 0);
   for (int i = 41; i <= 49; i++) {
     auto node = skiplist.Find(std::to_string(i));
     assert(node == NULL);
@@ -79,7 +79,7 @@ TEST(SkiplistTest, Constructor) {
   }
   auto left = skiplist.Find("41");
   auto right = skiplist.Find("49");
-  skiplist.Erase(left, right);
+  skiplist.Erase(left, right, 0);
   // do not care about size for test
   PersistentSkiplist new_skiplist(cmp, left, right, 0);
   for (int i = 41; i <= 49; i++) {

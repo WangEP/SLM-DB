@@ -21,6 +21,7 @@ struct IndexMeta {
 
 struct KeyAndMeta{
   uint32_t key;
+  uint32_t fnumber;
   IndexMeta* meta;
 };
 
@@ -31,6 +32,8 @@ class Index {
   const IndexMeta* Get(const Slice& key);
 
   void Insert(const uint32_t& key, IndexMeta* meta);
+
+  void Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta);
 
   void Range(const std::string&, const std::string&);
 
