@@ -1240,21 +1240,22 @@ Status DBImpl::Get(const ReadOptions& options,
 
 Status DBImpl::ReadFromTables(const Slice& key, std::string* value) {
   auto meta = index_->Get(key);
+  Status s;
   if (meta != NULL) {
     std::string fname = TableFileName(dbname_, meta->file_number);
     RandomAccessFile* file;
-    Status s = env_->NewRandomAccessFile(fname, &file);
+    s = env_->NewRandomAccessFile(fname, &file);
     if (s.ok()) {
-      char* scratch = NULL;
+      char* scratch = new char[meta->size];
       Slice result;
       s = file->Read(meta->offset, meta->size, &result, scratch);
       if (s.ok() && !result.empty()) {
         value->assign(result.data(), result.size());
-        return s;
+        delete[] scratch;
       }
     }
   }
-  return Status::NotFound(Slice());
+  return s;
 }
 
 Iterator* DBImpl::NewIterator(const ReadOptions& options) {
@@ -1442,6 +1443,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // this delay hands over some CPU to the compaction thread in
       // case it is sharing the same core as the writer.
       mutex_.Unlock();
+      Log(options_.info_log, "Level-0 slowdown triggered...\n");
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();

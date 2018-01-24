@@ -9,6 +9,7 @@ Index::Index() {
   mutex_ = new port::Mutex;
   condvar_ = new port::CondVar(mutex_);
   free_ = true;
+  bgstarted_ = false;
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
