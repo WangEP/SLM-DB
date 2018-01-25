@@ -150,7 +150,7 @@ void BTree::insert(int64_t key, void* ptr) {
 void* BTree::update(int64_t key, int64_t fnumber, void *ptr) {
   Node *p = root;
   while (p->type == Node::Internal) {
-    p = (Node *) ((iNode*) p)->search(key);
+    p = ((iNode*) p)->search(key);
     if (p == NULL) p = root;
   }
   return ((lNode *) p)->update(key, fnumber, ptr);
@@ -159,7 +159,7 @@ void* BTree::update(int64_t key, int64_t fnumber, void *ptr) {
 void *BTree::search(int64_t key) {
   Node* p = root;
   while (p->type == Node::Internal) {
-    p = (Node*)((iNode*)p)->search(key);
+    p = ((iNode*)p)->search(key);
     if (p == NULL) p = root;
   }
 

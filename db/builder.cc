@@ -61,10 +61,10 @@ Status BuildTable(const std::string& dbname,
     if (s.ok()) {
       s = file->Sync();
     }
-    Log(options.info_log, "indexing waiting");
+    //Log(options.info_log, "indexing waiting");
     // wait until indexing gets done
-    while (!index->IsQueueEmpty()) { }
-    Log(options.info_log, "finished waiting");
+//    while (!index->IsQueueEmpty()) { }
+    //Log(options.info_log, "finished waiting");
     index->AddQueue(queue);
     if (s.ok()) {
       s = file->Close();

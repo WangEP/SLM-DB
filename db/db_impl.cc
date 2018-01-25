@@ -159,8 +159,8 @@ DBImpl::~DBImpl() {
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
   // maybe push memory buffer(s) to disk if recovery log disabled
-  if (options_.disable_recovery_log)
-    CompactMemTableSynchronous();
+//  if (options_.disable_recovery_log)
+//    CompactMemTableSynchronous();
 
   while (bg_compaction_scheduled_) {
     bg_cv_.Wait();
@@ -953,10 +953,10 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   if (s.ok()) {
     s = compact->outfile->Sync();
   }
-  Log(options_.info_log, "indexing waiting");
+  //Log(options_.info_log, "indexing waiting");
   // wait until indexing gets done
-  while (!index_->IsQueueEmpty()) { }
-  Log(options_.info_log, "finished waiting");
+//  while (!index_->IsQueueEmpty()) { }
+  //Log(options_.info_log, "finished waiting");
   index_->AddQueue(compact->index_queue);
   if (s.ok()) {
     s = compact->outfile->Close();
@@ -1006,10 +1006,10 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
         compact->is_memtable ? level : level + 1, // if memtable compaction, write to level-0
         out.number, out.file_size, out.smallest, out.largest);
   }
-  Log(options_.info_log, "indexing waiting");
+  //Log(options_.info_log, "indexing waiting");
   // wait until indexing gets done
-  while (!index_->IsQueueEmpty()) { }
-  Log(options_.info_log, "finished waiting");
+//  while (!index_->IsQueueEmpty()) { }
+  //Log(options_.info_log, "finished waiting");
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
@@ -1443,7 +1443,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // this delay hands over some CPU to the compaction thread in
       // case it is sharing the same core as the writer.
       mutex_.Unlock();
-      Log(options_.info_log, "Level-0 slowdown triggered...\n");
+      //Log(options_.info_log, "Level-0 slowdown triggered...\n");
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
@@ -1581,6 +1581,11 @@ void DBImpl::GetApproximateSizes(
     MutexLock l(&mutex_);
     v->Unref();
   }
+}
+
+Iterator* DBImpl::RangeQuery(int64_t min, int64_t max) {
+
+  return nullptr;
 }
 
 // Default implementations of convenience methods that subclasses of DB

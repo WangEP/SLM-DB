@@ -55,20 +55,22 @@ void Index::Runner() {
     while (queue_.empty()) {
       condvar_->Wait();
     }
-    auto key = queue_.front().key;
-    auto fnumber = queue_.front().fnumber;
-    auto value = queue_.front().meta;
-    queue_.pop_front();
+    while (!queue_.empty()) {
+      auto key = queue_.front().key;
+      auto fnumber = queue_.front().fnumber;
+      auto value = queue_.front().meta;
+      queue_.pop_front();
+      if (fnumber == 0)
+        Insert(key, value);
+      else
+        Update(key, fnumber, value);
+    }
     mutex_->Unlock();
-    if (fnumber == 0)
-      Insert(key, value);
-    else
-      Update(key, fnumber, value);
   }
 #pragma clang diagnostic pop
 }
 
-void* Index::ThreadWrapper(void *index) {
+void* Index::ThreadWrapper(void* index) {
   reinterpret_cast<Index*>(index)->Runner();
   return NULL;
 }
