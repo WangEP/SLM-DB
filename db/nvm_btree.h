@@ -120,6 +120,9 @@ class lNode : public Node {
     posix_memalign(&ret, 64, size);
     return ret;
   }
+  inline LeafEntry& operator[](uint32_t idx) {
+      return entry[idx];
+  }
   // Helper
   bool overflow(void);
   int32_t count(void);
@@ -253,7 +256,7 @@ class BTree {
   void insert(int64_t, void*);
   void* update(int64_t, int64_t, void*);
   void remove(int64_t);
-  void range(int64_t, int64_t);
+  vector<LeafEntry*> range(int64_t, int64_t);
 
   // Helper
   iNode* findParent(Node*);
