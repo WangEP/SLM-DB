@@ -11,17 +11,18 @@
 namespace leveldb {
 
 struct IndexMeta {
-  uint32_t offset;
-  uint32_t size;
-  uint32_t file_number;
+  uint64_t refs;
+  uint64_t offset;
+  uint64_t size;
+  uint64_t file_number;
 
   IndexMeta(uint32_t offset, uint32_t size, uint32_t file_number) :
-      offset(offset), size(size), file_number(file_number) { }
+      offset(offset), size(size), file_number(file_number), refs(0) { }
 };
 
 struct KeyAndMeta{
   uint32_t key;
-  uint32_t fnumber;
+  uint64_t prev_file_number;
   IndexMeta* meta;
 };
 
@@ -64,8 +65,8 @@ class Index {
   BTree tree_; // Temporary
   bool bgstarted_;
   pthread_t thread_;
-  port::Mutex* mutex_;
-  port::CondVar* condvar_;
+  port::Mutex mutex_;
+  port::CondVar condvar_;
   bool free_;
 
   std::deque<KeyAndMeta> queue_;

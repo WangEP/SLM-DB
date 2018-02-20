@@ -38,10 +38,12 @@ RawTableBuilder::~RawTableBuilder() {
 void RawTableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
+  if (r->options.comparator->Compare(key, Slice("0000000000000210")) == 0) {
+    int i = 0;
+  }
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
-  assert(!r->closed);
   if (!ok()) return;
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;

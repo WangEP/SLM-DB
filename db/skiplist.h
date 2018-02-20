@@ -32,6 +32,7 @@
 #include "port/port.h"
 #include "util/arena.h"
 #include "util/random.h"
+#include "util/persist.h"
 
 namespace leveldb {
 
@@ -184,7 +185,7 @@ typename SkipList<Key,Comparator>::Node*
 SkipList<Key,Comparator>::NewNode(const Key& key, int height) {
   char* mem = arena_->AllocateAligned(
       sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
-  clflush(mem, sizeof(Node));
+  //clflush(mem, sizeof(Node) + sizeof(port::AtomicPointer) * (height - 1));
   return new (mem) Node(key);
 }
 
@@ -368,9 +369,8 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
     prev[i]->SetNext(i, x);
     if (i == 0) {
-      // clflush first level only
-      clflush((char *) x->Next(i), sizeof(Node*));
-      clflush((char *) prev[i]->Next(i), sizeof(Node*));
+      clflush((char *) x->Next(i), sizeof(Node *));
+      clflush((char *) prev[i]->Next(i), sizeof(Node *));
     }
   }
 }

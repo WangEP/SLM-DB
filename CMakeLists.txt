@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(leveldb C CXX)
-set(CMAKE_DEBUG_POSTFIX "d")
+project(PMDB C CXX)
+#set(CMAKE_DEBUG_POSTFIX "d")
 
 set(SNAPPY_LIBRARY "")
 
@@ -34,7 +34,8 @@ else()
     add_compile_options(
             -Wno-sign-compare
             -std=c++17
-            -O3
+            -O2
+            -DNDEBUG
     )
 endif()
 
@@ -151,7 +152,13 @@ set(LEVEL_DB_FILES
         db/persistent_skiplist.h
         db/persistent_memtable.cc
         db/persistent_memtable.h
-        db/persistent_skiplist.cc util/int_based_comparator.h util/fast_atoi.h db/range_iterator.cc db/range_iterator.h)
+        db/persistent_skiplist.cc
+        util/int_based_comparator.h
+        util/fast_atoi.h
+        db/range_iterator.cc
+        db/range_iterator.h
+        util/testutil.h
+        util/testutil.cc)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -198,11 +205,11 @@ target_link_libraries(simple_bench PUBLIC leveldb)
 add_executable(sanity_check bench/sanity_check.cc)
 target_link_libraries(sanity_check PUBLIC leveldb)
 
-add_executable(file_io_test util/file_io_test.cc)
-target_link_libraries(file_io_test PUBLIC leveldb)
-
 add_executable(raw_table_test table/raw_table_test.cc)
 target_link_libraries(raw_table_test PUBLIC leveldb)
 
 add_executable(persistent_skiplist_test db/persistent_skiplist_test.cc)
 target_link_libraries(persistent_skiplist_test PUBLIC leveldb)
+
+add_executable(db_bench db/db_bench.cc)
+target_link_libraries(db_bench PUBLIC leveldb)

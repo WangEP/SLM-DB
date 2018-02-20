@@ -99,6 +99,14 @@ inline const char* GetVarint32Ptr(const char* p,
   return GetVarint32PtrFallback(p, limit, value);
 }
 
+inline int32_t fast_atoi(const char* str, size_t size) {
+  int val = 0;
+  while (size-- > 0) {
+    val = val*10 + (*str++ - '0');
+  }
+  return val;
+}
+
 }  // namespace leveldb
 
 #endif  // STORAGE_LEVELDB_UTIL_CODING_H_

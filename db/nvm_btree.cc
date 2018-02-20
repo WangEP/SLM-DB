@@ -31,7 +31,8 @@ void BTree::insert(int64_t key, void* ptr) {
   // update if key exists
   if (leaf->search(key)!= NULL) {
     leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, 0, ptr));
-    delete meta;
+    if (meta != NULL && --meta->refs == 0)
+      delete meta;
     return;
   }
   if (!leaf->overflow()) {
@@ -705,7 +706,7 @@ void* lNode::update(int64_t key, int64_t fnumber, void *ptr) {
         clflush((char*) &entry[i].ptr, sizeof(void*));
         return p;
       } else
-        break;
+        return nullptr;
     }
   }
   if (sibling && sibling->splitKey < key) {

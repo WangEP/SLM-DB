@@ -62,6 +62,7 @@ class LEVELDB_EXPORT Table {
 
   explicit Table(Rep* rep) { rep_ = rep; }
   static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
+  static Iterator* BlockReader2(void*, const ReadOptions&, const BlockHandle&);
 
   // Calls (*handle_result)(arg, ...) with the entry found after a call
   // to Seek(key).  May not make such a call if filter policy says
@@ -71,6 +72,12 @@ class LEVELDB_EXPORT Table {
       const ReadOptions&, const Slice& key,
       void* arg,
       void (*handle_result)(void* arg, const Slice& k, const Slice& v));
+
+  Status InternalGet2(
+      const ReadOptions&, const Slice& key,
+      const BlockHandle& block_handle,
+      void* arg,
+      void(*handle_result)(void* arg, const Slice& k, const Slice& v));
 
 
   void ReadMeta(const Footer& footer);
