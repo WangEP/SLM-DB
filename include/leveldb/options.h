@@ -84,11 +84,8 @@ struct LEVELDB_EXPORT Options {
   // Default: 4MB
   size_t write_buffer_size;
 
-  // Default: 100MB
   size_t max_buffer_size;
-
-  // Default: 4MB
-  size_t compaction_threshhold;
+  size_t compaction_threshold;
 
   // Number of open files that can be used by the DB.  You may need to
   // increase this if your database has a large working set (budget
@@ -119,6 +116,14 @@ struct LEVELDB_EXPORT Options {
   //
   // Default: 16
   int block_restart_interval;
+
+  // disable writing of recovery log during DB::Write() / Put() calls.
+  // This speeds performance but can lead to loss of tens of megabytes
+  // of data if system crashes.
+  bool disable_recovery_log;
+
+  // Global index
+  Index* index;
 
   // Leveldb will write up to this amount of bytes to a file before
   // switching to a new one.
@@ -161,12 +166,6 @@ struct LEVELDB_EXPORT Options {
   // Default: NULL
   const FilterPolicy* filter_policy;
 
-  // Global index
-  Index* index;
-
-  // Disable lob option
-  bool disable_recovery_log;
-
   // Create an Options object with default values for all fields.
   Options();
 };
@@ -192,7 +191,7 @@ struct LEVELDB_EXPORT ReadOptions {
 
   ReadOptions()
       : verify_checksums(false),
-        fill_cache(false),
+        fill_cache(true),
         snapshot(NULL) {
   }
 };

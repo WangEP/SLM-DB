@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
     std::string value;
     status = db->Get(leveldb::ReadOptions(), key, &value);
     if (!status.ok()) {
-      printf("%s %s\n", key.data(), status.ToString().data());
+      printf("key %s %s\n", key.data(), status.ToString().data());
       return 1;
     }
     if (v != value) {

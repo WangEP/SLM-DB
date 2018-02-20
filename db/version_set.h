@@ -73,6 +73,9 @@ class Version {
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val,
              GetStats* stats);
 
+  Status Get2(const ReadOptions&, const LookupKey& key, std::string* val,
+              GetStats* stats);
+
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.
   // REQUIRES: lock is held
@@ -89,11 +92,7 @@ class Version {
   void Ref();
   void Unref();
 
-  Compaction* MakeLevel0Compaction(const Slice& user_begin,
-                                   const Slice& user_end);
-
-
-    void GetOverlappingInputs(
+  void GetOverlappingInputs(
       int level,
       const InternalKey* begin,         // NULL means before all keys
       const InternalKey* end,           // NULL means after all keys
@@ -227,8 +226,6 @@ class VersionSet {
   // Return the log file number for the log file that is currently
   // being compacted, or zero if there is no such log file.
   uint64_t PrevLogNumber() const { return prev_log_number_; }
-
-  Compaction* MemtableCompaction(const Slice& mem_begin, const Slice& mem_end);
 
   // Pick level and inputs for a new compaction.
   // Returns NULL if there is no compaction to be done.

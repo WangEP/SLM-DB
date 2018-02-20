@@ -22,6 +22,7 @@ struct ReadOptions;
 class BlockHandle {
  public:
   BlockHandle();
+  BlockHandle(uint64_t size, uint64_t offset);
 
   // The offset of the block in the file.
   uint64_t offset() const { return offset_; }
@@ -101,6 +102,11 @@ extern Status ReadBlock(RandomAccessFile* file,
 inline BlockHandle::BlockHandle()
     : offset_(~static_cast<uint64_t>(0)),
       size_(~static_cast<uint64_t>(0)) {
+}
+
+inline BlockHandle::BlockHandle(uint64_t size, uint64_t offset)
+    : offset_(offset),
+      size_(size) {
 }
 
 }  // namespace leveldb

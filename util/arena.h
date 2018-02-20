@@ -10,6 +10,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "port/port.h"
+#if QUARTZ
+#include "quartz/src/lib/pmalloc.h"
+#endif
 
 namespace leveldb {
 
@@ -40,7 +43,6 @@ class Arena {
 
   // Array of new[] allocated memory blocks
   std::vector<char*> blocks_;
-
 
   // Total memory usage of the arena.
   port::AtomicPointer memory_usage_;

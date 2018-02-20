@@ -212,6 +212,45 @@ Iterator* Table::BlockReader(void* arg,
   return iter;
 }
 
+Iterator* Table::BlockReader2(void* arg,
+                              const ReadOptions& options,
+                              const BlockHandle& handle) {
+  Status s;
+  Table* table = reinterpret_cast<Table*>(arg);
+  Cache* block_cache = table->rep_->options.block_cache;
+  Cache::Handle* cache_handle = NULL;
+  BlockContents contents;
+  Block* block = NULL;
+  if (block_cache != NULL) {
+    char cache_key_buffer[16];
+    EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
+    EncodeFixed64(cache_key_buffer+8, handle.offset());
+    Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+    cache_handle = block_cache->Lookup(key);
+    if (cache_handle != NULL) {
+      block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+    } else {
+      s = ReadBlock(table->rep_->file, options, handle, &contents);
+      if (s.ok()) {
+        block = new Block(contents);
+      }
+    }
+  }
+
+  Iterator* iter;
+  if (block != NULL) {
+    iter = block->NewIterator(table->rep_->options.comparator);
+    if (cache_handle == NULL) {
+      iter->RegisterCleanup(&DeleteBlock, block, NULL);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
+  } else {
+    iter = NewErrorIterator(s);
+  }
+  return iter;
+}
+
 Iterator* Table::NewIterator(const ReadOptions& options) const {
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
@@ -249,6 +288,19 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
   return s;
 }
 
+Status Table::InternalGet2(const ReadOptions& options, const Slice& k,
+                    const BlockHandle& block_handle, void* arg,
+                    void(*saver)(void*, const Slice&, const Slice&)) {
+  Status s;
+  Iterator* block_iter = BlockReader2(this, options, block_handle);
+  block_iter->Seek(k);
+  if (block_iter->Valid()) {
+    (*saver)(arg, block_iter->key(), block_iter->value());
+  }
+  s = block_iter->status();
+  delete block_iter;
+  return s;
+}
 
 uint64_t Table::ApproximateOffsetOf(const Slice& key) const {
   Iterator* index_iter =

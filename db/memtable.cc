@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include <future>
 #include "db/memtable.h"
+#include "db/dbformat.h"
+#include "leveldb/comparator.h"
 #include "leveldb/env.h"
-#include "include/leveldb/index.h"
+#include "leveldb/iterator.h"
+#include "util/coding.h"
 
 namespace leveldb {
 
@@ -29,11 +31,11 @@ MemTable::~MemTable() {
 size_t MemTable::ApproximateMemoryUsage() { return arena_.MemoryUsage(); }
 
 int MemTable::KeyComparator::operator()(const char* aptr, const char* bptr)
-    const {
+const {
   // Internal keys are encoded as length-prefixed strings.
   Slice a = GetLengthPrefixedSlice(aptr);
   Slice b = GetLengthPrefixedSlice(bptr);
-  return comparator.CompareMem(a, b);
+  return comparator.Compare(a, b);
 }
 
 // Encode a suitable internal key target for "target" and return it.
@@ -123,8 +125,8 @@ bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
     uint32_t key_length;
     const char* key_ptr = GetVarint32Ptr(entry, entry+5, &key_length);
     if (comparator_.comparator.user_comparator()->Compare(
-            Slice(key_ptr, key_length - 8),
-            key.user_key()) == 0) {
+        Slice(key_ptr, key_length - 8),
+        key.user_key()) == 0) {
       // Correct user key
       const uint64_t tag = DecodeFixed64(key_ptr + key_length - 8);
       switch (static_cast<ValueType>(tag & 0xff)) {

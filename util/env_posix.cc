@@ -3,38 +3,29 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <dirent.h>
-#include <cerrno>
+#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <ctime>
+#include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 #include <deque>
 #include <limits>
 #include <set>
-#include <map>
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <bits/ios_base.h>
-#include <fstream>
-#include <unordered_map>
-#include <future>
-#include <functional>
 #include "leveldb/env.h"
+#include "leveldb/slice.h"
 #include "port/port.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
-#include "persist.h"
-
-namespace bip = boost::interprocess;
 
 namespace leveldb {
 
@@ -219,7 +210,6 @@ class PosixMmapReadableFile: public RandomAccessFile {
       s = PosixError(filename_, EINVAL);
     } else {
       *result = Slice(reinterpret_cast<char*>(mmapped_region_) + offset, n);
-      assert(result->size() > 0);
     }
     return s;
   }
@@ -352,74 +342,6 @@ class PosixWritableFile : public WritableFile {
   }
 };
 
-class PosixMemoryIOFile : public MemoryIOFile {
- private:
-  std::string filename_;
-  void* addr_;
-  uint64_t max_size_;
-  volatile uint64_t current_;
-  int fd_;
-  bool is_flushed;
-
- public:
-  PosixMemoryIOFile(const std::string& fname, int fd, void* addr, uint64_t size)
-      : filename_(fname), fd_(fd), addr_(addr), max_size_(size), is_flushed(false) {
-    memset(addr_, '0', 32);
-    current_ = 32;
-  }
-
-  ~PosixMemoryIOFile() {
-    if (!is_flushed) {
-      Finish();
-    }
-  }
-
-  virtual Status Finish() {
-    Status s;
-    if (is_flushed) return s.IOError("already flushed", filename_);;
-    std::string prefix = std::to_string(current_-32);
-    memcpy(addr_ + 32 - prefix.size(), prefix.data(), prefix.size());
-    munmap(addr_, max_size_);
-    close(fd_);
-    is_flushed = true;
-    return s;
-  }
-
-  virtual std::string Filename() {
-    return std::move(filename_);
-  }
-
-  virtual uint64_t Size() {
-    return current_;
-  }
-
-  virtual bool IsWritable(uint64_t size) {
-    return size < max_size_ - current_;
-  }
-
-  virtual Status Append(const Slice& data) {
-    Status s;
-    if (is_flushed) return s.IOError("not written", data);
-    memcpy((addr_ + current_), data.data(), data.size());
-    clflush((char *) (addr_ + current_), data.size());
-    current_ += data.size();
-    return s;
-  }
-
-  virtual Status Read(uint64_t offset, size_t n, Slice* result,
-                      char* scratch) const {
-    Status s;
-    if (is_flushed || offset + n > current_) {
-      *result = Slice();
-      return PosixError(filename_, EINVAL);
-    }
-    memcpy(scratch, addr_ + offset, n);
-    *result = Slice(scratch, n);
-    return s;
-  }
-
-};
-
 static int LockOrUnlock(int fd, bool lock) {
   errno = 0;
   struct flock f;
@@ -478,14 +400,8 @@ class PosixEnv : public Env {
 
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) {
+    *result = NULL;
     Status s;
-    auto search = random_access_files.find(fname);
-    if (search != random_access_files.end()) {
-      *result = search->second;
-      return s;
-    } else {
-      *result = NULL;
-    }
     int fd = open(fname.c_str(), O_RDONLY);
     if (fd < 0) {
       s = PosixError(fname, errno);
@@ -496,7 +412,6 @@ class PosixEnv : public Env {
         void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
         if (base != MAP_FAILED) {
           *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
-          random_access_files.insert(std::make_pair(fname, *result));
         } else {
           s = PosixError(fname, errno);
         }
@@ -507,7 +422,6 @@ class PosixEnv : public Env {
       }
     } else {
       *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
-      random_access_files.insert(std::make_pair(fname, *result));
     }
     return s;
   }
@@ -538,44 +452,6 @@ class PosixEnv : public Env {
     return s;
   }
 
-  virtual Status NewMemoryIOFile(const std::string &fname,
-                                 uint64_t size,
-                                 MemoryIOFile **result) {
-    // NVRAM mmaped file
-    Status s;
-    int r;
-    int fd = open(fname.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0644);
-    if (fd < 0) {
-      *result = NULL;
-      s = PosixError(fname, errno);
-      return s;
-    }
-    r = lseek(fd, size-1, SEEK_SET);
-    if (r == -1) {
-      close(fd);
-      *result = NULL;
-      s = PosixError(fname, errno);
-      return s;
-    }
-    r = write(fd, "", 1);
-    if (r != 1) {
-      close(fd);
-      *result = NULL;
-      s = PosixError(fname, errno);
-      return s;
-    }
-    void* map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (map == MAP_FAILED) {
-      close(fd);
-      *result = NULL;
-      s = PosixError(fname, errno);
-      return s;
-    } else {
-      *result = new PosixMemoryIOFile(fname, fd, map, size);
-    }
-    return s;
-  }
-
   virtual bool FileExists(const std::string& fname) {
     return access(fname.c_str(), F_OK) == 0;
   }
@@ -597,11 +473,6 @@ class PosixEnv : public Env {
 
   virtual Status DeleteFile(const std::string& fname) {
     Status result;
-    auto search = random_access_files.find(fname);
-    if (search != random_access_files.end()) {
-      random_access_files.erase(search);
-      delete search->second;
-    }
     if (unlink(fname.c_str()) != 0) {
       result = PosixError(fname, errno);
     }
@@ -739,11 +610,8 @@ class PosixEnv : public Env {
     return NULL;
   }
 
-  // map for opened file descriptors
-  std::unordered_map<std::string, RandomAccessFile*> random_access_files;
-
-  port::Mutex* mu_;
-  port::CondVar* bgsignal_;
+  pthread_mutex_t mu_;
+  pthread_cond_t bgsignal_;
   pthread_t bgthread_;
   bool started_bgthread_;
 
@@ -788,13 +656,13 @@ static intptr_t MaxOpenFiles() {
 PosixEnv::PosixEnv()
     : started_bgthread_(false),
       mmap_limit_(MaxMmaps()),
-      fd_limit_(MaxOpenFiles()),
-      mu_(new port::Mutex),
-      bgsignal_(new port::CondVar(mu_)) {
+      fd_limit_(MaxOpenFiles()) {
+  PthreadCall("mutex_init", pthread_mutex_init(&mu_, NULL));
+  PthreadCall("cvar_init", pthread_cond_init(&bgsignal_, NULL));
 }
 
 void PosixEnv::Schedule(void (*function)(void*), void* arg) {
-  mu_->Lock();
+  PthreadCall("lock", pthread_mutex_lock(&mu_));
 
   // Start background thread if necessary
   if (!started_bgthread_) {
@@ -807,7 +675,7 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   // If the queue is currently empty, the background thread may currently be
   // waiting.
   if (queue_.empty()) {
-    bgsignal_->Signal();
+    PthreadCall("signal", pthread_cond_signal(&bgsignal_));
   }
 
   // Add to priority queue
@@ -815,27 +683,24 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   queue_.back().function = function;
   queue_.back().arg = arg;
 
-  mu_->Unlock();
+  PthreadCall("unlock", pthread_mutex_unlock(&mu_));
 }
 
 void PosixEnv::BGThread() {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
   while (true) {
     // Wait until there is an item that is ready to run
-    mu_->Lock();
+    PthreadCall("lock", pthread_mutex_lock(&mu_));
     while (queue_.empty()) {
-      bgsignal_->Wait();
+      PthreadCall("wait", pthread_cond_wait(&bgsignal_, &mu_));
     }
 
     void (*function)(void*) = queue_.front().function;
     void* arg = queue_.front().arg;
     queue_.pop_front();
 
-    mu_->Unlock();
+    PthreadCall("unlock", pthread_mutex_unlock(&mu_));
     (*function)(arg);
   }
-#pragma clang diagnostic pop
 }
 
 namespace {
@@ -863,10 +728,8 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
 }  // namespace
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
-static PosixEnv* default_env;
-static void InitDefaultEnv() {
-  default_env = new PosixEnv;
-}
+static Env* default_env;
+static void InitDefaultEnv() { default_env = new PosixEnv; }
 
 void EnvPosixTestHelper::SetReadOnlyFDLimit(int limit) {
   assert(default_env == NULL);

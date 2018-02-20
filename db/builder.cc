@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include <table/raw_table_builder.h>
 #include "db/builder.h"
 
 #include "db/filename.h"
@@ -12,13 +11,13 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
-#include "leveldb/index.h"
 
 namespace leveldb {
 
 Status BuildTable(const std::string& dbname,
                   Env* env,
                   const Options& options,
+                  TableCache* table_cache,
                   Iterator* iter,
                   FileMetaData* meta) {
   Status s;
@@ -33,44 +32,45 @@ Status BuildTable(const std::string& dbname,
       return s;
     }
 
-    RawTableBuilder* builder = new RawTableBuilder(options, file, meta->number);
-    meta->smallest.DecodeFrom(ExtractUserKey(iter->key()));
-    // wait if previous compaction indexing not finished
-    Index* index = options.index;
-    std::deque<KeyAndMeta> queue;
+    TableBuilder* builder = new TableBuilder(options, file, meta->number);
+    meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
-      Slice key = ExtractUserKey(iter->key());
+      Slice key = iter->key();
       meta->largest.DecodeFrom(key);
       builder->Add(key, iter->value());
-      // prep
-      KeyAndMeta key_and_meta;
-      key_and_meta.key = stoi(key.data());
-      key_and_meta.fnumber = 0;
-      key_and_meta.meta = new IndexMeta(builder->FileSize() - iter->value().size() - 1,
-                                iter->value().size(), meta->number);
-      queue.push_back(key_and_meta);
     }
 
+    // Finish and check for builder errors
+    s = builder->Finish();
     if (s.ok()) {
       meta->file_size = builder->FileSize();
       assert(meta->file_size > 0);
     }
-    s = builder->Finish();
     delete builder;
+
     // Finish and check for file errors
     if (s.ok()) {
       s = file->Sync();
     }
-    //Log(options.info_log, "indexing waiting");
-    // wait until indexing gets done
-//    while (!index->IsQueueEmpty()) { }
-    //Log(options.info_log, "finished waiting");
-    index->AddQueue(queue);
     if (s.ok()) {
       s = file->Close();
     }
     delete file;
     file = NULL;
+
+    if (s.ok()) {
+      // Verify that the table is usable
+      Iterator* it = table_cache->NewIterator(ReadOptions(),
+                                              meta->number,
+                                              meta->file_size);
+      s = it->status();
+      delete it;
+    }
+  }
+
+  // Check for input iterator errors
+  if (!iter->status().ok()) {
+    s = iter->status();
   }
 
   if (s.ok() && meta->file_size > 0) {
