@@ -101,7 +101,7 @@ inline const char* GetVarint32Ptr(const char* p,
 
 inline int32_t fast_atoi(const char* str, size_t size) {
   int val = 0;
-  while (size-- > 0) {
+  while(size-- > 0 && *str && *str >= '0' && *str <= '9') {
     val = val*10 + (*str++ - '0');
   }
   return val;

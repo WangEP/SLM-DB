@@ -27,7 +27,7 @@ Options::Options()
       reuse_logs(false),
       filter_policy(NULL),
       disable_recovery_log(true),
-      index(new Index()){
+      index(NULL){
 }
 
 }  // namespace leveldb

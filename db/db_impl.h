@@ -74,6 +74,10 @@ class DBImpl : public DB {
                                 SequenceNumber* latest_snapshot,
                                 uint32_t* seed);
 
+  Iterator* NewInternalIterator2(const ReadOptions&,
+                                SequenceNumber* latest_snapshot,
+                                 uint32_t* seed);
+
   Status NewDB();
 
   // Recover the descriptor from persistent storage.  May do a significant

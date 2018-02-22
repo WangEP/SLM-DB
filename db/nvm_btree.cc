@@ -31,8 +31,8 @@ void BTree::insert(int64_t key, void* ptr) {
   // update if key exists
   if (leaf->search(key)!= NULL) {
     leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, 0, ptr));
-    if (meta != NULL && --meta->refs == 0)
-      delete meta;
+    if (meta != NULL)
+      meta->Unref();
     return;
   }
   if (!leaf->overflow()) {

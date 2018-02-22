@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "util/fast_atoi.h"
+#include "util/coding.h"
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
 
@@ -12,7 +12,7 @@ Index::Index()
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
-  auto result = tree_.search(fast_atoi(key.data()));
+  auto result = tree_.search(fast_atoi(key.data(), key.size()));
   return reinterpret_cast<const IndexMeta *>(result);
 }
 

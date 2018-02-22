@@ -123,7 +123,7 @@ Status TableCache::Get(const ReadOptions& options,
 
 Status TableCache::Get2(const ReadOptions& options,
             uint64_t file_number,
-            const BlockHandle &block_handle,
+            const BlockHandle& block_handle,
             const Slice& k,
             void* arg,
             void(*saver)(void*, const Slice&, const Slice&)) {

@@ -219,8 +219,8 @@ Iterator* Table::BlockReader2(void* arg,
   Table* table = reinterpret_cast<Table*>(arg);
   Cache* block_cache = table->rep_->options.block_cache;
   Cache::Handle* cache_handle = NULL;
-  BlockContents contents;
   Block* block = NULL;
+  BlockContents contents;
   if (block_cache != NULL) {
     char cache_key_buffer[16];
     EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
@@ -233,7 +233,16 @@ Iterator* Table::BlockReader2(void* arg,
       s = ReadBlock(table->rep_->file, options, handle, &contents);
       if (s.ok()) {
         block = new Block(contents);
+        if (contents.cachable && options.fill_cache) {
+          cache_handle = block_cache->Insert(
+              key, block, block->size(), &DeleteCachedBlock);
+        }
       }
+    }
+  } else {
+    s = ReadBlock(table->rep_->file, options, handle, &contents);
+    if (s.ok()) {
+      block = new Block(contents);
     }
   }
 

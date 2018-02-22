@@ -132,7 +132,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   key_meta.key = fast_atoi(key.data(), key.size()-8);
   key_meta.prev_file_number = 0;
   key_meta.meta = r->indexmeta;
-  r->indexmeta->refs++;
+  r->indexmeta->Ref();
   r->index_queue.push_back(key_meta);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
@@ -209,7 +209,7 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
   handle->set_size(block_contents.size());
   // update block size in index meta
   if (is_data_block) {
-    r->indexmeta->size = block_contents.size();
+    r->indexmeta->handle.set_size(block_contents.size());
     clflush((char*) r->indexmeta, sizeof(IndexMeta));
   }
   r->status = r->file->Append(block_contents);
