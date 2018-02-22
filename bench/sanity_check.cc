@@ -2,6 +2,7 @@
 #include <chrono>
 #include <thread>
 #include "leveldb/db.h"
+#include "leveldb/index.h"
 
 uint64_t clflush_cnt = 0;
 uint64_t WRITE_LATENCY_IN_NS = 1000;
@@ -20,6 +21,7 @@ int main(int argc, char** argv) {
   options.filter_policy = NULL;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
+  options.index = new leveldb::Index();
   char *c = argv[1];
   std::string dbpath(c);
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);

@@ -439,38 +439,37 @@ Status Version::Get2(const ReadOptions& options,
   Slice user_key = k.user_key();
   const Comparator* ucmp = vset_->icmp_.user_comparator();
 
-  Index *index = vset_->options_->index;
-  const IndexMeta *index_meta = index->Get(user_key);
+  Index* index = vset_->options_->index;
+  const IndexMeta* index_meta = index->Get(user_key);
 
-  BlockHandle block_handle(index_meta->size, index_meta->offset);
+  if (index_meta != NULL) {
+    BlockHandle block_handle = index_meta->handle;
 
-  if (user_key.ToString() == "526") {
-    int i = 0;
+    Saver saver;
+    saver.state = kNotFound;
+    saver.ucmp = ucmp;
+    saver.user_key = user_key;
+    saver.value = value;
+    s = vset_->table_cache_->Get2(options, index_meta->file_number, block_handle,
+                                  ikey, &saver, SaveValue);
+    if (!s.ok()) {
+      return s;
+    }
+    switch (saver.state) {
+      case kNotFound:
+        s = Status::NotFound(Slice());
+        return s;
+      case kFound:
+        return s;
+      case kDeleted:
+        s = Status::NotFound(Slice());  // Use empty error message for speed
+        return s;
+      case kCorrupt:
+        s = Status::Corruption("corrupted key for ", user_key);
+        return s;
+    }
   }
-
-  Saver saver;
-  saver.state = kNotFound;
-  saver.ucmp = ucmp;
-  saver.user_key = user_key;
-  saver.value = value;
-  s = vset_->table_cache_->Get2(options, index_meta->file_number, block_handle,
-                                ikey, &saver, SaveValue);
-  if (!s.ok()) {
-    return s;
-  }
-  switch (saver.state) {
-    case kNotFound:
-      s = Status::NotFound(Slice());
-      return s;
-    case kFound:
-      return s;
-    case kDeleted:
-      s = Status::NotFound(Slice());  // Use empty error message for speed
-      return s;
-    case kCorrupt:
-      s = Status::Corruption("corrupted key for ", user_key);
-      return s;
-  }
+  return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
 bool Version::UpdateStats(const GetStats& stats) {

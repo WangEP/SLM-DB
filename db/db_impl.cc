@@ -1116,6 +1116,12 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
   return internal_iter;
 }
 
+Iterator* DBImpl::NewInternalIterator2(const ReadOptions& options,
+                                       SequenceNumber* latest_snapshot,
+                                       uint32_t* seed) {
+    
+}
+
 Iterator* DBImpl::TEST_NewInternalIterator() {
   SequenceNumber ignored;
   uint32_t ignored_seed;
@@ -1165,9 +1171,9 @@ Status DBImpl::Get(const ReadOptions& options,
     mutex_.Lock();
   }
 
-  if (have_stat_update && current->UpdateStats(stats)) {
-    MaybeScheduleCompaction();
-  }
+//  if (have_stat_update && current->UpdateStats(stats)) {
+//    MaybeScheduleCompaction();
+//  }
   mem->Unref();
   if (imm != NULL) imm->Unref();
   current->Unref();

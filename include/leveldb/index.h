@@ -5,19 +5,33 @@
 #include <map>
 #include <port/port.h>
 #include <deque>
+#include <table/format.h>
 #include "db/nvm_btree.h"
 #include "leveldb/env.h"
 
 namespace leveldb {
 
-struct IndexMeta {
+class IndexMeta {
+ private:
   uint64_t refs;
-  uint64_t offset;
-  uint64_t size;
+ public:
   uint64_t file_number;
+  BlockHandle handle;
 
   IndexMeta(uint32_t offset, uint32_t size, uint32_t file_number) :
-      offset(offset), size(size), file_number(file_number), refs(0) { }
+      handle(size, offset), file_number(file_number), refs(0) { }
+
+  ~IndexMeta() { }
+
+  void Ref() {
+    ++refs;
+  }
+
+  void Unref() {
+    if (--refs == 0)
+      delete this;
+  }
+
 };
 
 struct KeyAndMeta{
