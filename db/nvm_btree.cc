@@ -215,7 +215,7 @@ vector<LeafEntry*> BTree::range(int64_t min, int64_t max) {
     std::sort(std::begin(ret), std::end(ret), [](LeafEntry* a, LeafEntry* b){
                 return a->key < b->key;
             });
-    return ret;
+    return std::move(ret);
 }
 
 void BTree::remove(int64_t key) {

@@ -50,7 +50,7 @@ class Index {
 
   void Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta);
 
-  void Range(const std::string&, const std::string&);
+  Iterator* Range(const uint32_t& begin, const uint32_t& end);
 
   void AsyncInsert(const KeyAndMeta& key_and_meta);
 
@@ -87,6 +87,24 @@ class Index {
 
   Index(const Index&);
   void operator=(const Index&);
+};
+
+class IndexIterator : public Iterator {
+ public:
+  IndexIterator(std::vector<LeafEntry*> entries);
+
+  virtual bool Valid();
+  virtual void SeekToFirst();
+  virtual void SeekToLast();
+  virtual void Seek(const Slice& target);
+  virtual void Next();
+  virtual void Prev();
+  virtual Slice key() const;
+  virtual Slice value() const;
+  virtual Status status() const;
+  
+ private:
+  std::vector<LeafEntry*> entries_;
 };
 
 } // namespace leveldb

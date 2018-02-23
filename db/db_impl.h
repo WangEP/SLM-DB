@@ -41,6 +41,7 @@ class DBImpl : public DB {
   virtual bool GetProperty(const Slice& property, std::string* value);
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes);
   virtual void CompactRange(const Slice* begin, const Slice* end);
+  virtual Iterator* RangeQuery(const Slice* begin, const Slice* end);
 
   Status CompactMemTableSynchronous();
   // Extra methods (for testing) that are not in the public DB interface
@@ -73,10 +74,6 @@ class DBImpl : public DB {
   Iterator* NewInternalIterator(const ReadOptions&,
                                 SequenceNumber* latest_snapshot,
                                 uint32_t* seed);
-
-  Iterator* NewInternalIterator2(const ReadOptions&,
-                                SequenceNumber* latest_snapshot,
-                                 uint32_t* seed);
 
   Status NewDB();
 
