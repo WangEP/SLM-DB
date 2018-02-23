@@ -1116,10 +1116,8 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
   return internal_iter;
 }
 
-Iterator* DBImpl::NewInternalIterator2(const ReadOptions& options,
-                                       SequenceNumber* latest_snapshot,
-                                       uint32_t* seed) {
-    
+Iterator* DBImpl::RangeQuery(const Slice* begin, const Slice* end) {
+
 }
 
 Iterator* DBImpl::TEST_NewInternalIterator() {
