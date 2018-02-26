@@ -154,11 +154,12 @@ set(LEVEL_DB_FILES
         db/persistent_memtable.h
         db/persistent_skiplist.cc
         util/int_based_comparator.h
-        util/fast_atoi.h
         db/range_iterator.cc
         db/range_iterator.h
         util/testutil.h
-        util/testutil.cc)
+        util/testutil.cc
+        db/index_iterator.cc
+        db/index_iterator.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

@@ -183,6 +183,11 @@ void MergingIterator::FindLargest() {
 }
 }  // namespace
 
+class RangeIterator : public Iterator {
+ public:
+  RangeIterator(const Comparator* comparator, std::vector<Iterator*> iterators, int n);
+};
+
 Iterator* NewMergingIterator(const Comparator* cmp, Iterator** list, int n) {
   assert(n >= 0);
   if (n == 0) {
@@ -192,6 +197,18 @@ Iterator* NewMergingIterator(const Comparator* cmp, Iterator** list, int n) {
   } else {
     return new MergingIterator(cmp, list, n);
   }
+}
+
+Iterator* NewMerginIterator2(const Comparator* cmp, std::vector<Iterator*> list, int n) {
+  assert(n >= 0);
+  if (n == 0) {
+    return NewEmptyIterator();
+  } else if (n == 1) {
+    return list[0];
+  } else {
+    return new RangeIterator(cmp, list, n);
+  }
+  
 }
 
 }  // namespace leveldb

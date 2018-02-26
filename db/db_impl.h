@@ -41,7 +41,7 @@ class DBImpl : public DB {
   virtual bool GetProperty(const Slice& property, std::string* value);
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes);
   virtual void CompactRange(const Slice* begin, const Slice* end);
-  virtual Iterator* RangeQuery(const Slice* begin, const Slice* end);
+  virtual Iterator* RangeQuery(const ReadOptions&, const Slice* begin, const Slice* end);
 
   Status CompactMemTableSynchronous();
   // Extra methods (for testing) that are not in the public DB interface
@@ -131,6 +131,9 @@ class DBImpl : public DB {
 
   // table_cache_ provides its own synchronization
   TableCache* table_cache_;
+
+  // B-tree data block indexing
+  Index* index_;
 
   // Lock over the persistent DB state.  Non-NULL iff successfully acquired.
   FileLock* db_lock_;

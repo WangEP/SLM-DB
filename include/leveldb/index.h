@@ -3,11 +3,12 @@
 
 #include <cstdint>
 #include <map>
-#include <port/port.h>
 #include <deque>
-#include <table/format.h>
+#include "port/port.h"
+#include "table/format.h"
 #include "db/nvm_btree.h"
 #include "leveldb/env.h"
+#include "leveldb/iterator.h"
 
 namespace leveldb {
 
@@ -87,24 +88,6 @@ class Index {
 
   Index(const Index&);
   void operator=(const Index&);
-};
-
-class IndexIterator : public Iterator {
- public:
-  IndexIterator(std::vector<LeafEntry*> entries);
-
-  virtual bool Valid();
-  virtual void SeekToFirst();
-  virtual void SeekToLast();
-  virtual void Seek(const Slice& target);
-  virtual void Next();
-  virtual void Prev();
-  virtual Slice key() const;
-  virtual Slice value() const;
-  virtual Status status() const;
-  
- private:
-  std::vector<LeafEntry*> entries_;
 };
 
 } // namespace leveldb

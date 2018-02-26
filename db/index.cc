@@ -2,7 +2,7 @@
 #include "util/coding.h"
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
-#include "leveldb/iterator.h"
+#include "db/index_iterator.h"
 
 namespace leveldb {
 
@@ -31,6 +31,7 @@ void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta
 Iterator* Index::Range(const uint32_t& begin, const uint32_t& end) {
   std::vector<LeafEntry*> entries = tree_.range(begin, end);
   Iterator* iter = new IndexIterator(entries);
+  return iter;
 }
 
 void Index::AsyncInsert(const KeyAndMeta& key_and_meta) {
