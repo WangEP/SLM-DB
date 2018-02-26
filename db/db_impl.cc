@@ -25,6 +25,7 @@
 #include "leveldb/status.h"
 #include "leveldb/table.h"
 #include "leveldb/table_builder.h"
+#include "leveldb/index.h"
 #include "port/port.h"
 #include "table/block.h"
 #include "table/merger.h"
@@ -1116,8 +1117,32 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
   return internal_iter;
 }
 
-Iterator* DBImpl::RangeQuery(const Slice* begin, const Slice* end) {
+Iterator* DBImpl::RangeQuery(const ReadOptions& options,
+                             const Slice* begin,
+                             const Slice* end) {
+  IterState* cleanup = new IterState;
+  mutex_.Lock();
+  std::vector<Iterator*> list;
+  list.push_back(mem_->NewIterator());
+  mem_->Ref();
+  if (imm_ != NULL) {
+    list.push_back(imm_->NewIterator());
+    imm_->Ref();
+  }
+  list.push_back(index_->Range(fast_atoi(begin->data(), begin->size()),
+                               fast_atoi(end->data(), end->size())));
+  
+  cleanup->mu = &mutex_;
+  cleanup->mem = mem_;
+  cleanup->imm = imm_;
+  cleanup->version = versions_->current();
 
+  Iterator* merging_iterator;
+
+  merging_iterator->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
+
+  mutex_.Unlock();
+  return merging_iterator;
 }
 
 Iterator* DBImpl::TEST_NewInternalIterator() {

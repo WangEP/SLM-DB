@@ -5,6 +5,8 @@
 #ifndef STORAGE_LEVELDB_TABLE_MERGER_H_
 #define STORAGE_LEVELDB_TABLE_MERGER_H_
 
+#include <vector>
+
 namespace leveldb {
 
 class Comparator;
@@ -20,6 +22,9 @@ class Iterator;
 // REQUIRES: n >= 0
 extern Iterator* NewMergingIterator(
     const Comparator* comparator, Iterator** children, int n);
+
+extern Iterator* NewMergingIterator2(
+    const Comparator* comparator, std::vector<Iterator*> list, int n);
 
 }  // namespace leveldb
 
