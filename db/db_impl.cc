@@ -1118,21 +1118,21 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
 }
 
 Iterator* DBImpl::RangeQuery(const ReadOptions& options,
-                             const Slice* begin,
-                             const Slice* end) {
+                             const Slice& begin,
+                             const Slice& end) {
   IterState* cleanup = new IterState;
   std::vector<Iterator*> list;
   mutex_.Lock();
   // add mem iterator
   Iterator* mem_iter = mem_->NewIterator();
-  mem_iter->Seek(*begin);
+  mem_iter->Seek(begin);
   list.push_back(mem_iter);
   mem_->Ref();
 
   // add imm iterator
   if (imm_ != NULL) {
     Iterator* imm_iter = imm_->NewIterator();
-    imm_iter->Seek(*begin);
+    imm_iter->Seek(begin);
     list.push_back(imm_iter);
     imm_->Ref();
   }
@@ -1141,8 +1141,8 @@ Iterator* DBImpl::RangeQuery(const ReadOptions& options,
 
   // add btree range query
   SequenceNumber number = versions_->LastSequence();
-  list.push_back(index_->Range(fast_atoi(begin->data(), begin->size()),
-                               fast_atoi(end->data(), end->size()), versions_->current(), number));
+  list.push_back(index_->Range(fast_atoi(begin.data(), begin.size()),
+                               fast_atoi(end.data(), end.size()), versions_->current(), number));
 
   // put all together
   Iterator* range_iterator = NewRangeIterator(&internal_comparator_,
