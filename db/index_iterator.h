@@ -3,14 +3,16 @@
 
 #include <vector>
 #include "leveldb/iterator.h"
+#include "leveldb/index.h"
 #include "db/nvm_btree.h"
 #include "table/format.h"
+#include "version_set.h"
 
 namespace leveldb {
 
 class IndexIterator : public Iterator {
  public:
-  IndexIterator(std::vector<LeafEntry*> entries);
+  IndexIterator(std::vector<LeafEntry*> entries, void* vcurrent, uint64_t number);
 
   virtual bool Valid() const;
   virtual void SeekToFirst();
@@ -25,7 +27,14 @@ class IndexIterator : public Iterator {
  private:
   std::vector<LeafEntry*> entries_;
   std::vector<LeafEntry*>::iterator iterator_;
-  BlockHandle block_handle_;
+  std::string key_;
+  ReadOptions options_;
+  uint64_t number_;
+  IndexMeta* index_ptr;
+  std::string* value_;
+  Version* vcurrent_;
+
+  void IndexChange();
 };
 
 }

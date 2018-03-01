@@ -23,7 +23,7 @@ class Iterator;
 extern Iterator* NewMergingIterator(
     const Comparator* comparator, Iterator** children, int n);
 
-extern Iterator* NewMergingIterator2(
+extern Iterator* NewRangeIterator(
     const Comparator* comparator, std::vector<Iterator*> list, int n);
 
 }  // namespace leveldb

@@ -35,6 +35,7 @@ class TableCache;
 class Version;
 class VersionSet;
 class WritableFile;
+class IndexMeta;
 
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
@@ -75,6 +76,9 @@ class Version {
 
   Status Get2(const ReadOptions&, const LookupKey& key, std::string* val,
               GetStats* stats);
+
+  Status Get3(const ReadOptions&, const LookupKey& key, std::string* val,
+              IndexMeta* index_meta);
 
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.

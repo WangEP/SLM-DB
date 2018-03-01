@@ -51,6 +51,9 @@ class Node {
     posix_memalign(&ret, 64, size);
     return ret;
   }
+  void operator delete(void* buffer) {
+    free(buffer);
+  }
 
   void print();
   void print(stringstream& ss);
@@ -119,6 +122,9 @@ class lNode : public Node {
     void *ret;
     posix_memalign(&ret, 64, size);
     return ret;
+  }
+  void operator delete (void* buffer) {
+    free(buffer);
   }
   inline LeafEntry& operator[](uint32_t idx) {
       return entry[idx];

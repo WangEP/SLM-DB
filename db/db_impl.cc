@@ -1121,28 +1121,42 @@ Iterator* DBImpl::RangeQuery(const ReadOptions& options,
                              const Slice* begin,
                              const Slice* end) {
   IterState* cleanup = new IterState;
-  mutex_.Lock();
   std::vector<Iterator*> list;
-  list.push_back(mem_->NewIterator());
+  mutex_.Lock();
+  // add mem iterator
+  Iterator* mem_iter = mem_->NewIterator();
+  mem_iter->Seek(*begin);
+  list.push_back(mem_iter);
   mem_->Ref();
+
+  // add imm iterator
   if (imm_ != NULL) {
-    list.push_back(imm_->NewIterator());
+    Iterator* imm_iter = imm_->NewIterator();
+    imm_iter->Seek(*begin);
+    list.push_back(imm_iter);
     imm_->Ref();
   }
+
+  versions_->current()->Ref();
+
+  // add btree range query
+  SequenceNumber number = versions_->LastSequence();
   list.push_back(index_->Range(fast_atoi(begin->data(), begin->size()),
-                               fast_atoi(end->data(), end->size())));
-  
+                               fast_atoi(end->data(), end->size()), versions_->current(), number));
+
+  // put all together
+  Iterator* range_iterator = NewRangeIterator(&internal_comparator_,
+                                                std::move(list),
+                                                list.size());
+  // init cleaner
   cleanup->mu = &mutex_;
   cleanup->mem = mem_;
   cleanup->imm = imm_;
   cleanup->version = versions_->current();
-
-  Iterator* merging_iterator;
-
-  merging_iterator->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
+  range_iterator->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
 
   mutex_.Unlock();
-  return merging_iterator;
+  return range_iterator;
 }
 
 Iterator* DBImpl::TEST_NewInternalIterator() {

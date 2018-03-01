@@ -154,8 +154,6 @@ set(LEVEL_DB_FILES
         db/persistent_memtable.h
         db/persistent_skiplist.cc
         util/int_based_comparator.h
-        db/range_iterator.cc
-        db/range_iterator.h
         util/testutil.h
         util/testutil.cc
         db/index_iterator.cc
