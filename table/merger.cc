@@ -183,10 +183,97 @@ void MergingIterator::FindLargest() {
 }
 }  // namespace
 
+namespace {
+
 class RangeIterator : public Iterator {
  public:
   RangeIterator(const Comparator* comparator, std::vector<Iterator*> iterators, int n);
+  ~RangeIterator();
+
+  virtual bool Valid() const;
+  virtual void SeekToFirst();
+  virtual void SeekToLast();
+  virtual void Seek(const Slice& target);
+  virtual void Next();
+  virtual void Prev();
+  virtual Slice key() const;
+  virtual Slice value() const;
+  virtual Status status() const;
+ private:
+  std::vector<Iterator*> iterators_;
+  const Comparator* comparator_;
+  int size_;
+  int target_;
 };
+
+RangeIterator::RangeIterator(const Comparator* comparator,
+                             std::vector<Iterator*> iterators, int n)
+    : comparator_(comparator), iterators_(iterators), size_(n), target_(0) { }
+
+RangeIterator::~RangeIterator() {
+}
+
+bool RangeIterator::Valid() const {
+  for (auto iter : iterators_)
+    if (!iter->Valid())
+      return false;
+  return true;
+}
+
+void RangeIterator::SeekToFirst() {
+  for (auto iter : iterators_) {
+    iter->SeekToFirst();
+  }
+}
+
+void RangeIterator::SeekToLast() {
+  for (auto iter : iterators_) {
+    iter->SeekToLast();
+  }
+}
+
+void RangeIterator::Seek(const Slice& target) {
+  Slice key;
+  for (int i = 0; i < size_; i++) {
+    iterators_[i]->Seek(target);
+    if (key.empty() && comparator_->Compare(key, iterators_[i]->key()) > 0) {
+      target_ = i;
+    }
+  }
+}
+
+void RangeIterator::Next() {
+  for (int i = 0; i < size_; i++)
+    if (i != target_ && comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) == 0)
+      iterators_[i]->Next();
+  iterators_[target_]->Next();
+  for (int i = 0; i < size_; i++)
+    if (comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) < 0) {
+      target_ = i;
+    }
+}
+
+void RangeIterator::Prev() {
+  // skip for now
+}
+
+Slice RangeIterator::key() const {
+  return iterators_[target_]->key();
+}
+
+Slice RangeIterator::value() const {
+  return iterators_[target_]->value();
+}
+
+Status RangeIterator::status() const {
+  for (auto iter : iterators_)
+    if (!iter->status().ok()) {
+      return iter->status();
+    }
+  return Status::OK();
+}
+
+} // namespace
 
 Iterator* NewMergingIterator(const Comparator* cmp, Iterator** list, int n) {
   assert(n >= 0);
@@ -199,7 +286,7 @@ Iterator* NewMergingIterator(const Comparator* cmp, Iterator** list, int n) {
   }
 }
 
-Iterator* NewMerginIterator2(const Comparator* cmp, std::vector<Iterator*> list, int n) {
+Iterator* NewRangeIterator(const Comparator* cmp, std::vector<Iterator*> list, int n) {
   assert(n >= 0);
   if (n == 0) {
     return NewEmptyIterator();
