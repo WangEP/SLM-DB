@@ -135,7 +135,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       seed_(0),
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
-      manual_compaction_(NULL) {
+      manual_compaction_(NULL),
+      index_(raw_options.index) {
   has_imm_.Release_Store(NULL);
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
@@ -1123,26 +1124,34 @@ Iterator* DBImpl::RangeQuery(const ReadOptions& options,
   IterState* cleanup = new IterState;
   std::vector<Iterator*> list;
   mutex_.Lock();
+  //
+  versions_->current()->Ref();
+  SequenceNumber snapshot;
+  if (options.snapshot != NULL) {
+    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
+  } else {
+    snapshot = versions_->LastSequence();
+  }
+  LookupKey k(begin, snapshot);
   // add mem iterator
   Iterator* mem_iter = mem_->NewIterator();
-  mem_iter->Seek(begin);
+  mem_iter->Seek(k.memtable_key());
   list.push_back(mem_iter);
   mem_->Ref();
 
   // add imm iterator
   if (imm_ != NULL) {
     Iterator* imm_iter = imm_->NewIterator();
-    imm_iter->Seek(begin);
+    imm_iter->Seek(k.memtable_key());
     list.push_back(imm_iter);
     imm_->Ref();
   }
 
-  versions_->current()->Ref();
+
 
   // add btree range query
-  SequenceNumber number = versions_->LastSequence();
   list.push_back(index_->Range(fast_atoi(begin.data(), begin.size()),
-                               fast_atoi(end.data(), end.size()), versions_->current(), number));
+                               fast_atoi(end.data(), end.size()), versions_->current(), snapshot));
 
   // put all together
   Iterator* range_iterator = NewRangeIterator(&internal_comparator_,
