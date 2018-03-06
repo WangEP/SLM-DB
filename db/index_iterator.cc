@@ -8,7 +8,8 @@ IndexIterator::IndexIterator(std::vector<LeafEntry*> entries, void* vcurrent, ui
     : entries_(entries),
       index_ptr(NULL),
       vcurrent_(reinterpret_cast<Version*>(vcurrent)),
-      number_(number) {
+      number_(number),
+      value_(new std::string()){
   SeekToFirst();
 }
 
@@ -18,15 +19,17 @@ bool IndexIterator::Valid() const {
 
 void IndexIterator::SeekToFirst() {
   iterator_ = entries_.begin();
-  iterator_++;
-  key_ = std::to_string((*iterator_)->key);
+  char k[100];
+  snprintf(k, sizeof(k), "%016d", (*iterator_)->key);
+  key_ = k;
   IndexChange();
 }
 
 void IndexIterator::SeekToLast() {
   iterator_ = entries_.end();
-  iterator_--;
-  key_ = std::to_string((*iterator_)->key);
+  char k[100];
+  snprintf(k, sizeof(k), "%016d", (*iterator_)->key);
+  key_ = k;
   IndexChange();
 }
 
@@ -40,13 +43,17 @@ void IndexIterator::Seek(const Slice& target) {
 
 void IndexIterator::Next() {
   if (iterator_ != entries_.end()) iterator_++;
-  key_ = std::to_string((*iterator_)->key);
+  char k[100];
+  snprintf(k, sizeof(k), "%016d", (*iterator_)->key);
+  key_ = k;
   IndexChange();
 }
 
 void IndexIterator::Prev() {
   if (iterator_ != entries_.begin()) iterator_--;
-  key_ = std::to_string((*iterator_)->key);
+  char k[100];
+  snprintf(k, sizeof(k), "%016d", (*iterator_)->key);
+  key_ = k;
   IndexChange();
 }
 
@@ -70,8 +77,9 @@ void IndexIterator::IndexChange() {
     index_ptr = reinterpret_cast<IndexMeta*>((*iterator_)->ptr);
   }
   LookupKey lkey(key_, number_);
-  value_->clear();
-  vcurrent_->Get3(options_, lkey, value_, index_ptr);
+  if (!value_->empty()) value_->clear();
+  Status s = vcurrent_->Get3(options_, lkey, value_, index_ptr);
+  assert(s.ok());
 }
 
 }

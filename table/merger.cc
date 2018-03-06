@@ -208,7 +208,14 @@ class RangeIterator : public Iterator {
 
 RangeIterator::RangeIterator(const Comparator* comparator,
                              std::vector<Iterator*> iterators, int n)
-    : comparator_(comparator), iterators_(iterators), size_(n), target_(0) { }
+    : comparator_(comparator), iterators_(iterators), size_(n) {
+  Slice key;
+  for (int i = 0; i < size_; i++) {
+    if (key.empty() || comparator_->Compare(key, iterators_[i]->key()) > 0) {
+      target_ = i;
+    }
+  }
+}
 
 RangeIterator::~RangeIterator() {
 }
@@ -233,10 +240,11 @@ void RangeIterator::SeekToLast() {
 }
 
 void RangeIterator::Seek(const Slice& target) {
+  return; // skip
   Slice key;
   for (int i = 0; i < size_; i++) {
     iterators_[i]->Seek(target);
-    if (key.empty() && comparator_->Compare(key, iterators_[i]->key()) > 0) {
+    if (key.empty() || comparator_->Compare(key, iterators_[i]->key()) > 0) {
       target_ = i;
     }
   }
@@ -244,7 +252,7 @@ void RangeIterator::Seek(const Slice& target) {
 
 void RangeIterator::Next() {
   for (int i = 0; i < size_; i++)
-    if (i != target_ && comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) == 0)
+    if (i != target_ || comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) == 0)
       iterators_[i]->Next();
   iterators_[target_]->Next();
   for (int i = 0; i < size_; i++)

@@ -212,3 +212,6 @@ target_link_libraries(persistent_skiplist_test PUBLIC leveldb)
 
 add_executable(db_bench db/db_bench.cc)
 target_link_libraries(db_bench PUBLIC leveldb)
+
+add_executable(range_check bench/range_check.cc)
+target_link_libraries(range_check PUBLIC leveldb)
