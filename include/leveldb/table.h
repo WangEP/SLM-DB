@@ -55,6 +55,7 @@ class LEVELDB_EXPORT Table {
   // E.g., the approximate offset of the last key in the table will
   // be close to the file length.
   uint64_t ApproximateOffsetOf(const Slice& key) const;
+  static Iterator* BlockReader2(void*, const ReadOptions&, const BlockHandle&);
 
  private:
   struct Rep;
@@ -62,7 +63,6 @@ class LEVELDB_EXPORT Table {
 
   explicit Table(Rep* rep) { rep_ = rep; }
   static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
-  static Iterator* BlockReader2(void*, const ReadOptions&, const BlockHandle&);
 
   // Calls (*handle_result)(arg, ...) with the entry found after a call
   // to Seek(key).  May not make such a call if filter policy says
