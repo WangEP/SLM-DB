@@ -252,7 +252,7 @@ void RangeIterator::Seek(const Slice& target) {
 
 void RangeIterator::Next() {
   for (int i = 0; i < size_; i++)
-    if (i != target_ || comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) == 0)
+    if (i != target_ && comparator_->Compare(iterators_[i]->key(), iterators_[target_]->key()) == 0)
       iterators_[i]->Next();
   iterators_[target_]->Next();
   for (int i = 0; i < size_; i++)

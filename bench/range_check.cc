@@ -54,13 +54,14 @@ int main(int argc, char** argv) {
     snprintf(k2, sizeof(k2), "%016d", (j+range_size_));
     std::string end = k2;
     leveldb::Iterator* iter = db->RangeQuery(read_options, begin, end);
-    for (;iter->Valid(); iter->Next()) {
+    while (iter->Valid()) {
       char k[100];
       snprintf(k, sizeof(k), "%016d", j++);
       std::string key = k;
       std::string v = "valuevalue" + key;
       std::string value = iter->value().ToString();
       assert(v == value);
+      iter->Next();
     }
     delete iter;
   }
