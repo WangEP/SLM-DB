@@ -498,8 +498,8 @@ class Benchmark {
       } else if (name == Slice("readrandom")) {
         method = &Benchmark::ReadRandom;
       } else if (name == Slice("rangequery")) {
-        ranges_ = 5;
-        range_size_ = 1000;
+        ranges_ = 1;
+        range_size_ = 1000000;
         method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;
@@ -839,9 +839,10 @@ class Benchmark {
       char end[100];
       snprintf(end, sizeof(end), "%016d", l);
       Iterator* iter = db_->RangeQuery(options, begin, end);
-      for (;iter->Valid(); iter->Next()) {
+      while (iter->Valid()) {
         bytes += iter->key().size() + iter->value().size();
         thread->stats.FinishedSingleOp();
+        iter->Next();
       }
       delete iter;
     }

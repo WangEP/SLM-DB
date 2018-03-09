@@ -1151,7 +1151,7 @@ Iterator* DBImpl::RangeQuery(const ReadOptions& options,
 
   // add btree range query
   list.push_back(index_->Range(fast_atoi(begin.data(), begin.size()),
-                               fast_atoi(end.data(), end.size()), versions_->current(), snapshot));
+                               fast_atoi(end.data(), end.size()), versions_));
 
   // put all together
   Iterator* range_iterator = NewRangeIterator(&internal_comparator_,

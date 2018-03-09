@@ -18,6 +18,27 @@ namespace leveldb {
 
 class Env;
 
+struct TableHandle {
+  typedef void (*CleanupFunction)(void* arg1, void* arg2);
+
+  TableHandle() : table_(NULL), func(NULL), arg1(NULL), arg2(NULL) { }
+
+  void RegisterCleanup(CleanupFunction arg, void* cache, void* handle) {
+    func = arg;
+    arg1 = cache;
+    arg2 = handle;
+  }
+
+  ~TableHandle() {
+    (*func)(arg1, arg2);
+  }
+
+  Table* table_;
+  CleanupFunction func;
+  void* arg1;
+  void* arg2;
+};
+
 class TableCache {
  public:
   TableCache(const std::string& dbname, const Options* options, int entries);
@@ -50,6 +71,8 @@ class TableCache {
               const Slice& k,
               void* arg,
               void(*handle_result)(void*, const Slice&, const Slice&));
+
+  Status GetTable(uint64_t file_number, TableHandle* table_handle);
 
   // Evict any entry for the specified file number
   void Evict(uint64_t file_number);

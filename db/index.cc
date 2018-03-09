@@ -28,9 +28,9 @@ void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta
   tree_.update(key, fnumber, meta);
 }
 
-Iterator* Index::Range(const uint32_t& begin, const uint32_t& end, void* ptr, uint64_t number) {
+Iterator* Index::Range(const uint32_t& begin, const uint32_t& end, void* ptr) {
   std::vector<LeafEntry*> entries = tree_.range(begin, end);
-  Iterator* iter = new IndexIterator(entries, ptr, number);
+  Iterator* iter = new IndexIterator(entries, ptr);
   return iter;
 }
 
