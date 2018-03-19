@@ -130,7 +130,6 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   // add to index queue block meta 
   KeyAndMeta key_meta;
   key_meta.key = fast_atoi(key.data(), key.size()-8);
-  key_meta.prev_file_number = 0;
   key_meta.meta = r->indexmeta;
   r->indexmeta->Ref();
   r->index_queue.push_back(key_meta);
