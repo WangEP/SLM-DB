@@ -37,7 +37,6 @@ class IndexMeta {
 
 struct KeyAndMeta{
   uint32_t key;
-  uint64_t prev_file_number;
   IndexMeta* meta;
 };
 

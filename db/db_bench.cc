@@ -498,8 +498,8 @@ class Benchmark {
       } else if (name == Slice("readrandom")) {
         method = &Benchmark::ReadRandom;
       } else if (name == Slice("rangequery")) {
-        ranges_ = 1;
-        range_size_ = 1000000;
+        ranges_ = 10;
+        range_size_ = 10000;
         method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;

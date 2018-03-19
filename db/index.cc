@@ -58,13 +58,9 @@ void Index::Runner() {
     assert(queue_.size() > 0);
     for (;!queue_.empty();) {
       auto key = queue_.front().key;
-      auto fnumber = queue_.front().prev_file_number;
       auto value = queue_.front().meta;
       queue_.pop_front();
-      if (fnumber == 0)
-        Insert(key, value);
-      else
-        Update(key, fnumber, value);
+      Insert(key, value);
     }
     assert(queue_.size() == 0);
     mutex_.Unlock();
