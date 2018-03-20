@@ -157,7 +157,15 @@ set(LEVEL_DB_FILES
         util/testutil.h
         util/testutil.cc
         db/index_iterator.cc
-        db/index_iterator.h)
+        db/index_iterator.h
+        db/zero_level_version.cc
+        db/zero_level_version.h
+        db/version_control.cc
+        db/version_control.h
+        db/zero_level_version_edit.cc
+        db/zero_level_version_edit.h
+        db/index_based_compaction.cc
+        db/index_based_compaction.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
