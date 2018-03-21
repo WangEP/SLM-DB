@@ -10,11 +10,51 @@ namespace leveldb {
 
 class ZeroLevelVersionEdit {
  public:
-  void DeleteFile(uint64_t file) { deleted_files_.push_back(file); }
-  void AddFile(uint64_t file, uint64_t file_size, const InternalKey& smallest, const InternalKey& largest);
+	ZeroLevelVersionEdit() { Clear(); };
+	~ZeroLevelVersionEdit() { };
+
+	void Clear();
+
+	void SetComparatorName(const Slice&);
+	void SetLogNumber(uint64_t);
+	void SetPrevLogNumber(uint64_t);
+	void SetNextFile(uint64_t);
+	void SetLastSequence(uint64_t);
+
+  void DeleteFile(uint64_t file) {
+    deleted_files_.push_back(file);
+  }
+
+  void AddFile(uint64_t file,
+               uint64_t file_size,
+               const InternalKey& smallest,
+               const InternalKey& largest) {
+    FileMetaData f;
+    f.number = file;
+    f.file_size = file_size;
+    f.smallest = smallest;
+    f.largest = largest;
+    new_files_.push_back(f);
+  }
+
+	void EncodeTo(std::string* dst) const;
+	Status DecodeFrom(const Slice& src);
+
+	std::string DebugString() const;
  private:
   std::vector<FileMetaData> new_files_;
   std::vector<uint64_t> deleted_files_;
+
+	std::string comparator_;
+	uint64_t log_number_;
+	uint64_t prev_log_number_;
+	uint64_t next_file_number_;
+	SequenceNumber last_sequence_;
+	bool has_comparator_;
+	bool has_log_number_;
+	bool has_prev_log_number_;
+	bool has_next_file_number_;
+	bool has_last_sequence_;
 };
 
 } // namespace leveldb
