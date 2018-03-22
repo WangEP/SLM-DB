@@ -9,15 +9,19 @@ namespace leveldb {
 
 class VersionControl {
  public:
+  VersionControl(const std::string& dbname,
+                 const Options* options,
+                 TableCache* table_cache,
+                 const InternalKeyComparator*);
 
-  ZeroLevelVersion* current() { return current_; }
-  ZeroLevelVersion* next() { return next_; }
-  TableCache* cache() { return cache_; }
+  ZeroLevelVersion* current_version() { return vcurrent_; }
+  ZeroLevelVersion* next_version() { return vnext_; }
+  TableCache* cache() { return table_cache_; }
   const Options* const options() { return options_; }
   const Comparator* user_comparator() const { return icmp_.user_comparator(); }
   const Comparator* internal_comparator() const { return &icmp_;}
 
-  Status LogAndApply(ZeroLevelVersion* new_, port::Mutex* mu);
+  Status LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu);
 
   uint64_t ManifestFileNumber() const { return manifest_file_number_; }
   uint64_t NewFileNumber() { return next_file_number_++; }
@@ -31,10 +35,15 @@ class VersionControl {
     }
   }
 
-  uint64_t NumFiles() { return current()->NumFiles(); }
-  uint64_t NumBytes() { return current()->NumBytes(); }
+  uint64_t NumFiles() { return current_version()->NumFiles(); }
+  uint64_t NumBytes() { return current_version()->NumBytes(); }
 
  private:
+  class Builder;
+
+  void AppendVersion(ZeroLevelVersion* v);
+  void Finalize(ZeroLevelVersion* v);
+
   Env* const env_;
   const std::string dbname_;
 
@@ -48,10 +57,10 @@ class VersionControl {
   const Options* const options_;
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
-  ZeroLevelVersion* current_;
-  ZeroLevelVersion* next_;
+  ZeroLevelVersion* vcurrent_;
+  ZeroLevelVersion* vnext_;
   ZeroLevelVersionEdit* edit_;
-  TableCache* cache_;
+  TableCache* table_cache_;
 
   // no copy
   VersionControl(const VersionControl&);

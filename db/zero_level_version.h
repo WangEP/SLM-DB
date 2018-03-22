@@ -23,11 +23,16 @@ struct FileMetaData {
 
 class ZeroLevelVersion {
  public:
+  ZeroLevelVersion(VersionControl* vcontrol)
+      : vcontrol_(vcontrol), refs_(0) { }
 
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val);
 
   void Ref();
   void Unref();
+
+  void AddFile(FileMetaData* f);
+  std::map<uint64_t, FileMetaData*> GetFiles() { return files_; };
 
   uint64_t NumFiles() { return files_.size() + to_compact_.size(); }
   uint64_t NumBytes() {
