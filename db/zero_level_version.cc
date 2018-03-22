@@ -75,7 +75,7 @@ void ZeroLevelVersion::Ref() {
 }
 
 void ZeroLevelVersion::Unref() {
-  assert(this != vcontrol_->next());
+  assert(this != vcontrol_->next_version());
   assert(refs_ >= 1);
   --refs_;
   if (refs_ == 0) {
@@ -108,6 +108,10 @@ ZeroLevelVersion::~ZeroLevelVersion() {
       delete f;
     }
   }
+}
+void ZeroLevelVersion::AddFile(FileMetaData* f) {
+  f->refs++;
+  files_.insert({f->number, f});
 }
 
 } // namespace leveldb
