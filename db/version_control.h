@@ -2,6 +2,7 @@
 #define STORAGE_LEVELDB_DB_VERSION_CONTROL_H_
 
 #include "zero_level_version.h"
+#include "zero_level_version_edit.h"
 #include "port/port_posix.h"
 
 namespace leveldb {
@@ -10,7 +11,11 @@ class VersionControl {
  public:
 
   ZeroLevelVersion* current() { return current_; }
+  ZeroLevelVersion* next() { return next_; }
   TableCache* cache() { return cache_; }
+  const Options* const options() { return options_; }
+  const Comparator* user_comparator() const { return icmp_.user_comparator(); }
+  const Comparator* internal_comparator() const { return &icmp_;}
 
   Status LogAndApply(ZeroLevelVersion* new_, port::Mutex* mu);
 
@@ -39,9 +44,12 @@ class VersionControl {
   uint64_t log_number_;
   uint64_t prev_log_number_;
 
+  const InternalKeyComparator icmp_;
+  const Options* const options_;
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
   ZeroLevelVersion* current_;
+  ZeroLevelVersion* next_;
   ZeroLevelVersionEdit* edit_;
   TableCache* cache_;
 

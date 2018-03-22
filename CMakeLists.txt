@@ -164,8 +164,7 @@ set(LEVEL_DB_FILES
         db/version_control.h
         db/zero_level_version_edit.cc
         db/zero_level_version_edit.h
-        db/index_based_compaction.cc
-        db/index_based_compaction.h)
+        db/index_based_compaction.cc db/index_based_compaction.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
