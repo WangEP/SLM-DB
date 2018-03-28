@@ -33,7 +33,7 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++17
+            -std=c++14
             -O2
             -DNDEBUG
     )
