@@ -1,4 +1,5 @@
 #include "version_control.h"
+#include "filename.h"
 
 namespace leveldb {
 
@@ -47,12 +48,78 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   edit->SetLastSequence(last_sequence_);
 
   ZeroLevelVersion* v = new ZeroLevelVersion(this);
+  {
+    Builder builder(this, vcurrent_);
+    builder.Apply(edit);
+    builder.SaveTo(v);
+  }
   Finalize(v);
 
+  std::string new_manifest_file;
+  Status s;
+  if (descriptor_log_ == NULL) {
+    assert(descriptor_file_ == NULL);
+    new_manifest_file = DescriptorFileName(dbname_, manifest_file_number_);
+    edit->SetNextFile(next_file_number_);
+    s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
+    if (s.ok()) {
+      descriptor_log_ = new log::Writer(descriptor_file_);
+      s = WriteSnapshot(descriptor_log_);
+    }
+  }
+
+  {
+    mu->Unlock();
+    if (s.ok()) {
+      std::string record;
+      edit->EncodeTo(&record);
+      s = descriptor_log_->AddRecord(record);
+      if (s.ok()) {
+        s = descriptor_file_->Sync();
+      }
+      if (!s.ok()) {
+        Log(options_->info_log, "MANIFEST write: %s\n", s.ToString().c_str());
+      }
+    }
+    if (s.ok() && !new_manifest_file.empty()) {
+      s = SetCurrentFile(env_, dbname_, manifest_file_number_);
+    }
+    mu->Lock();
+  }
+
+  if (s.ok()) {
+    // append vers
+    AppendVersion(v);
+    log_number_ = edit->GetLogNumber();
+    prev_log_number_ = edit->GetPrevLogNumber();
+  } else {
+    delete v;
+    if (!new_manifest_file.empty()) {
+      delete descriptor_log_;
+      delete descriptor_file_;
+      descriptor_log_ = NULL;
+      descriptor_file_ = NULL;
+      env_->DeleteFile(new_manifest_file);
+    }
+  }
+  return s;
 }
 
 void VersionControl::Finalize(ZeroLevelVersion* v) {
 
+
+}
+
+Status VersionControl::WriteSnapshot(log::Writer* log) {
+  ZeroLevelVersionEdit edit;
+  edit.SetComparatorName(icmp_.user_comparator()->Name());
+  for (auto iter : current_version()->GetFiles()) {
+    const FileMetaData* f = iter.second;
+    edit.AddFile(f->number, f->file_size, f->smallest, f->largest);
+  }
+  std::string record;
+  edit.EncodeTo(&record);
+  return log->AddRecord(record);
 }
 
 class VersionControl::Builder {
