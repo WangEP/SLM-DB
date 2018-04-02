@@ -43,6 +43,7 @@ class VersionControl {
 
   void AppendVersion(ZeroLevelVersion* v);
   void Finalize(ZeroLevelVersion* v);
+  Status WriteSnapshot(log::Writer* log);
 
   Env* const env_;
   const std::string dbname_;
