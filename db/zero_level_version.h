@@ -7,6 +7,7 @@
 #include "leveldb/env.h"
 #include "log_writer.h"
 #include "table_cache.h"
+#include "version_control.h"
 namespace leveldb {
 
 struct FileMetaData {
@@ -20,26 +21,35 @@ struct FileMetaData {
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) { }
 };
 
-struct FileMetaDataCmp {
-  FileMetaDataCmp(const Comparator& cmp) : cmp_(cmp) { }
-  bool operator() (const FileMetaData& lhs, const FileMetaData& rhs) const {
-    return cmp_.Compare(lhs.largest.Encode(), rhs.largest.Encode());
-  }
-  const Comparator cmp_;
-};
-
 class ZeroLevelVersion {
  public:
-  std::map<uint64_t, FileMetaData*> CopyFiles();
-  std::vector<FileMetaData*> CopyCompactionState();
+  ZeroLevelVersion(VersionControl* vcontrol)
+      : vcontrol_(vcontrol), refs_(0) { }
+
+  Status Get(const ReadOptions&, const LookupKey& key, std::string* val);
+
+  void Ref();
+  void Unref();
+
+  void AddFile(FileMetaData* f);
+  std::map<uint64_t, FileMetaData*> GetFiles() { return files_; };
 
   uint64_t NumFiles() { return files_.size() + to_compact_.size(); }
-  uint64_t NumBytes() { return 0; }
+  uint64_t NumBytes() {
+    uint64_t bytes = 0;
+    for (auto f : files_) bytes += f.second->file_size;
+    return bytes;
+  }
+
+  std::string DebugString() const;
 
  private:
-  std::map<uint64_t, FileMetaData> files_;
-  std::vector<FileMetaData> to_compact_;
+  std::map<uint64_t, FileMetaData*> files_;
+  std::vector<FileMetaData*> to_compact_;
+  VersionControl* vcontrol_;
+  int refs_;
 
+  ~ZeroLevelVersion();
   // no copy
   ZeroLevelVersion(const ZeroLevelVersion&);
   void operator=(const ZeroLevelVersion&);
