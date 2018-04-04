@@ -30,7 +30,7 @@ struct TableBuilder::Rep {
   int64_t num_entries;
   int64_t total_size;
   std::deque<KeyAndMeta> index_queue;
-  uint32_t fnumber;
+  uint64_t fnumber;
   bool closed;          // Either Finish() or Abandon() has been called.
   FilterBlockBuilder* filter_block;
   Index* index;
@@ -51,7 +51,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  Rep(const Options& opt, WritableFile* f, uint32_t number)
+  Rep(const Options& opt, WritableFile* f, uint64_t number)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -70,7 +70,7 @@ struct TableBuilder::Rep {
   }
 };
 
-TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint32_t number)
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number)
     : rep_(new Rep(options, file, number)) {
   if (rep_->filter_block != NULL) {
     rep_->filter_block->StartBlock(0);
