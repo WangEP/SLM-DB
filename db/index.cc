@@ -21,11 +21,15 @@ void Index::Insert(const uint32_t& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
   clflush((char *) &key, sizeof(uint32_t));
-  tree_.insert(key, m);
+  void* ptr = tree_.insert(key, m);
+  if (ptr != NULL) {
+    m = reinterpret_cast<IndexMeta*>(ptr);
+    m->Unref();
+  }
 }
 
 void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta) {
-  tree_.update(key, fnumber, meta);
+  tree_.update(key, meta);
 }
 
 Iterator* Index::Range(const uint32_t& begin, const uint32_t& end, void* ptr) {

@@ -29,7 +29,7 @@ class LEVELDB_EXPORT TableBuilder {
   // Create a builder that will store the contents of the table it is
   // building in *file.  Does not close the file.  It is up to the
   // caller to close the file after calling Finish().
-  TableBuilder(const Options& options, WritableFile* file, uint32_t number);
+  TableBuilder(const Options& options, WritableFile* file, uint64_t number);
 
   // REQUIRES: Either Finish() or Abandon() has been called.
   ~TableBuilder();

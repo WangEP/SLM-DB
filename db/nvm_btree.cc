@@ -12,7 +12,7 @@ BTree::BTree() {
   failedSearch = 0;
 }
 
-void BTree::insert(int64_t key, void* ptr) {
+void* BTree::insert(int64_t key, void* ptr) {
   Node* node = root, *lSib = NULL;
   Split* split = NULL;
   iNodeSearch:
@@ -30,10 +30,7 @@ void BTree::insert(int64_t key, void* ptr) {
   lNode* leaf = (lNode*)node;
   // update if key exists
   if (leaf->search(key)!= NULL) {
-    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, ptr));
-    if (meta != NULL)
-      meta->Unref();
-    return;
+    return leaf->update(key, ptr);
   }
   if (!leaf->overflow()) {
 #ifdef WritingTime
@@ -146,6 +143,7 @@ void BTree::insert(int64_t key, void* ptr) {
       split = NULL;
     }
   }
+  return NULL;
 }
 
 void* BTree::update(int64_t key, void *ptr) {
@@ -700,7 +698,6 @@ void* lNode::update(int64_t key, void *ptr) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       void *p = entry[i].ptr;
-      leveldb::IndexMeta* m = reinterpret_cast<leveldb::IndexMeta*>(p);
       entry[i].ptr = ptr;
       clflush((char*) &entry[i].ptr, sizeof(void*));
       return p;
