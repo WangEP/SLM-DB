@@ -9,7 +9,8 @@ enum Tag {
   kLastSequence   = 4,
   kDeletedFile    = 5,
   kNewFile        = 6,
-  kPrevLogNumber  = 7
+  kPrevLogNumber  = 7,
+  kToCompactFile  = 8
 };
 
 void ZeroLevelVersionEdit::Clear() {
@@ -81,8 +82,14 @@ void ZeroLevelVersionEdit::EncodeTo(std::string* dst) const {
     PutVarint32(dst, kNewFile);
     PutVarint64(dst, file.number);
     PutVarint64(dst, file.file_size);
+    PutVarint64(dst, file.total);
+    PutVarint64(dst, file.alive);
     PutLengthPrefixedSlice(dst, file.smallest.Encode());
     PutLengthPrefixedSlice(dst, file.largest.Encode());
+  }
+  for (auto file : to_compact_files_) {
+    PutVarint32(dst, kToCompactFile);
+    PutVarint64(dst, file);
   }
 }
 
@@ -161,11 +168,21 @@ Status ZeroLevelVersionEdit::DecodeFrom(const Slice& src) {
       case kNewFile:
         if (GetVarint64(&input, &f.number) &&
             GetVarint64(&input, &f.file_size) &&
+            GetVarint64(&input, &f.alive) &&
+            GetVarint64(&input, &f.total) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest)) {
           new_files_.push_back(f);
         } else {
           msg = "new-file entry";
+        }
+        break;
+
+      case kToCompactFile:
+        if (GetVarint64(&input, &number)) {
+          to_compact_files_.push_back(number);
+        } else {
+          msg = "to compact file";
         }
         break;
 

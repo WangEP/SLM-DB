@@ -105,9 +105,14 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   return s;
 }
 
+ZeroLevelCompaction* VersionControl::PickCompaction() {
+  // get compaction and return
+  ZeroLevelCompaction* c;
+  return c;
+}
+
 void VersionControl::Finalize(ZeroLevelVersion* v) {
-
-
+  // search for compaction
 }
 
 Status VersionControl::WriteSnapshot(log::Writer* log) {
@@ -115,16 +120,19 @@ Status VersionControl::WriteSnapshot(log::Writer* log) {
   edit.SetComparatorName(icmp_.user_comparator()->Name());
   for (auto iter : current_version()->GetFiles()) {
     const FileMetaData* f = iter.second;
-    edit.AddFile(f->number, f->file_size, f->smallest, f->largest);
+    edit.AddFile(f->number, f->file_size, f->total, f->alive, f->smallest, f->largest);
   }
   std::string record;
   edit.EncodeTo(&record);
   return log->AddRecord(record);
 }
 
+// Builder class
+
 class VersionControl::Builder {
   std::vector<FileMetaData*> added_files_;
   std::set<uint64_t> deleted_files_;
+  std::set<uint64_t> to_compact_files_;
   VersionControl* vcontrol_;
   ZeroLevelVersion* base_;
  public:
@@ -148,6 +156,9 @@ class VersionControl::Builder {
     for (auto iter : edit->GetDeletedFiles()) {
       deleted_files_.insert(iter);
     }
+    for (auto iter : edit->GetNewCompactFiles()) {
+      to_compact_files_.insert(iter);
+    }
     for (auto iter : edit->GetNewFiles()) {
       FileMetaData* f = new FileMetaData(iter);
       f->refs = 1;
@@ -160,8 +171,15 @@ class VersionControl::Builder {
 
   void SaveTo(ZeroLevelVersion* v) {
     for (auto iter : base_->GetFiles()) {
-      if (deleted_files_.count(iter.first) <= 0) {
+      // move to compaction list
+      if (to_compact_files_.count(iter.first) > 0) {
+        v->AddCompactionFile(iter.second);
+        iter.second->refs--;
+      }
+      // do not add if file got deleted
+      else if (deleted_files_.count(iter.first) <= 0) {
         v->AddFile(iter.second);
+        iter.second->refs--;
       }
     }
     for (auto iter : added_files_) {
@@ -170,5 +188,28 @@ class VersionControl::Builder {
   }
 
 };
+
+// Compaction class
+
+ZeroLevelCompaction::~ZeroLevelCompaction() {
+  if (input_version_ != NULL) {
+    input_version_->Unref();
+  }
+}
+
+void ZeroLevelCompaction::AddInputDeletions(ZeroLevelVersionEdit* edit) {
+  for (auto f : inputs_) {
+    edit->DeleteFile(f->number);
+  }
+}
+
+
+void ZeroLevelCompaction::ReleaseInputs() {
+  if (input_version_ != NULL) {
+    input_version_->Unref();
+    input_version_ = NULL;
+  }
+}
+
 
 } // namespace leveldb

@@ -33,20 +33,29 @@ class ZeroLevelVersionEdit {
   bool HasNextFile() { return has_next_file_number_; }
   bool HasLastSequence() { return has_last_sequence_; }
 
-  std::vector<uint64_t> GetDeletedFiles() { return deleted_files_; }
-  std::vector<FileMetaData> GetNewFiles() { return new_files_; }
+  std::vector<uint64_t> GetDeletedFiles() const { return deleted_files_; }
+  std::vector<FileMetaData> GetNewFiles() const { return new_files_; }
+  std::vector<uint64_t> GetNewCompactFiles() const { return to_compact_files_; }
 
   void DeleteFile(uint64_t file) {
     deleted_files_.push_back(file);
   }
 
+  void CompactFile(uint64_t file) {
+    to_compact_files_.push_back(file);
+  }
+
   void AddFile(uint64_t file,
                uint64_t file_size,
+               uint64_t total,
+               uint64_t alive,
                const InternalKey& smallest,
                const InternalKey& largest) {
     FileMetaData f;
     f.number = file;
     f.file_size = file_size;
+    f.total = total;
+    f.alive = alive;
     f.smallest = smallest;
     f.largest = largest;
     new_files_.push_back(f);
@@ -59,6 +68,7 @@ class ZeroLevelVersionEdit {
  private:
   std::vector<FileMetaData> new_files_;
   std::vector<uint64_t> deleted_files_;
+  std::vector<uint64_t> to_compact_files_;
 
   std::string comparator_;
   uint64_t log_number_;
