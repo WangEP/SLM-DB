@@ -14,6 +14,8 @@ struct FileMetaData {
   int refs;
   int allowed_seeks;          // Seeks allowed until compaction
   uint64_t number;
+  uint64_t alive;             // Count of live keys
+  uint64_t total;             // Total count of keys
   uint64_t file_size;         // File size in bytes
   InternalKey smallest;       // Smallest internal key served by table
   InternalKey largest;        // Largest internal key served by table
@@ -32,12 +34,14 @@ class ZeroLevelVersion {
   void Unref();
 
   void AddFile(FileMetaData* f);
+  void AddCompactionFile(FileMetaData* f);
   std::map<uint64_t, FileMetaData*> GetFiles() { return files_; };
 
   uint64_t NumFiles() { return files_.size() + to_compact_.size(); }
   uint64_t NumBytes() {
     uint64_t bytes = 0;
     for (auto f : files_) bytes += f.second->file_size;
+    for (auto f : to_compact_) bytes += f->file_size;
     return bytes;
   }
 

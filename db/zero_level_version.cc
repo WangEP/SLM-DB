@@ -109,9 +109,15 @@ ZeroLevelVersion::~ZeroLevelVersion() {
     }
   }
 }
+
 void ZeroLevelVersion::AddFile(FileMetaData* f) {
   f->refs++;
   files_.insert({f->number, f});
+}
+
+void ZeroLevelVersion::AddCompactionFile(FileMetaData* f) {
+  f->refs++;
+  to_compact_.push_back(f);
 }
 
 } // namespace leveldb

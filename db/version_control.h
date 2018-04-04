@@ -7,6 +7,8 @@
 
 namespace leveldb {
 
+class ZeroLevelCompaction;
+
 class VersionControl {
  public:
   VersionControl(const std::string& dbname,
@@ -22,6 +24,7 @@ class VersionControl {
   const Comparator* internal_comparator() const { return &icmp_;}
 
   Status LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu);
+  ZeroLevelCompaction* PickCompaction();
 
   uint64_t ManifestFileNumber() const { return manifest_file_number_; }
   uint64_t NewFileNumber() { return next_file_number_++; }
@@ -66,6 +69,29 @@ class VersionControl {
   // no copy
   VersionControl(const VersionControl&);
   void operator=(const VersionControl&);
+};
+
+class ZeroLevelCompaction {
+ public:
+  ~ZeroLevelCompaction();
+
+  ZeroLevelVersionEdit* edit() { return edit_; }
+  int num_input_files() const { return inputs_.size(); }
+
+  FileMetaData* input(int i) { return inputs_[i]; }
+
+  uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
+
+  void AddInputDeletions(ZeroLevelVersionEdit* edit);
+
+  void ReleaseInputs();
+
+ private:
+  uint64_t max_output_file_size_;
+  ZeroLevelVersion* input_version_;
+  ZeroLevelVersionEdit* edit_;
+
+  std::vector<FileMetaData*> inputs_;
 };
 
 } // namespace leveldb
