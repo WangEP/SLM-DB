@@ -14,6 +14,7 @@ namespace leveldb {
 
 class IndexMeta {
  private:
+  ~IndexMeta() { }
   uint64_t refs;
  public:
   uint64_t file_number;
@@ -21,8 +22,6 @@ class IndexMeta {
 
   IndexMeta(uint32_t offset, uint32_t size, uint32_t file_number) :
       handle(size, offset), file_number(file_number), refs(0) { }
-
-  ~IndexMeta() { }
 
   void Ref() {
     ++refs;
