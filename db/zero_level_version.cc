@@ -1,4 +1,5 @@
 #include "zero_level_version.h"
+#include "version_control.h"
 #include "leveldb/index.h"
 
 namespace leveldb {

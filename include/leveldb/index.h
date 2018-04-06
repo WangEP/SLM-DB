@@ -1,5 +1,5 @@
-#ifndef STORAGE_LEVELDB_DB_INDEX_H
-#define STORAGE_LEVELDB_DB_INDEX_H
+#ifndef STORAGE_LEVELDB_DB_INDEX_H_
+#define STORAGE_LEVELDB_DB_INDEX_H_
 
 #include <cstdint>
 #include <map>
@@ -11,6 +11,8 @@
 #include "leveldb/iterator.h"
 
 namespace leveldb {
+
+class ZeroLevelVersionEdit;
 
 class IndexMeta {
  private:
@@ -37,6 +39,7 @@ class IndexMeta {
 struct KeyAndMeta{
   uint32_t key;
   IndexMeta* meta;
+  ZeroLevelVersionEdit* edit;
 };
 
 class Index {
@@ -45,7 +48,7 @@ class Index {
 
   const IndexMeta* Get(const Slice& key);
 
-  void Insert(const uint32_t& key, IndexMeta* meta);
+  void Insert(const uint32_t& key, IndexMeta* meta, ZeroLevelVersionEdit* edit);
 
   void Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta);
 
@@ -90,4 +93,4 @@ class Index {
 
 } // namespace leveldb
 
-#endif //STORAGE_LEVELDB_DB_GLOBAL_INDEX_H
+#endif //STORAGE_LEVELDB_DB_GLOBAL_INDEX_H_

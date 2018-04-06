@@ -16,8 +16,12 @@ class VersionControl {
                  TableCache* table_cache,
                  const InternalKeyComparator*);
 
-  ZeroLevelVersion* current_version() { return vcurrent_; }
-  ZeroLevelVersion* next_version() { return vnext_; }
+  struct SummaryStorage {
+    char buffer[100];
+  };
+
+  ZeroLevelVersion* current() { return current_; }
+  ZeroLevelVersion* next_version() { return next_; }
   TableCache* cache() { return table_cache_; }
   const Options* const options() { return options_; }
   const Comparator* user_comparator() const { return icmp_.user_comparator(); }
@@ -25,6 +29,11 @@ class VersionControl {
 
   Status LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu);
   ZeroLevelCompaction* PickCompaction();
+  Status Recover(bool* save_manifest);
+  Iterator* MakeInputIterator(ZeroLevelCompaction* c);
+  const char* Summary(SummaryStorage* scratch) const;
+
+  bool NeedsCompaction() const;
 
   uint64_t ManifestFileNumber() const { return manifest_file_number_; }
   uint64_t NewFileNumber() { return next_file_number_++; }
@@ -32,14 +41,12 @@ class VersionControl {
   uint64_t PrevLogNumber() const { return prev_log_number_; }
   uint64_t LastSequence() const { return last_sequence_; }
 
-  void ReuseFileNumber(uint64_t file_number) {
-    if (next_file_number_ == file_number + 1) {
-      next_file_number_ = file_number;
-    }
-  }
+  void MarkFileNumberUsed(uint64_t number);
+  void ReuseFileNumber(uint64_t file_number);
+  void SetLastSequence(uint64_t s);
 
-  uint64_t NumFiles() { return current_version()->NumFiles(); }
-  uint64_t NumBytes() { return current_version()->NumBytes(); }
+  uint64_t NumFiles() { return current_->NumFiles(); }
+  uint64_t NumBytes() { return current_->NumBytes(); }
 
  private:
   class Builder;
@@ -47,6 +54,7 @@ class VersionControl {
   void AppendVersion(ZeroLevelVersion* v);
   void Finalize(ZeroLevelVersion* v);
   Status WriteSnapshot(log::Writer* log);
+  bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
 
   Env* const env_;
   const std::string dbname_;
@@ -61,8 +69,8 @@ class VersionControl {
   const Options* const options_;
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
-  ZeroLevelVersion* vcurrent_;
-  ZeroLevelVersion* vnext_;
+  ZeroLevelVersion* current_;
+  ZeroLevelVersion* next_;
   ZeroLevelVersionEdit* edit_;
   TableCache* table_cache_;
 
@@ -79,6 +87,8 @@ class ZeroLevelCompaction {
   int num_input_files() const { return inputs_.size(); }
 
   FileMetaData* input(int i) { return inputs_[i]; }
+
+  size_t size() { return inputs_.size(); }
 
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
 
