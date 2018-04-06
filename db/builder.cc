@@ -7,10 +7,11 @@
 #include "db/filename.h"
 #include "db/dbformat.h"
 #include "db/table_cache.h"
-#include "db/version_edit.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
+#include "zero_level_version.h"
+#include "zero_level_version_edit.h"
 
 namespace leveldb {
 
@@ -19,7 +20,8 @@ Status BuildTable(const std::string& dbname,
                   const Options& options,
                   TableCache* table_cache,
                   Iterator* iter,
-                  FileMetaData* meta) {
+                  FileMetaData* meta,
+                  ZeroLevelVersionEdit* edit) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
@@ -32,13 +34,15 @@ Status BuildTable(const std::string& dbname,
       return s;
     }
 
-    TableBuilder* builder = new TableBuilder(options, file, meta->number);
+    TableBuilder* builder = new TableBuilder(options, file, meta->number, edit);
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
       meta->largest.DecodeFrom(key);
+      meta->total++;
       builder->Add(key, iter->value());
     }
+    meta->alive = meta->total;
 
     // Finish and check for builder errors
     s = builder->Finish();

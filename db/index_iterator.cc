@@ -6,7 +6,7 @@ namespace leveldb {
 
 IndexIterator::IndexIterator(std::vector<LeafEntry*> entries, void* ptr)
     : entries_(entries),
-      vset_(reinterpret_cast<VersionSet*>(ptr)),
+      vset_(reinterpret_cast<VersionControl*>(ptr)),
       index_ptr_(NULL),
       table_handle_(NULL),
       block_iterator_(NULL) {

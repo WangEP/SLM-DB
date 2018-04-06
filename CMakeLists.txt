@@ -85,13 +85,13 @@ set(LEVEL_DB_FILES
         db/snapshot.h
         db/memtable.cc
         db/memtable.h
-        db/repair.cc
+#        db/repair.cc
         db/table_cache.cc
         db/table_cache.h
-        db/version_edit.cc
-        db/version_edit.h
-        db/version_set.cc
-        db/version_set.h
+#        db/version_edit.cc
+#        db/version_edit.h
+#        db/version_set.cc
+#        db/version_set.h
         db/write_batch.cc
         db/write_batch_internal.h
         db/index.cc

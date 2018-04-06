@@ -22,6 +22,9 @@ class TableCache;
 class Version;
 class VersionEdit;
 class VersionSet;
+class VersionControl;
+class ZeroLevelVersion;
+class ZeroLevelVersionEdit;
 
 class DBImpl : public DB {
  public:
@@ -80,7 +83,7 @@ class DBImpl : public DB {
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
-  Status Recover(VersionEdit* edit, bool* save_manifest)
+  Status Recover(ZeroLevelVersionEdit* edit, bool* save_manifest)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void MaybeIgnoreError(Status* s) const;
@@ -94,10 +97,10 @@ class DBImpl : public DB {
   void CompactMemTable() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status RecoverLogFile(uint64_t log_number, bool last_log, bool* save_manifest,
-                        VersionEdit* edit, SequenceNumber* max_sequence)
+                        ZeroLevelVersionEdit* edit, SequenceNumber* max_sequence)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
+  Status WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit, ZeroLevelVersion* base)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
@@ -173,7 +176,7 @@ class DBImpl : public DB {
   };
   ManualCompaction* manual_compaction_;
 
-  VersionSet* versions_;
+  VersionControl* versions_;
 
   // Have we encountered a background error in paranoid mode?
   Status bg_error_;
@@ -193,7 +196,7 @@ class DBImpl : public DB {
       this->bytes_written += c.bytes_written;
     }
   };
-  CompactionStats stats_[config::kNumLevels];
+  CompactionStats stats_;
 
   // No copying allowed
   DBImpl(const DBImpl&);

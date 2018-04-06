@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <unordered_map>
 #include "dbformat.h"
 #include "zero_level_version.h"
 
@@ -21,7 +22,7 @@ class ZeroLevelVersionEdit {
   void SetNextFile(uint64_t);
   void SetLastSequence(uint64_t);
 
-  Slice GetComparatorName() { return comparator_; }
+  std::string GetComparatorName() const { return comparator_; }
   uint64_t GetLogNumber() { return log_number_; }
   uint64_t GetPrevLogNumber() { return prev_log_number_; }
   uint64_t GetNextFile() { return next_file_number_; }
@@ -30,12 +31,20 @@ class ZeroLevelVersionEdit {
   bool HasCompartorName() { return has_comparator_; }
   bool HasLogNumber() { return has_log_number_; }
   bool HasPrevLogNumber() { return has_prev_log_number_; }
-  bool HasNextFile() { return has_next_file_number_; }
+  bool HasNextFileNumber() { return has_next_file_number_; }
   bool HasLastSequence() { return has_last_sequence_; }
 
   std::vector<uint64_t> GetDeletedFiles() const { return deleted_files_; }
   std::vector<FileMetaData> GetNewFiles() const { return new_files_; }
   std::vector<uint64_t> GetNewCompactFiles() const { return to_compact_files_; }
+
+  void DecreaseCount(uint64_t fnumber) {
+    if (key_counter_.find(fnumber) != key_counter_.end()) {
+      key_counter_[fnumber]++;
+    } else {
+      key_counter_[fnumber] = 1;
+    }
+  }
 
   void DeleteFile(uint64_t file) {
     deleted_files_.push_back(file);
@@ -69,6 +78,7 @@ class ZeroLevelVersionEdit {
   std::vector<FileMetaData> new_files_;
   std::vector<uint64_t> deleted_files_;
   std::vector<uint64_t> to_compact_files_;
+  std::unordered_map<uint64_t, uint64_t> key_counter_;
 
   std::string comparator_;
   uint64_t log_number_;

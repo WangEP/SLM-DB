@@ -35,6 +35,7 @@ struct TableBuilder::Rep {
   FilterBlockBuilder* filter_block;
   Index* index;
   IndexMeta* indexmeta;
+  ZeroLevelVersionEdit* edit;
 
 
   // We do not emit the index entry for a block until we have seen the
@@ -51,7 +52,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  Rep(const Options& opt, WritableFile* f, uint64_t number)
+  Rep(const Options& opt, WritableFile* f, uint64_t number, ZeroLevelVersionEdit* e)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -65,13 +66,14 @@ struct TableBuilder::Rep {
         pending_index_entry(false),
         index(options.index),
         fnumber(number),
-        total_size(0) {
+        total_size(0),
+        edit(e) {
     index_block_options.block_restart_interval = 1;
   }
 };
 
-TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number)
-    : rep_(new Rep(options, file, number)) {
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number, ZeroLevelVersionEdit* edit)
+    : rep_(new Rep(options, file, number, edit)) {
   if (rep_->filter_block != NULL) {
     rep_->filter_block->StartBlock(0);
   }
@@ -131,6 +133,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   KeyAndMeta key_meta;
   key_meta.key = fast_atoi(key.data(), key.size()-8);
   key_meta.meta = r->indexmeta;
+  key_meta.edit = r->edit;
   r->indexmeta->Ref();
   r->index_queue.push_back(key_meta);
 

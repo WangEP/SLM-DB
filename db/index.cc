@@ -3,6 +3,7 @@
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
 #include "db/index_iterator.h"
+#include "zero_level_version_edit.h"
 
 namespace leveldb {
 
@@ -17,13 +18,14 @@ const IndexMeta* Index::Get(const Slice& key) {
   return reinterpret_cast<const IndexMeta *>(result);
 }
 
-void Index::Insert(const uint32_t& key, IndexMeta* meta) {
+void Index::Insert(const uint32_t& key, IndexMeta* meta, ZeroLevelVersionEdit* edit) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
   clflush((char *) &key, sizeof(uint32_t));
   void* ptr = tree_.insert(key, m);
   if (ptr != NULL) {
     m = reinterpret_cast<IndexMeta*>(ptr);
+    edit->DecreaseCount(m->file_number);
     m->Unref();
   }
 }
@@ -63,8 +65,9 @@ void Index::Runner() {
     for (;!queue_.empty();) {
       auto key = queue_.front().key;
       auto value = queue_.front().meta;
+      auto edit = queue_.front().edit;
       queue_.pop_front();
-      Insert(key, value);
+      Insert(key, value, edit);
     }
     assert(queue_.size() == 0);
     mutex_.Unlock();

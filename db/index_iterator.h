@@ -6,7 +6,7 @@
 #include "leveldb/index.h"
 #include "db/nvm_btree.h"
 #include "table/format.h"
-#include "version_set.h"
+#include "version_control.h"
 #include "table_cache.h"
 
 namespace leveldb {
@@ -33,7 +33,7 @@ class IndexIterator : public Iterator {
   ReadOptions options_;
   uint64_t file_number_;
   IndexMeta* index_ptr_;
-  VersionSet* vset_;
+  VersionControl* vset_;
   TableHandle* table_handle_;
   Iterator* block_iterator_;
   int it = 0;
