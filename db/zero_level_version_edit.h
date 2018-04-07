@@ -36,22 +36,18 @@ class ZeroLevelVersionEdit {
 
   std::vector<uint64_t> GetDeletedFiles() const { return deleted_files_; }
   std::vector<FileMetaData> GetNewFiles() const { return new_files_; }
-  std::vector<uint64_t> GetNewCompactFiles() const { return to_compact_files_; }
+  std::unordered_map<uint64_t, uint64_t> GetDeadKeyCounter() const { return dead_key_counter_; };
 
   void DecreaseCount(uint64_t fnumber) {
-    if (key_counter_.find(fnumber) != key_counter_.end()) {
-      key_counter_[fnumber]++;
+    if (dead_key_counter_.find(fnumber) != dead_key_counter_.end()) {
+      dead_key_counter_[fnumber]++;
     } else {
-      key_counter_[fnumber] = 1;
+      dead_key_counter_[fnumber] = 1;
     }
   }
 
   void DeleteFile(uint64_t file) {
     deleted_files_.push_back(file);
-  }
-
-  void CompactFile(uint64_t file) {
-    to_compact_files_.push_back(file);
   }
 
   void AddFile(uint64_t file,
@@ -77,8 +73,7 @@ class ZeroLevelVersionEdit {
  private:
   std::vector<FileMetaData> new_files_;
   std::vector<uint64_t> deleted_files_;
-  std::vector<uint64_t> to_compact_files_;
-  std::unordered_map<uint64_t, uint64_t> key_counter_;
+  std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
 
   std::string comparator_;
   uint64_t log_number_;

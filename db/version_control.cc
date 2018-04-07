@@ -11,7 +11,7 @@ namespace leveldb {
 class VersionControl::Builder {
   std::vector<FileMetaData*> added_files_;
   std::set<uint64_t> deleted_files_;
-  std::set<uint64_t> to_compact_files_;
+  std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
   VersionControl* vcontrol_;
   ZeroLevelVersion* base_;
  public:
@@ -35,8 +35,8 @@ class VersionControl::Builder {
     for (auto iter : edit->GetDeletedFiles()) {
       deleted_files_.insert(iter);
     }
-    for (auto iter : edit->GetNewCompactFiles()) {
-      to_compact_files_.insert(iter);
+    for (auto iter : edit->GetDeadKeyCounter()) {
+      dead_key_counter_.insert({iter.first, iter.second});
     }
     for (auto iter : edit->GetNewFiles()) {
       FileMetaData* f = new FileMetaData(iter);
@@ -48,20 +48,25 @@ class VersionControl::Builder {
     }
   }
 
-  void SaveTo(ZeroLevelVersion* v) {
+  void SaveTo(ZeroLevelVersion* v, int threshold) {
     for (auto iter : base_->GetFiles()) {
+      FileMetaData* f = iter.second;
+      uint64_t dead = 0;
+      try {
+        dead = dead_key_counter_.at(f->number);
+      } catch (std::exception e) {}
+      f->alive -= dead;
       // move to compaction list
-      if (to_compact_files_.count(iter.first) > 0) {
-        v->AddCompactionFile(iter.second);
-        iter.second->refs--;
-      }
+      if (f->total/f->alive > threshold) {
         // do not add if file got deleted
-      else if (deleted_files_.count(iter.first) <= 0) {
-        v->AddFile(iter.second);
-        iter.second->refs--;
+        v->AddCompactionFile(f);
+      } else if (deleted_files_.count(iter.first) <= 0) {
+        v->AddFile(f);
       }
+      f->refs--;
     }
     for (auto iter : added_files_) {
+      assert(dead_key_counter_.find(iter->number) == dead_key_counter_.end());
       v->AddFile(iter);
     }
   }
