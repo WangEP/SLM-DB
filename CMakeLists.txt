@@ -46,7 +46,7 @@ add_definitions(-fno-builtin-memcmp)
 add_definitions(-Wint-to-pointer-cast)
 
 set(LEVEL_DB_FILES
-        include/leveldb/c.h
+#        include/leveldb/c.h
         include/leveldb/cache.h
         include/leveldb/comparator.h
         include/leveldb/db.h
@@ -63,13 +63,13 @@ set(LEVEL_DB_FILES
         include/leveldb/write_batch.h
         include/leveldb/export.h
         include/leveldb/index.h
-        db/c.cc
+#        db/c.cc
         db/builder.cc
         db/builder.h
         db/db_impl.cc
         db/db_impl.h
-        db/db_iter.cc
-        db/db_iter.h
+#        db/db_iter.cc
+#        db/db_iter.h
         db/dbformat.cc
         db/dbformat.h
         db/dumpfile.cc
