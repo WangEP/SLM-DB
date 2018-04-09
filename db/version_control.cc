@@ -54,13 +54,11 @@ class VersionControl::Builder {
       uint64_t dead = 0;
       try {
         dead = dead_key_counter_.at(f->number);
-      } catch (std::exception e) {}
+      } catch (std::exception& e) {}
       f->alive -= dead;
-      // move to compaction list
-      if (f->total/f->alive > threshold) {
-        // do not add if file got deleted
+      if (f->total/f->alive > threshold) { // move to compaction list
         v->AddCompactionFile(f);
-      } else if (deleted_files_.count(iter.first) <= 0) {
+      } else if (deleted_files_.count(iter.first) <= 0) { // do not add if file got deleted
         v->AddFile(f);
       }
       f->refs--;
