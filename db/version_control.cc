@@ -93,6 +93,15 @@ void ZeroLevelCompaction::ReleaseInputs() {
   }
 }
 
+bool ZeroLevelCompaction::IsInput(uint64_t num) {
+  for (auto f : inputs_) {
+    if (f->number == num) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Version Control class
 
 VersionControl::VersionControl(const std::string& dbname,
@@ -231,7 +240,7 @@ Status VersionControl::Recover(bool* save_manifest) {
 
   if (s.ok()) {
     ZeroLevelVersion* v = new ZeroLevelVersion(this);
-    builder.SaveTo(v);
+    builder.SaveTo(v, options_->compaction_threshold);
     Finalize(v);
     AppendVersion(v);
     manifest_file_number_ = next_file;
@@ -273,7 +282,7 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   {
     Builder builder(this, current_);
     builder.Apply(edit);
-    builder.SaveTo(v);
+    builder.SaveTo(v, options_->compaction_threshold);
   }
   Finalize(v);
 

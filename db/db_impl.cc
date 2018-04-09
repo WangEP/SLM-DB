@@ -227,10 +227,6 @@ void DBImpl::DeleteObsoleteFiles() {
     return;
   }
 
-  // Make a set of all of the live files
-  //std::set<uint64_t> live = pending_outputs_;
-  //versions_->AddLiveFiles(&live);
-
   std::vector<std::string> filenames;
   env_->GetChildren(dbname_, &filenames); // Ignoring errors on purpose
   uint64_t number;
@@ -803,6 +799,31 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
 
     Slice key = input->key();
+
+    // Handle key/value, add to state, etc.
+    bool drop = false;
+    if (!ParseInternalKey(key, &ikey)) {
+      // Do not hide error keys
+      current_user_key.clear();
+      has_current_user_key = false;
+      last_sequence_for_key = kMaxSequenceNumber;
+    } else {
+      if (!has_current_user_key ||
+          user_comparator()->Compare(ikey.user_key,
+                                     Slice(current_user_key)) != 0) {
+        // First occurrence of this user key
+        current_user_key.assign(ikey.user_key.data(), ikey.user_key.size());
+        has_current_user_key = true;
+        last_sequence_for_key = kMaxSequenceNumber;
+      }
+
+      if (last_sequence_for_key <= compact->smallest_snapshot) {
+        // Hidden by an newer entry for same user key
+        drop = true;    // (A)
+      }
+
+      last_sequence_for_key = ikey.sequence;
+    }
 #if 0
     Log(options_.info_log,
         "  Compact: %s, seq %d, type: %d %d, drop: %d, is_base: %d, "
@@ -812,32 +833,35 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         compact->compaction->IsBaseLevelForKey(ikey.user_key),
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
+    if (!compact->compaction->IsInput(index_->Get(key)->file_number)) {
+      drop = true;
+    }
 
     // make key/value drop if more fresh key exists
-
-    // Open output file if necessary
-    if (compact->builder == NULL) {
-      status = OpenCompactionOutputFile(compact);
-      if (!status.ok()) {
-        break;
+    if (!drop) {
+      // Open output file if necessary
+      if (compact->builder == NULL) {
+        status = OpenCompactionOutputFile(compact);
+        if (!status.ok()) {
+          break;
+        }
       }
-    }
-    if (compact->builder->NumEntries() == 0) {
-      compact->current_output()->smallest.DecodeFrom(key);
-    }
-    compact->current_output()->largest.DecodeFrom(key);
-    compact->builder->Add(key, input->value());
-
-    // Close output file if it is big enough
-    if (compact->builder->FileSize() >=
-        compact->compaction->MaxOutputFileSize()) {
-      status = FinishCompactionOutputFile(compact, input);
-      if (!status.ok()) {
-        break;
+      if (compact->builder->NumEntries() == 0) {
+        compact->current_output()->smallest.DecodeFrom(key);
       }
-    }
+      compact->current_output()->largest.DecodeFrom(key);
+      compact->builder->Add(key, input->value());
 
-    input->Next();
+      // Close output file if it is big enough
+      if (compact->builder->FileSize() >=
+          compact->compaction->MaxOutputFileSize()) {
+        status = FinishCompactionOutputFile(compact, input);
+        if (!status.ok()) {
+          break;
+        }
+      }
+      input->Next();
+    }
   }
 
   if (status.ok() && shutting_down_.Acquire_Load()) {

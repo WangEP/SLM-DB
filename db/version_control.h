@@ -88,6 +88,8 @@ class ZeroLevelCompaction {
 
   FileMetaData* input(int i) { return inputs_[i]; }
 
+  bool IsInput(uint64_t num);
+
   size_t size() { return inputs_.size(); }
 
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
