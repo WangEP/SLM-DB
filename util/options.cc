@@ -18,18 +18,17 @@ Options::Options()
       env(Env::Default()),
       info_log(NULL),
       write_buffer_size(4<<20),
-      max_buffer_size(12<<20),
-      compaction_threshhold(4<<20),
       max_open_files(1000),
       block_cache(NULL),
       block_size(4096),
       block_restart_interval(16),
       max_file_size(2<<20),
+      compaction_threshold(50),
       compression(kSnappyCompression),
       reuse_logs(false),
       filter_policy(NULL),
       disable_recovery_log(true),
-      index(new Index()){
+      index(NULL){
 }
 
 }  // namespace leveldb

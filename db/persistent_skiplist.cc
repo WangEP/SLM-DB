@@ -61,9 +61,12 @@ PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice& key, const Sli
   auto level = RandomLevel();
   Node* next_node = node;
   Node* prev_node = node->prev[0];
-  if (Equal(node->key, key))
+  bool del = false;
+  if (Equal(node->key, key)) {
     next_node = next_node->next[0];
-  Node* new_node = new Node(key, value, level);
+    del = true;
+  }
+  Node* new_node = MakeNode(key, value, level);
   if (level > current_level) current_level = level;
   assert(current_level <= max_level);
   for (auto i = 0; i < level; i++) {
@@ -79,6 +82,9 @@ PersistentSkiplist::Node* PersistentSkiplist::Insert(const Slice& key, const Sli
       clflush((char*)new_node->next[0], sizeof(void*));
       clflush((char*)next_node->next[0], sizeof(void*));
     }
+  }
+  if (del) {
+    delete node;
   }
   current_size += new_node->GetSize();
   return new_node;

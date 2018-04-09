@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(leveldb C CXX)
-set(CMAKE_DEBUG_POSTFIX "d")
+project(PMDB C CXX)
+#set(CMAKE_DEBUG_POSTFIX "d")
 
 set(SNAPPY_LIBRARY "")
 
@@ -33,8 +33,9 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++17
-            -O3
+            -std=c++14
+            -O2
+            -DNDEBUG
     )
 endif()
 
@@ -45,7 +46,7 @@ add_definitions(-fno-builtin-memcmp)
 add_definitions(-Wint-to-pointer-cast)
 
 set(LEVEL_DB_FILES
-        include/leveldb/c.h
+#        include/leveldb/c.h
         include/leveldb/cache.h
         include/leveldb/comparator.h
         include/leveldb/db.h
@@ -62,13 +63,13 @@ set(LEVEL_DB_FILES
         include/leveldb/write_batch.h
         include/leveldb/export.h
         include/leveldb/index.h
-        db/c.cc
+#        db/c.cc
         db/builder.cc
         db/builder.h
         db/db_impl.cc
         db/db_impl.h
-        db/db_iter.cc
-        db/db_iter.h
+#        db/db_iter.cc
+#        db/db_iter.h
         db/dbformat.cc
         db/dbformat.h
         db/dumpfile.cc
@@ -84,13 +85,13 @@ set(LEVEL_DB_FILES
         db/snapshot.h
         db/memtable.cc
         db/memtable.h
-        db/repair.cc
+#        db/repair.cc
         db/table_cache.cc
         db/table_cache.h
-        db/version_edit.cc
-        db/version_edit.h
-        db/version_set.cc
-        db/version_set.h
+#        db/version_edit.cc
+#        db/version_edit.h
+#        db/version_set.cc
+#        db/version_set.h
         db/write_batch.cc
         db/write_batch_internal.h
         db/index.cc
@@ -151,7 +152,19 @@ set(LEVEL_DB_FILES
         db/persistent_skiplist.h
         db/persistent_memtable.cc
         db/persistent_memtable.h
-        db/persistent_skiplist.cc util/int_based_comparator.h util/fast_atoi.h db/range_iterator.cc db/range_iterator.h)
+        db/persistent_skiplist.cc
+        util/int_based_comparator.h
+        util/testutil.h
+        util/testutil.cc
+        db/index_iterator.cc
+        db/index_iterator.h
+        db/zero_level_version.cc
+        db/zero_level_version.h
+        db/version_control.cc
+        db/version_control.h
+        db/zero_level_version_edit.cc
+        db/zero_level_version_edit.h
+        db/index_based_compaction.cc db/index_based_compaction.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -198,11 +211,14 @@ target_link_libraries(simple_bench PUBLIC leveldb)
 add_executable(sanity_check bench/sanity_check.cc)
 target_link_libraries(sanity_check PUBLIC leveldb)
 
-add_executable(file_io_test util/file_io_test.cc)
-target_link_libraries(file_io_test PUBLIC leveldb)
-
 add_executable(raw_table_test table/raw_table_test.cc)
 target_link_libraries(raw_table_test PUBLIC leveldb)
 
 add_executable(persistent_skiplist_test db/persistent_skiplist_test.cc)
 target_link_libraries(persistent_skiplist_test PUBLIC leveldb)
+
+add_executable(db_bench db/db_bench.cc)
+target_link_libraries(db_bench PUBLIC leveldb)
+
+add_executable(range_check bench/range_check.cc)
+target_link_libraries(range_check PUBLIC leveldb)

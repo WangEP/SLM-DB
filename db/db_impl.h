@@ -7,7 +7,6 @@
 
 #include <deque>
 #include <set>
-#include <memory>
 #include "db/dbformat.h"
 #include "db/log_writer.h"
 #include "db/snapshot.h"
@@ -15,7 +14,6 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
-#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -24,6 +22,9 @@ class TableCache;
 class Version;
 class VersionEdit;
 class VersionSet;
+class VersionControl;
+class ZeroLevelVersion;
+class ZeroLevelVersionEdit;
 
 class DBImpl : public DB {
  public:
@@ -37,55 +38,23 @@ class DBImpl : public DB {
   virtual Status Get(const ReadOptions& options,
                      const Slice& key,
                      std::string* value);
-  virtual Iterator* NewIterator(const ReadOptions&);
   virtual const Snapshot* GetSnapshot();
   virtual void ReleaseSnapshot(const Snapshot* snapshot);
   virtual bool GetProperty(const Slice& property, std::string* value);
-  virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes);
-  virtual void CompactRange(const Slice* begin, const Slice* end);
-  virtual Iterator* RangeQuery(int64_t min, int64_t max);
-
-  Status CompactMemTableSynchronous();
-  // Extra methods (for testing) that are not in the public DB interface
-
-  // Compact any files in the named level that overlap [*begin,*end]
-  void TEST_CompactRange(int level, const Slice* begin, const Slice* end);
-
-  // Force current memtable contents to be compacted.
-  Status TEST_CompactMemTable();
-
-  // Return an internal iterator over the current state of the database.
-  // The keys of this iterator are internal keys (see format.h).
-  // The returned iterator should be deleted when no longer needed.
-  Iterator* TEST_NewInternalIterator();
-
-  // Return the maximum overlapping data (in bytes) at next level for any
-  // file at a level >= 1.
-  int64_t TEST_MaxNextLevelOverlappingBytes();
-
-  // Record a sample of bytes read at the specified internal key.
-  // Samples are taken approximately once every config::kReadBytesPeriod
-  // bytes.
-  void RecordReadSample(Slice key);
+  virtual Iterator* RangeQuery(const ReadOptions&, const Slice& begin, const Slice& end);
 
  private:
   friend class DB;
   struct CompactionState;
   struct Writer;
 
-  Iterator* NewInternalIterator(const ReadOptions&,
-                                SequenceNumber* latest_snapshot,
-                                uint32_t* seed);
-
   Status NewDB();
-
-  Status ReadFromTables(const Slice& key, std::string* value);
 
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
-  Status Recover(VersionEdit* edit, bool* save_manifest)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  Status Recover(ZeroLevelVersionEdit* edit, bool* save_manifest)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void MaybeIgnoreError(Status* s) const;
 
@@ -98,15 +67,14 @@ class DBImpl : public DB {
   void CompactMemTable() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status RecoverLogFile(uint64_t log_number, bool last_log, bool* save_manifest,
-                        VersionEdit* edit, SequenceNumber* max_sequence)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+                        ZeroLevelVersionEdit* edit, SequenceNumber* max_sequence)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status MakeMemtableCompaction(PersistentMemtable* mem);
-  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  Status WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit, ZeroLevelVersion* base)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   WriteBatch* BuildBatchGroup(Writer** last_writer);
 
   void RecordBackgroundError(const Status& s);
@@ -116,14 +84,14 @@ class DBImpl : public DB {
   void BackgroundCall();
   void  BackgroundCompaction() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void CleanupCompaction(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status DoCompactionWork(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
-  Status FinishCompactionOutputFile(CompactionState* compact);
+  Status FinishCompactionOutputFile(CompactionState* compact, Iterator* input);
   Status InstallCompactionResults(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Constant after construction
   Env* const env_;
@@ -136,6 +104,9 @@ class DBImpl : public DB {
 
   // table_cache_ provides its own synchronization
   TableCache* table_cache_;
+
+  // B-tree data block indexing
+  Index* index_;
 
   // Lock over the persistent DB state.  Non-NULL iff successfully acquired.
   FileLock* db_lock_;
@@ -151,7 +122,6 @@ class DBImpl : public DB {
   uint64_t logfile_number_;
   log::Writer* log_;
   uint32_t seed_;                // For sampling.
-  Index* index_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;
@@ -166,17 +136,7 @@ class DBImpl : public DB {
   // Has a background compaction been scheduled or is running?
   bool bg_compaction_scheduled_;
 
-  // Information for a manual compaction
-  struct ManualCompaction {
-    int level;
-    bool done;
-    const InternalKey* begin;   // NULL means beginning of key range
-    const InternalKey* end;     // NULL means end of key range
-    InternalKey tmp_storage;    // Used to keep track of compaction progress
-  };
-  ManualCompaction* manual_compaction_;
-
-  VersionSet* versions_;
+  VersionControl* versions_;
 
   // Have we encountered a background error in paranoid mode?
   Status bg_error_;
@@ -196,7 +156,7 @@ class DBImpl : public DB {
       this->bytes_written += c.bytes_written;
     }
   };
-  CompactionStats stats_[config::kNumLevels];
+  CompactionStats stats_;
 
   // No copying allowed
   DBImpl(const DBImpl&);

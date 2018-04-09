@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
-#include <memory>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -19,23 +18,22 @@
 #include "db/log_writer.h"
 #include "db/memtable.h"
 #include "db/table_cache.h"
-#include "db/version_set.h"
 #include "db/write_batch_internal.h"
-#include "leveldb/index.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/status.h"
 #include "leveldb/table.h"
 #include "leveldb/table_builder.h"
+#include "leveldb/index.h"
 #include "port/port.h"
 #include "table/block.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
-#include "table/raw_block_iter.h"
-#include "table/raw_table_builder.h"
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
+#include "zero_level_version.h"
+#include "version_control.h"
 
 namespace leveldb {
 
@@ -53,7 +51,7 @@ struct DBImpl::Writer {
 };
 
 struct DBImpl::CompactionState {
-  Compaction* const compaction;
+  ZeroLevelCompaction* const compaction;
 
   // Sequence numbers < smallest_snapshot are not significant since we
   // will never have to service a snapshot below smallest_snapshot.
@@ -65,26 +63,24 @@ struct DBImpl::CompactionState {
   struct Output {
     uint64_t number;
     uint64_t file_size;
+    uint64_t total;
+    uint64_t alive;
     InternalKey smallest, largest;
   };
   std::vector<Output> outputs;
 
   // State kept for output being generated
   WritableFile* outfile;
-  RawTableBuilder* builder;
-
-  bool is_memtable;
-  std::deque<KeyAndMeta> index_queue;
+  TableBuilder* builder;
 
   uint64_t total_bytes;
 
   Output* current_output() { return &outputs[outputs.size()-1]; }
 
-  explicit CompactionState(Compaction* c)
+  explicit CompactionState(ZeroLevelCompaction* c)
       : compaction(c),
         outfile(NULL),
         builder(NULL),
-        is_memtable(false),
         total_bytes(0) {
   }
 };
@@ -142,15 +138,14 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       seed_(0),
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
-      index_(options_.index),
-      manual_compaction_(NULL) {
+      index_(raw_options.index) {
   has_imm_.Release_Store(NULL);
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
 
-  versions_ = new VersionSet(dbname_, &options_, table_cache_,
+  versions_ = new VersionControl(dbname_, &options_, table_cache_,
                              &internal_comparator_);
 }
 
@@ -158,9 +153,6 @@ DBImpl::~DBImpl() {
   // Wait for background work to finish
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
-  // maybe push memory buffer(s) to disk if recovery log disabled
-//  if (options_.disable_recovery_log)
-//    CompactMemTableSynchronous();
 
   while (bg_compaction_scheduled_) {
     bg_cv_.Wait();
@@ -188,7 +180,7 @@ DBImpl::~DBImpl() {
 }
 
 Status DBImpl::NewDB() {
-  VersionEdit new_db;
+  ZeroLevelVersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
   new_db.SetLogNumber(0);
   new_db.SetNextFile(2);
@@ -236,8 +228,8 @@ void DBImpl::DeleteObsoleteFiles() {
   }
 
   // Make a set of all of the live files
-  std::set<uint64_t> live = pending_outputs_;
-  versions_->AddLiveFiles(&live);
+  //std::set<uint64_t> live = pending_outputs_;
+  //versions_->AddLiveFiles(&live);
 
   std::vector<std::string> filenames;
   env_->GetChildren(dbname_, &filenames); // Ignoring errors on purpose
@@ -249,7 +241,7 @@ void DBImpl::DeleteObsoleteFiles() {
       switch (type) {
         case kLogFile:
           keep = ((number >= versions_->LogNumber()) ||
-              (number == versions_->PrevLogNumber()));
+                  (number == versions_->PrevLogNumber()));
           break;
         case kDescriptorFile:
           // Keep my manifest file, and any newer incarnations'
@@ -257,12 +249,14 @@ void DBImpl::DeleteObsoleteFiles() {
           keep = (number >= versions_->ManifestFileNumber());
           break;
         case kTableFile:
-          keep = (live.find(number) != live.end());
+          // keep = (live.find(number) != live.end());
+          keep = versions_->current()->IsAlive(number);
           break;
         case kTempFile:
           // Any temp files that are currently being written to must
           // be recorded in pending_outputs_, which is inserted into "live"
-          keep = (live.find(number) != live.end());
+          // keep = (live.find(number) != live.end());
+          keep = versions_->current()->IsAlive(number);
           break;
         case kCurrentFile:
         case kDBLockFile:
@@ -284,7 +278,7 @@ void DBImpl::DeleteObsoleteFiles() {
   }
 }
 
-Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
+Status DBImpl::Recover(ZeroLevelVersionEdit* edit, bool *save_manifest) {
   mutex_.AssertHeld();
 
   // Ignore error from CreateDir since the creation of the DB is
@@ -334,23 +328,24 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   if (!s.ok()) {
     return s;
   }
-  std::set<uint64_t> expected;
-  versions_->AddLiveFiles(&expected);
   uint64_t number;
   FileType type;
   std::vector<uint64_t> logs;
+  bool missing = false;
   for (size_t i = 0; i < filenames.size(); i++) {
     if (ParseFileName(filenames[i], &number, &type)) {
-      expected.erase(number);
+      if (!versions_->current()->IsAlive(number)) {
+        missing = true;
+        break;
+      }
       if (type == kLogFile && ((number >= min_log) || (number == prev_log)))
         logs.push_back(number);
     }
   }
-  if (!expected.empty()) {
+  if (missing) {
     char buf[50];
-    snprintf(buf, sizeof(buf), "%d missing files; e.g.",
-             static_cast<int>(expected.size()));
-    return Status::Corruption(buf, TableFileName(dbname_, *(expected.begin())));
+    snprintf(buf, sizeof(buf), "missing some files; e.g.");
+    return Status::Corruption(buf, TableFileName(dbname_, number));
   }
 
   // Recover in the order in which the logs were generated
@@ -376,7 +371,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
 }
 
 Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
-                              bool* save_manifest, VersionEdit* edit,
+                              bool* save_manifest, ZeroLevelVersionEdit* edit,
                               SequenceNumber* max_sequence) {
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
@@ -424,7 +419,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   int compactions = 0;
   MemTable* mem = NULL;
   while (reader.ReadRecord(&record, &scratch) &&
-      status.ok()) {
+         status.ok()) {
     if (record.size() < 12) {
       reporter.Corruption(
           record.size(), Status::Corruption("log record too small"));
@@ -443,11 +438,23 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     }
     const SequenceNumber last_seq =
         WriteBatchInternal::Sequence(&batch) +
-            WriteBatchInternal::Count(&batch) - 1;
+        WriteBatchInternal::Count(&batch) - 1;
     if (last_seq > *max_sequence) {
       *max_sequence = last_seq;
     }
 
+    if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
+      compactions++;
+      *save_manifest = true;
+      status = WriteLevel0Table(mem, edit, NULL);
+      mem->Unref();
+      mem = NULL;
+      if (!status.ok()) {
+        // Reflect errors immediately so that conditions like full
+        // file-systems cause the DB::Open() to fail.
+        break;
+      }
+    }
   }
 
   delete file;
@@ -479,7 +486,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     // mem did not get reused; compact it.
     if (status.ok()) {
       *save_manifest = true;
-      imm_ = mem;
+      status = WriteLevel0Table(mem, edit, NULL);
     }
     mem->Unref();
   }
@@ -487,108 +494,8 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   return status;
 }
 
-Status DBImpl::MakeMemtableCompaction(PersistentMemtable* mem) {
-  const uint64_t start_micros = env_->NowMicros();
-  mem->Ref();
-  auto range = mem->GetRange();
-  Compaction* c = versions_->MemtableCompaction(range.first, range.second);
-  std::shared_ptr<Iterator> mem_iterator(mem->NewIterator());
-  mem_iterator->Next();
-  CompactionState* compact = new CompactionState(c);
-  compact->is_memtable = true;
-  Status status;
-  Log(options_.info_log, "Compacting memtable portion with %d@%d files",
-      compact->compaction->num_input_files(0),
-      compact->compaction->level());
-  assert(compact->builder == NULL);
-  assert(compact->outfile == NULL);
-  mutex_.Unlock();
-  std::vector<std::shared_ptr<Iterator>> iterators;
-  iterators.push_back(mem_iterator);
-  for (int i = 0; i < compact->compaction->num_input_files(0); i++) {
-    uint64_t file_number = compact->compaction->input(0, i)->number;
-    std::string fname = TableFileName(dbname_, file_number);
-    SequentialFile* file;
-    Status s = env_->NewSequentialFile(fname, &file);
-    auto iter = std::make_shared<RawBlockIterator>(file);
-    iterators.push_back(std::dynamic_pointer_cast<Iterator>(iter));
-  }
-  std::shared_ptr<Iterator> input;
-  Slice prev_key;
-  while (true) {
-    input = nullptr;
-    for (auto iterator : iterators) {
-      if (iterator->Valid() && (input == nullptr ||
-          internal_comparator_.Compare(input->key(), iterator->key()) > 0)) {
-        if (!prev_key.empty() &&
-            internal_comparator_.Compare(prev_key, iterator->key()) == 0) {
-          iterator->Next();
-        } else {
-          input = iterator;
-        }
-      }
-    }
-    if (input == nullptr) break;
-    Slice key = input->key();
-    Slice value = input->value();
-    if (compact->builder == NULL) {
-      status = OpenCompactionOutputFile(compact);
-      compact->current_output()->smallest.DecodeFrom(key);
-    }
-    compact->builder->Add(key, value);
-
-    KeyAndMeta key_and_meta;
-    key_and_meta.key = atoi(key.data());
-    key_and_meta.fnumber = 0;
-    key_and_meta.meta = new IndexMeta(compact->builder->FileSize() - value.size() - 1,
-                                      value.size(), compact->outputs.back().number);
-    compact->index_queue.push_back(key_and_meta);
-    compact->current_output()->largest.DecodeFrom(key);
-    if (compact->builder->FileSize() >= compact->compaction->MaxOutputFileSize()) {
-      status = FinishCompactionOutputFile(compact);
-    }
-    input->Next();
-  }
-  if (status.ok() && shutting_down_.Acquire_Load()) {
-    status = Status::IOError("Deleting DB during compaction");
-  }
-  if (status.ok() && compact->builder != NULL) {
-    status = FinishCompactionOutputFile(compact);
-  }
-
-  CompactionStats stats;
-  stats.micros = env_->NowMicros() - start_micros;
-  stats.bytes_read += mem->ApproximateMemoryUsage();
-  for (int i = 0; i < compact->compaction->num_input_files(0); i++) {
-    stats.bytes_read += compact->compaction->input(0, i)->file_size;
-  }
-  for (int i = 0; i < compact->outputs.size(); i++) {
-    stats.bytes_written += compact->outputs[i].file_size;
-  }
-
-  mutex_.Lock();
-  stats_[0].Add(stats);
-  if (status.ok()) {
-    status = InstallCompactionResults(compact);
-  }
-  if (status.ok()) {
-    mem->Unref();
-    mem = NULL;
-    has_imm_.Release_Store(NULL);
-  } else {
-    RecordBackgroundError(status);
-  }
-  VersionSet::LevelSummaryStorage tmp;
-  Log(options_.info_log, "compacted to: %s", versions_->LevelSummary(&tmp));
-  CleanupCompaction(compact);
-  c->ReleaseInputs();
-  DeleteObsoleteFiles();
-  delete c;
-  return status;
-}
-
-Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
-                                Version* base) {
+Status DBImpl::WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit,
+                                ZeroLevelVersion* base) {
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
@@ -601,7 +508,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, iter, &meta);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, edit);
     mutex_.Lock();
   }
 
@@ -617,44 +524,43 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   // should not be added to the manifest.
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
-    const Slice min_user_key = meta.smallest.Encode();
-    const Slice max_user_key = meta.largest.Encode();
-    if (base != NULL) {
-      level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
-    }
-    edit->AddFile(level, meta.number, meta.file_size,
+    const Slice min_user_key = meta.smallest.user_key();
+    const Slice max_user_key = meta.largest.user_key();
+    edit->AddFile(meta.number, meta.total, meta.alive, meta.file_size,
                   meta.smallest, meta.largest);
   }
 
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
-  stats_[level].Add(stats);
+  stats_.Add(stats);
   return s;
 }
 
 void DBImpl::CompactMemTable() {
   mutex_.AssertHeld();
-  Status s;
   assert(imm_ != NULL);
+
   // Save the contents of the memtable as a new Table
-  VersionEdit edit;
-  Version* base = versions_->current();
+  ZeroLevelVersionEdit edit;
+  ZeroLevelVersion* base = versions_->current();
   base->Ref();
-  s = WriteLevel0Table(imm_, &edit, base);
+  Status s = WriteLevel0Table(imm_, &edit, base);
   base->Unref();
 
   if (s.ok() && shutting_down_.Acquire_Load()) {
     s = Status::IOError("Deleting DB during memtable compaction");
   }
 
+  // Replace immutable memtable with the generated Table
   if (s.ok()) {
     edit.SetPrevLogNumber(0);
-    edit.SetLogNumber(logfile_number_);
+    edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
     s = versions_->LogAndApply(&edit, &mutex_);
   }
 
   if (s.ok()) {
+    // Commit to the new state
     imm_->Unref();
     imm_ = NULL;
     has_imm_.Release_Store(NULL);
@@ -662,92 +568,6 @@ void DBImpl::CompactMemTable() {
   } else {
     RecordBackgroundError(s);
   }
-}
-
-void DBImpl::CompactRange(const Slice* begin, const Slice* end) {
-  int max_level_with_files = 1;
-  {
-    MutexLock l(&mutex_);
-    Version* base = versions_->current();
-    for (int level = 1; level < config::kNumLevels; level++) {
-      if (base->OverlapInLevel(level, begin, end)) {
-        max_level_with_files = level;
-      }
-    }
-  }
-  TEST_CompactMemTable(); // TODO(sanjay): Skip if memtable does not overlap
-  for (int level = 0; level < max_level_with_files; level++) {
-    TEST_CompactRange(level, begin, end);
-  }
-}
-
-void DBImpl::TEST_CompactRange(int level, const Slice* begin,const Slice* end) {
-  assert(level >= 0);
-  assert(level + 1 < config::kNumLevels);
-
-  InternalKey begin_storage, end_storage;
-
-  ManualCompaction manual;
-  manual.level = level;
-  manual.done = false;
-  if (begin == NULL) {
-    manual.begin = NULL;
-  } else {
-    begin_storage = InternalKey(*begin, kMaxSequenceNumber, kValueTypeForSeek);
-    manual.begin = &begin_storage;
-  }
-  if (end == NULL) {
-    manual.end = NULL;
-  } else {
-    end_storage = InternalKey(*end, 0, static_cast<ValueType>(0));
-    manual.end = &end_storage;
-  }
-
-  MutexLock l(&mutex_);
-  while (!manual.done && !shutting_down_.Acquire_Load() && bg_error_.ok()) {
-    if (manual_compaction_ == NULL) {  // Idle
-      manual_compaction_ = &manual;
-      MaybeScheduleCompaction();
-    } else {  // Running either my compaction or another compaction.
-      bg_cv_.Wait();
-    }
-  }
-  if (manual_compaction_ == &manual) {
-    // Cancel my manual compaction since we aborted early for some reason.
-    manual_compaction_ = NULL;
-  }
-}
-
-Status DBImpl::TEST_CompactMemTable() {
-  // NULL batch means just wait for earlier writes to be done
-  Status s = Write(WriteOptions(), NULL);
-  if (s.ok()) {
-    // Wait until the compaction completes
-    MutexLock l(&mutex_);
-    while (imm_ != NULL && bg_error_.ok()) {
-      bg_cv_.Wait();
-    }
-    if (imm_ != NULL) {
-      s = bg_error_;
-    }
-  }
-  return s;
-}
-
-Status DBImpl::CompactMemTableSynchronous() {
-  // NULL batch means just wait for earlier writes to be done
-  Status s = Write(WriteOptions(), NULL);
-  if (s.ok()) {
-    // Wait until the compaction completes
-    MutexLock l(&mutex_);
-    while (imm_ != NULL && bg_error_.ok()) {
-      bg_cv_.Wait();
-    }
-    if (imm_ != NULL) {
-      s = bg_error_;
-    }
-  }
-  return s;
 }
 
 void DBImpl::RecordBackgroundError(const Status& s) {
@@ -767,8 +587,7 @@ void DBImpl::MaybeScheduleCompaction() {
   } else if (!bg_error_.ok()) {
     // Already got an error; no more changes
   } else if (imm_ == NULL &&
-      manual_compaction_ == NULL &&
-      !versions_->NeedsCompaction()) {
+             !versions_->NeedsCompaction()) {
     // No work to be done
   } else {
     bg_compaction_scheduled_ = true;
@@ -807,47 +626,11 @@ void DBImpl::BackgroundCompaction() {
     return;
   }
 
-  Compaction* c;
-  bool is_manual = (manual_compaction_ != NULL);
-  InternalKey manual_end;
-  if (is_manual) {
-    ManualCompaction* m = manual_compaction_;
-    c = versions_->CompactRange(m->level, m->begin, m->end);
-    m->done = (c == NULL);
-    if (c != NULL) {
-      manual_end = c->input(0, c->num_input_files(0) - 1)->largest;
-    }
-    Log(options_.info_log,
-        "Manual compaction at level-%d from %s .. %s; will stop at %s\n",
-        m->level,
-        (m->begin ? m->begin->DebugString().c_str() : "(begin)"),
-        (m->end ? m->end->DebugString().c_str() : "(end)"),
-        (m->done ? "(end)" : manual_end.DebugString().c_str()));
-  } else {
-    c = versions_->PickCompaction();
-  }
+  ZeroLevelCompaction* c = versions_->PickCompaction();
 
   Status status;
   if (c == NULL) {
     // Nothing to do
-  } else if (!is_manual && c->IsTrivialMove()) {
-    // Move file to next level
-    assert(c->num_input_files(0) == 1);
-    FileMetaData* f = c->input(0, 0);
-    c->edit()->DeleteFile(c->level(), f->number);
-    c->edit()->AddFile(c->level() + 1, f->number, f->file_size,
-                       f->smallest, f->largest);
-    status = versions_->LogAndApply(c->edit(), &mutex_);
-    if (!status.ok()) {
-      RecordBackgroundError(status);
-    }
-    VersionSet::LevelSummaryStorage tmp;
-    Log(options_.info_log, "Moved #%lld to level-%d %lld bytes %s: %s\n",
-        static_cast<unsigned long long>(f->number),
-        c->level() + 1,
-        static_cast<unsigned long long>(f->file_size),
-        status.ToString().c_str(),
-        versions_->LevelSummary(&tmp));
   } else {
     CompactionState* compact = new CompactionState(c);
     status = DoCompactionWork(compact);
@@ -867,20 +650,6 @@ void DBImpl::BackgroundCompaction() {
   } else {
     Log(options_.info_log,
         "Compaction error: %s", status.ToString().c_str());
-  }
-
-  if (is_manual) {
-    ManualCompaction* m = manual_compaction_;
-    if (!status.ok()) {
-      m->done = true;
-    }
-    if (!m->done) {
-      // We only compacted part of the requested range.  Update *m
-      // to the range that is left to be compacted.
-      m->tmp_storage = manual_end;
-      m->begin = &m->tmp_storage;
-    }
-    manual_compaction_ = NULL;
   }
 }
 
@@ -921,13 +690,13 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
-    compact->builder = new RawTableBuilder(options_, compact->outfile, file_number);
-    compact->index_queue.clear();
+    compact->builder = new TableBuilder(options_, compact->outfile, file_number, compact->compaction->edit());
   }
   return s;
 }
 
-Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
+Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
+                                          Iterator* input) {
   assert(compact != NULL);
   assert(compact->outfile != NULL);
   assert(compact->builder != NULL);
@@ -936,16 +705,16 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   assert(output_number != 0);
 
   // Check for iterator errors
-  Status s;
+  Status s = input->status();
   const uint64_t current_entries = compact->builder->NumEntries();
-  const uint64_t current_bytes = compact->builder->FileSize();
-  compact->current_output()->file_size = current_bytes;
-  compact->total_bytes += current_bytes;
   if (s.ok()) {
     s = compact->builder->Finish();
   } else {
     compact->builder->Abandon();
   }
+  const uint64_t current_bytes = compact->builder->FileSize();
+  compact->current_output()->file_size = current_bytes;
+  compact->total_bytes += current_bytes;
   delete compact->builder;
   compact->builder = NULL;
 
@@ -953,11 +722,6 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   if (s.ok()) {
     s = compact->outfile->Sync();
   }
-  //Log(options_.info_log, "indexing waiting");
-  // wait until indexing gets done
-//  while (!index_->IsQueueEmpty()) { }
-  //Log(options_.info_log, "finished waiting");
-  index_->AddQueue(compact->index_queue);
   if (s.ok()) {
     s = compact->outfile->Close();
   }
@@ -965,24 +729,19 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
   compact->outfile = NULL;
 
   if (s.ok() && current_entries > 0) {
+    // Verify that the table is usable
+    Iterator* iter = table_cache_->NewIterator(ReadOptions(),
+                                               output_number,
+                                               current_bytes);
+    s = iter->status();
+    delete iter;
     if (s.ok()) {
       Log(options_.info_log,
-          "Generated table #%llu@%d: %lld keys, %lld bytes",
+          "Generated table #%llu: %lld keys, %lld bytes",
           (unsigned long long) output_number,
-          compact->compaction->level(),
           (unsigned long long) current_entries,
           (unsigned long long) current_bytes);
     }
-  }
-  if (has_imm_.NoBarrier_Load() != NULL) {
-    //const uint64_t imm_start = env_->NowMicros();
-    mutex_.Lock();
-    if (imm_ != NULL) {
-      CompactMemTable();
-      bg_cv_.SignalAll();  // Wakeup MakeRoomForWrite() if necessary
-    }
-    mutex_.Unlock();
-    //imm_micros += (env_->NowMicros() - imm_start);
   }
   return s;
 }
@@ -990,26 +749,17 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact) {
 
 Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   mutex_.AssertHeld();
-  Log(options_.info_log,  "Compacted %d@%d + %d@%d files => %lld bytes",
-      compact->compaction->num_input_files(0),
-      compact->compaction->level(),
-      compact->compaction->num_input_files(1),
-      compact->compaction->level() + 1,
+  Log(options_.info_log,  "Compacted %d@ files => %lld bytes",
+      compact->compaction->num_input_files(),
       static_cast<long long>(compact->total_bytes));
 
   // Add compaction outputs
   compact->compaction->AddInputDeletions(compact->compaction->edit());
-  const int level = compact->compaction->level();
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     const CompactionState::Output& out = compact->outputs[i];
     compact->compaction->edit()->AddFile(
-        compact->is_memtable ? level : level + 1, // if memtable compaction, write to level-0
-        out.number, out.file_size, out.smallest, out.largest);
+        out.number, out.file_size, out.total, out.alive, out.smallest, out.largest);
   }
-  //Log(options_.info_log, "indexing waiting");
-  // wait until indexing gets done
-//  while (!index_->IsQueueEmpty()) { }
-  //Log(options_.info_log, "finished waiting");
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
@@ -1017,11 +767,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
 
-  Log(options_.info_log,  "Compacting %d@%d + %d@%d files",
-      compact->compaction->num_input_files(0),
-      compact->compaction->level(),
-      compact->compaction->num_input_files(1),
-      compact->compaction->level() + 1);
+  Log(options_.info_log,  "Compacting %d files",
+      compact->compaction->num_input_files());
 
   assert(versions_->NumLevelFiles(compact->compaction->level()) > 0);
   assert(compact->builder == NULL);
@@ -1034,91 +781,88 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
-  // get files for compaction
+
+  Iterator* input = versions_->MakeInputIterator(compact->compaction);
+  input->SeekToFirst();
   Status status;
-  {
-
-    std::vector<std::shared_ptr<RawBlockIterator>> iterators;
-    for (int which = 0; which < 2; which++) {
-      for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
-        uint64_t file_number = compact->compaction->input(which, i)->number;
-        std::string fname = TableFileName(dbname_, file_number);
-        SequentialFile* file;
-        Status s = env_->NewSequentialFile(fname, &file);
-        if (s.ok()) {
-          iterators.push_back(std::make_shared<RawBlockIterator>(file));
-          iterators.back()->SetFileNumber(file_number);
-        }
+  ParsedInternalKey ikey;
+  std::string current_user_key;
+  bool has_current_user_key = false;
+  SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
+  for (; input->Valid() && !shutting_down_.Acquire_Load(); ) {
+    // Prioritize immutable compaction work
+    if (has_imm_.NoBarrier_Load() != NULL) {
+      const uint64_t imm_start = env_->NowMicros();
+      mutex_.Lock();
+      if (imm_ != NULL) {
+        CompactMemTable();
+        bg_cv_.SignalAll();  // Wakeup MakeRoomForWrite() if necessary
       }
-    }
-    std::shared_ptr<RawBlockIterator> input;
-    Slice prev_key;
-    while (true) {
-      input = nullptr;
-      for (auto iterator : iterators) {
-        if (iterator->Valid() && (input == nullptr ||
-            internal_comparator_.Compare(input->key(), iterator->key()) > 0)) {
-          if (!prev_key.empty() &&
-              internal_comparator_.Compare(prev_key, iterator->key()) == 0) {
-            iterator->Next();
-          } else {
-            input = iterator;
-          }
-        }
-      }
-      if (input == nullptr) break;
-
-      Slice key = input->key();
-      Slice value = input->value();
-      if (compact->compaction->ShouldStopBefore(key) &&
-          compact->builder != NULL) {
-        status = FinishCompactionOutputFile(compact);
-
-      }
-      // Open output file if necessary
-      if (compact->builder == NULL) {
-        status = OpenCompactionOutputFile(compact);
-        compact->current_output()->smallest.DecodeFrom(key);
-      }
-      // Add kv to builder;
-      compact->builder->Add(key, value);
-      // prep
-      KeyAndMeta key_and_meta;
-      key_and_meta.key = atoi(key.data());
-      key_and_meta.fnumber = input->GetFileNumber();
-      key_and_meta.meta = new IndexMeta(compact->builder->FileSize() - value.size() - 1,
-                                        value.size(), compact->outputs.back().number);
-      compact->index_queue.push_back(key_and_meta);
-      compact->current_output()->largest.DecodeFrom(key);
-      // Finish file if size exceeds
-      if (compact->builder->FileSize() >= compact->compaction->MaxOutputFileSize()) {
-        status = FinishCompactionOutputFile(compact);
-      }
-      prev_key = key;
-      input->Next();
+      mutex_.Unlock();
+      imm_micros += (env_->NowMicros() - imm_start);
     }
 
-    if (status.ok() && shutting_down_.Acquire_Load()) {
-      status = Status::IOError("Deleting DB during compaction");
+    Slice key = input->key();
+#if 0
+    Log(options_.info_log,
+        "  Compact: %s, seq %d, type: %d %d, drop: %d, is_base: %d, "
+        "%d smallest_snapshot: %d",
+        ikey.user_key.ToString().c_str(),
+        (int)ikey.sequence, ikey.type, kTypeValue, drop,
+        compact->compaction->IsBaseLevelForKey(ikey.user_key),
+        (int)last_sequence_for_key, (int)compact->smallest_snapshot);
+#endif
+
+    // make key/value drop if more fresh key exists
+
+    // Open output file if necessary
+    if (compact->builder == NULL) {
+      status = OpenCompactionOutputFile(compact);
+      if (!status.ok()) {
+        break;
+      }
     }
-    if (status.ok() && compact->builder != NULL) {
-      status = FinishCompactionOutputFile(compact);
+    if (compact->builder->NumEntries() == 0) {
+      compact->current_output()->smallest.DecodeFrom(key);
     }
+    compact->current_output()->largest.DecodeFrom(key);
+    compact->builder->Add(key, input->value());
+
+    // Close output file if it is big enough
+    if (compact->builder->FileSize() >=
+        compact->compaction->MaxOutputFileSize()) {
+      status = FinishCompactionOutputFile(compact, input);
+      if (!status.ok()) {
+        break;
+      }
+    }
+
+    input->Next();
   }
+
+  if (status.ok() && shutting_down_.Acquire_Load()) {
+    status = Status::IOError("Deleting DB during compaction");
+  }
+  if (status.ok() && compact->builder != NULL) {
+    status = FinishCompactionOutputFile(compact, input);
+  }
+  if (status.ok()) {
+    status = input->status();
+  }
+  delete input;
+  input = NULL;
 
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros - imm_micros;
-  for (int which = 0; which < 2; which++) {
-    for (int i = 0; i < compact->compaction->num_input_files(which); i++) {
-      stats.bytes_read += compact->compaction->input(which, i)->file_size;
-    }
+  for (int i = 0; i < compact->compaction->num_input_files(); i++) {
+    stats.bytes_read += compact->compaction->input(i)->file_size;
   }
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     stats.bytes_written += compact->outputs[i].file_size;
   }
 
   mutex_.Lock();
-  stats_[compact->compaction->level() + 1].Add(stats);
+  stats_.Add(stats);
 
   if (status.ok()) {
     status = InstallCompactionResults(compact);
@@ -1126,16 +870,16 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   if (!status.ok()) {
     RecordBackgroundError(status);
   }
-  VersionSet::LevelSummaryStorage tmp;
+  VersionControl::SummaryStorage tmp;
   Log(options_.info_log,
-      "compacted to: %s", versions_->LevelSummary(&tmp));
+      "compacted to: %s", versions_->Summary(&tmp));
   return status;
 }
 
 namespace {
 struct IterState {
   port::Mutex* mu;
-  Version* version;
+  ZeroLevelVersion* version;
   MemTable* mem;
   MemTable* imm;
 };
@@ -1151,46 +895,54 @@ static void CleanupIteratorState(void* arg1, void* arg2) {
 }
 }  // namespace
 
-Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
-                                      SequenceNumber* latest_snapshot,
-                                      uint32_t* seed) {
-//  IterState* cleanup = new IterState;
-//  mutex_.Lock();
-//  *latest_snapshot = versions_->LastSequence();
-//
-//  // Collect together all needed child iterators
-//  std::vector<Iterator*> list;
-//  list.push_back(mem_->NewIterator());
-//  mem_->Ref();
-//  if (imm_ != NULL) {
-//    list.push_back(imm_->NewIterator());
-//    imm_->Ref();
-//  }
-//  versions_->current()->AddIterators(options, &list);
-//  Iterator* internal_iter =
-//      NewMergingIterator(&internal_comparator_, &list[0], list.size());
-//  versions_->current()->Ref();
-//
-//  cleanup->mu = &mutex_;
-//  cleanup->mem = mem_;
-//  cleanup->imm = imm_;
-//  cleanup->version = versions_->current();
-//  internal_iter->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
-//
-//  *seed = ++seed_;
-//  mutex_.Unlock();
-//  return internal_iter;
-}
+Iterator* DBImpl::RangeQuery(const ReadOptions& options,
+                             const Slice& begin,
+                             const Slice& end) {
+  IterState* cleanup = new IterState;
+  std::vector<Iterator*> list;
+  mutex_.Lock();
+  //
+  versions_->current()->Ref();
+  SequenceNumber snapshot;
+  if (options.snapshot != NULL) {
+    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
+  } else {
+    snapshot = versions_->LastSequence();
+  }
+  LookupKey k(begin, snapshot);
+  // add mem iterator
+  Iterator* mem_iter = mem_->NewIterator();
+  mem_iter->Seek(k.memtable_key());
+  list.push_back(mem_iter);
+  mem_->Ref();
 
-Iterator* DBImpl::TEST_NewInternalIterator() {
-  SequenceNumber ignored;
-  uint32_t ignored_seed;
-  return NewInternalIterator(ReadOptions(), &ignored, &ignored_seed);
-}
+  // add imm iterator
+  if (imm_ != NULL) {
+    Iterator* imm_iter = imm_->NewIterator();
+    imm_iter->Seek(k.memtable_key());
+    list.push_back(imm_iter);
+    imm_->Ref();
+  }
 
-int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
-  MutexLock l(&mutex_);
-  return versions_->MaxNextLevelOverlappingBytes();
+
+
+  // add btree range query
+  list.push_back(index_->Range(fast_atoi(begin.data(), begin.size()),
+                               fast_atoi(end.data(), end.size()), versions_));
+
+  // put all together
+  Iterator* range_iterator = NewRangeIterator(&internal_comparator_,
+                                                std::move(list),
+                                                list.size());
+  // init cleaner
+  cleanup->mu = &mutex_;
+  cleanup->mem = mem_;
+  cleanup->imm = imm_;
+  cleanup->version = versions_->current();
+  range_iterator->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
+
+  mutex_.Unlock();
+  return range_iterator;
 }
 
 Status DBImpl::Get(const ReadOptions& options,
@@ -1207,74 +959,33 @@ Status DBImpl::Get(const ReadOptions& options,
 
   MemTable* mem = mem_;
   MemTable* imm = imm_;
-  Version* current = versions_->current();
+  ZeroLevelVersion* current = versions_->current();
   mem->Ref();
   if (imm != NULL) imm->Ref();
   current->Ref();
 
   bool have_stat_update = false;
-  Version::GetStats stats;
 
   // Unlock while reading from files and memtables
   {
     mutex_.Unlock();
+    // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
     } else {
-      s = ReadFromTables(key, value);
+      s = current->Get(options, lkey, value);
+      have_stat_update = true;
     }
     mutex_.Lock();
   }
 
-  if (have_stat_update && current->UpdateStats(stats)) {
-    MaybeScheduleCompaction();
-  }
   mem->Unref();
   if (imm != NULL) imm->Unref();
   current->Unref();
   return s;
-}
-
-Status DBImpl::ReadFromTables(const Slice& key, std::string* value) {
-  auto meta = index_->Get(key);
-  Status s;
-  if (meta != NULL) {
-    std::string fname = TableFileName(dbname_, meta->file_number);
-    RandomAccessFile* file;
-    s = env_->NewRandomAccessFile(fname, &file);
-    if (s.ok()) {
-      char* scratch = new char[meta->size];
-      Slice result;
-      s = file->Read(meta->offset, meta->size, &result, scratch);
-      if (s.ok() && !result.empty()) {
-        value->assign(result.data(), result.size());
-        delete[] scratch;
-      }
-    }
-  }
-  return s;
-}
-
-Iterator* DBImpl::NewIterator(const ReadOptions& options) {
-  SequenceNumber latest_snapshot;
-  uint32_t seed;
-  Iterator* iter = NewInternalIterator(options, &latest_snapshot, &seed);
-  return NewDBIterator(
-      this, user_comparator(), iter,
-      (options.snapshot != NULL
-       ? reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_
-       : latest_snapshot),
-      seed);
-}
-
-void DBImpl::RecordReadSample(Slice key) {
-  MutexLock l(&mutex_);
-  if (versions_->current()->RecordReadSample(key)) {
-    MaybeScheduleCompaction();
-  }
 }
 
 const Snapshot* DBImpl::GetSnapshot() {
@@ -1312,9 +1023,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
   }
 
   // May temporarily unlock and wait.
-  //mutex_.Unlock();
   Status status = MakeRoomForWrite(my_batch == NULL);
-  //mutex_.Lock();
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && my_batch != NULL) {  // NULL batch is for compactions
@@ -1434,32 +1143,17 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
-    } else if (allow_delay &&
-            versions_->NumLevelFiles(0) >= config::kL0_SlowdownWritesTrigger) {
-      // We are getting close to hitting a hard limit on the number of
-      // L0 files.  Rather than delaying a single write by several
-      // seconds when we hit the hard limit, start delaying each
-      // individual write by 1ms to reduce latency variance.  Also,
-      // this delay hands over some CPU to the compaction thread in
-      // case it is sharing the same core as the writer.
-      mutex_.Unlock();
-      //Log(options_.info_log, "Level-0 slowdown triggered...\n");
-      env_->SleepForMicroseconds(1000);
-      allow_delay = false;  // Do not delay a single write more than once
-      mutex_.Lock();
-    } else if (imm_ != NULL && mem_->ApproximateMemoryUsage() >= options_.max_buffer_size) {
+    } else if (!force &&
+               (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
+      // There is room in current memtable
+      break;
+    } else if (imm_ != NULL) {
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       bg_cv_.Wait();
-    } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
-      // There are too many level-0 files.
-      Log(options_.info_log, "Too many L0 files; waiting...\n");
-      bg_cv_.Wait();
-    } else if (mem_->ApproximateMemoryUsage() >= options_.compaction_threshhold
-        && imm_ == NULL){
-      // Attempt to move compaction range key/values from memtable
-      // check if we need recovery log
+    } else {
+      // Attempt to switch to a new memtable and trigger compaction of old
       if (!options_.disable_recovery_log) {
         assert(versions_->PrevLogNumber() == 0);
         uint64_t new_log_number = versions_->NewFileNumber();
@@ -1482,9 +1176,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mem_->Ref();
       force = false;   // Do not force another compaction if have room
       MaybeScheduleCompaction();
-    } else if (mem_->ApproximateMemoryUsage() <= options_.max_buffer_size) {
-      // There is room in current memtable
-      break;
     }
   }
   return s;
@@ -1507,8 +1198,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
       return false;
     } else {
       char buf[100];
-      snprintf(buf, sizeof(buf), "%d",
-               versions_->NumLevelFiles(static_cast<int>(level)));
+      snprintf(buf, sizeof(buf), "%d", 0);
       *value = buf;
       return true;
     }
@@ -1516,24 +1206,21 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     char buf[200];
     snprintf(buf, sizeof(buf),
              "                               Compactions\n"
-                 "Level  Files Size(MB) Time(sec) Read(MB) Write(MB)\n"
-                 "--------------------------------------------------\n"
-    );
+             "Level  Files Size(MB) Time(sec) Read(MB) Write(MB)\n"
+             "--------------------------------------------------\n"
+             );
     value->append(buf);
-    for (int level = 0; level < config::kNumLevels; level++) {
-      int files = versions_->NumLevelFiles(level);
-      if (stats_[level].micros > 0 || files > 0) {
-        snprintf(
-            buf, sizeof(buf),
-            "%3d %8d %8.0f %9.0f %8.0f %9.0f\n",
-            level,
-            files,
-            versions_->NumLevelBytes(level) / 1048576.0,
-            stats_[level].micros / 1e6,
-            stats_[level].bytes_read / 1048576.0,
-            stats_[level].bytes_written / 1048576.0);
-        value->append(buf);
-      }
+    int files = versions_->NumFiles();
+    if (stats_.micros > 0 || files > 0) {
+      snprintf(
+          buf, sizeof(buf),
+          "%8d %8.0f %9.0f %8.0f %9.0f\n",
+          files,
+          versions_->NumBytes() / 1048576.0,
+          stats_.micros / 1e6,
+          stats_.bytes_read / 1048576.0,
+          stats_.bytes_written / 1048576.0);
+      value->append(buf);
     }
     return true;
   } else if (in == "sstables") {
@@ -1555,37 +1242,6 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
   }
 
   return false;
-}
-
-void DBImpl::GetApproximateSizes(
-    const Range* range, int n,
-    uint64_t* sizes) {
-  // TODO(opt): better implementation
-  Version* v;
-  {
-    MutexLock l(&mutex_);
-    versions_->current()->Ref();
-    v = versions_->current();
-  }
-
-  for (int i = 0; i < n; i++) {
-    // Convert user_key into a corresponding internal key.
-    InternalKey k1(range[i].start, kMaxSequenceNumber, kValueTypeForSeek);
-    InternalKey k2(range[i].limit, kMaxSequenceNumber, kValueTypeForSeek);
-    uint64_t start = versions_->ApproximateOffsetOf(v, k1);
-    uint64_t limit = versions_->ApproximateOffsetOf(v, k2);
-    sizes[i] = (limit >= start ? limit - start : 0);
-  }
-
-  {
-    MutexLock l(&mutex_);
-    v->Unref();
-  }
-}
-
-Iterator* DBImpl::RangeQuery(int64_t min, int64_t max) {
-
-  return nullptr;
 }
 
 // Default implementations of convenience methods that subclasses of DB
@@ -1610,12 +1266,12 @@ Status DB::Open(const Options& options, const std::string& dbname,
 
   DBImpl* impl = new DBImpl(options, dbname);
   impl->mutex_.Lock();
-  VersionEdit edit;
+  ZeroLevelVersionEdit edit;
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
   Status s;
   // do not recover from logs
-  s = impl->Recover(&edit, &save_manifest);
+   s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == NULL) {
     // Create new log and a corresponding memtable.
     if (!options.disable_recovery_log) {

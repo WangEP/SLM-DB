@@ -22,9 +22,6 @@ RandomAccessFile::~RandomAccessFile() {
 WritableFile::~WritableFile() {
 }
 
-MemoryIOFile::~MemoryIOFile() {
-}
-
 Logger::~Logger() {
 }
 

@@ -5,16 +5,16 @@
 #include "leveldb/table_builder.h"
 
 #include <assert.h>
-#include <future>
 #include "leveldb/comparator.h"
 #include "leveldb/env.h"
 #include "leveldb/filter_policy.h"
+#include "leveldb/options.h"
 #include "table/block_builder.h"
 #include "table/filter_block.h"
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
-#include "include/leveldb/index.h"
+#include "leveldb/index.h"
 
 namespace leveldb {
 
@@ -28,8 +28,15 @@ struct TableBuilder::Rep {
   BlockBuilder index_block;
   std::string last_key;
   int64_t num_entries;
+  int64_t total_size;
+  std::deque<KeyAndMeta> index_queue;
+  uint64_t fnumber;
   bool closed;          // Either Finish() or Abandon() has been called.
   FilterBlockBuilder* filter_block;
+  Index* index;
+  IndexMeta* indexmeta;
+  ZeroLevelVersionEdit* edit;
+
 
   // We do not emit the index entry for a block until we have seen the
   // first key for the next data block.  This allows us to use shorter
@@ -45,8 +52,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-
-  Rep(const Options& opt, WritableFile* f)
+  Rep(const Options& opt, WritableFile* f, uint64_t number, ZeroLevelVersionEdit* e)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -57,13 +63,17 @@ struct TableBuilder::Rep {
         closed(false),
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
-        pending_index_entry(false) {
+        pending_index_entry(false),
+        index(options.index),
+        fnumber(number),
+        total_size(0),
+        edit(e) {
     index_block_options.block_restart_interval = 1;
   }
 };
 
-TableBuilder::TableBuilder(const Options& options, WritableFile* file)
-    : rep_(new Rep(options, file)) {
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number, ZeroLevelVersionEdit* edit)
+    : rep_(new Rep(options, file, number, edit)) {
   if (rep_->filter_block != NULL) {
     rep_->filter_block->StartBlock(0);
   }
@@ -98,6 +108,10 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
+  // create index meta for new block
+  if (r->data_block.empty()) {
+    r->indexmeta = new IndexMeta(r->offset, 0, r->fnumber);
+  }
 
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
@@ -115,6 +129,13 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
+  // add to index queue block meta 
+  KeyAndMeta key_meta;
+  key_meta.key = fast_atoi(key.data(), key.size()-8);
+  key_meta.meta = r->indexmeta;
+  key_meta.edit = r->edit;
+  r->indexmeta->Ref();
+  r->index_queue.push_back(key_meta);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
@@ -128,7 +149,7 @@ void TableBuilder::Flush() {
   if (!ok()) return;
   if (r->data_block.empty()) return;
   assert(!r->pending_index_entry);
-  WriteBlock(&r->data_block, &r->pending_handle);
+  WriteBlock(&r->data_block, &r->pending_handle, true);
   if (ok()) {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
@@ -136,9 +157,16 @@ void TableBuilder::Flush() {
   if (r->filter_block != NULL) {
     r->filter_block->StartBlock(r->offset);
   }
+//  if (ok()) {
+//    r->index->AddQueue(r->index_queue);
+//    assert(r->index_queue.size() == 0);
+//    if (!r->index_queue.empty())
+//      Log(r->options.info_log, "queue not empty, size %d", r->index_queue.size());
+//    r->index_queue.clear();
+//  }
 }
 
-void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
+void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block) {
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
   //    type: uint8
@@ -169,17 +197,23 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
       break;
     }
   }
-  WriteRawBlock(block_contents, type, handle);
+  WriteRawBlock(block_contents, type, handle, is_data_block);
   r->compressed_output.clear();
   block->Reset();
 }
 
 void TableBuilder::WriteRawBlock(const Slice& block_contents,
                                  CompressionType type,
-                                 BlockHandle* handle) {
+                                 BlockHandle* handle,
+                                 bool is_data_block) {
   Rep* r = rep_;
   handle->set_offset(r->offset);
   handle->set_size(block_contents.size());
+  // update block size in index meta
+  if (is_data_block) {
+    r->indexmeta->handle.set_size(block_contents.size());
+    clflush((char*) r->indexmeta, sizeof(IndexMeta));
+  }
   r->status = r->file->Append(block_contents);
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
@@ -203,6 +237,8 @@ Status TableBuilder::Finish() {
   Flush();
   assert(!r->closed);
   r->closed = true;
+  r->index->AddQueue(r->index_queue);
+  assert(r->index_queue.size() == 0);
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
@@ -236,9 +272,6 @@ Status TableBuilder::Finish() {
       r->pending_handle.EncodeTo(&handle_encoding);
       r->index_block.Add(r->last_key, Slice(handle_encoding));
       r->pending_index_entry = false;
-      // global index finishing
-//      r->global_index->Add(r->last_key, r->pending_handle.offset(),
-//                           r->pending_handle.size(), false);
     }
     WriteBlock(&r->index_block, &index_block_handle);
   }

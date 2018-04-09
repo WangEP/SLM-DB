@@ -51,11 +51,11 @@ class Streamer {
 
  private:
 
+  Slice buffer_;
+  size_t current_;
   uint64_t buffer_size;
   SequentialFile* file_;
-  size_t current_;
   char* ptr;
-  Slice buffer_;
   Status status_;
 };
 

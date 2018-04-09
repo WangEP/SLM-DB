@@ -8,8 +8,11 @@ uint64_t clflush_cnt = 0;
 uint64_t WRITE_LATENCY_IN_NS = 1000;
 int data_cnt = 5000000;
 int data_begin = 0;
+int ranges_ = 10;
+int range_size_ = 1000;
 
 int main(int argc, char** argv) {
+  srand(0);
   if (argc < 2) {
     printf("file arg\n");
     return 1;
@@ -28,8 +31,10 @@ int main(int argc, char** argv) {
   assert(status.ok());
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = data_begin; i < data_begin+data_cnt; i++) {
-    std::string key = std::to_string(i);
-    std::string value = "valuevalue" + std::to_string(i);
+    char k[100];
+    snprintf(k, sizeof(k), "%016d", i);
+    std::string key = k;
+    std::string value = "valuevalue" + key;
     tsize += key.size() + value.size();
     status = db->Put(leveldb::WriteOptions(), key, value);
   }
@@ -38,19 +43,27 @@ int main(int argc, char** argv) {
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(data_cnt/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
   std::cout << clflush_cnt << "\tclflush count" << std::endl;
   std::cout << tsize << "\tbytes written" << std::endl;
-  clock_gettime(CLOCK_MONOTONIC, &start);
-  for (auto i = data_begin; i < data_begin+data_cnt; i++) {
-    std::string v = "valuevalue" + std::to_string(i);
-    std::string key = std::to_string(i);
-    std::string value;
-    status = db->Get(leveldb::ReadOptions(), key, &value);
-    if (!status.ok()) {
-      printf("key %s %s\n", key.data(), status.ToString().data());
-      return 1;
+  leveldb::ReadOptions read_options;
+  int64_t bytes = 0;
+  for (int i = 0; i < ranges_; i++) {
+    int j = i*i*1000;
+    char k1[100];
+    snprintf(k1, sizeof(k1), "%016d", j);
+    std::string begin = k1;
+    char k2[100];
+    snprintf(k2, sizeof(k2), "%016d", (j+range_size_));
+    std::string end = k2;
+    leveldb::Iterator* iter = db->RangeQuery(read_options, begin, end);
+    while (iter->Valid()) {
+      char k[100];
+      snprintf(k, sizeof(k), "%016d", j++);
+      std::string key = k;
+      std::string v = "valuevalue" + key;
+      std::string value = iter->value().ToString();
+      assert(v == value);
+      iter->Next();
     }
-    if (v != value) {
-      printf("%s %s %s %lu\n", key.data(), v.data(), value.data(), value.size());
-    }
+    delete iter;
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
   elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);

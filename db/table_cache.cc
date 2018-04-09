@@ -60,6 +60,9 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
         s = Status::OK();
       }
     }
+    if (s. ok() && file_size == 0) {
+      s = env_->GetFileSize(fname, &file_size);
+    }
     if (s.ok()) {
       s = Table::Open(*options_, file, file_size, &table);
     }
@@ -114,6 +117,33 @@ Status TableCache::Get(const ReadOptions& options,
     Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
     s = t->InternalGet(options, k, arg, saver);
     cache_->Release(handle);
+  }
+  return s;
+}
+
+Status TableCache::Get2(const ReadOptions& options,
+            uint64_t file_number,
+            const BlockHandle& block_handle,
+            const Slice& k,
+            void* arg,
+            void(*saver)(void*, const Slice&, const Slice&)) {
+  Cache::Handle* handle = NULL;
+  Status s = FindTable(file_number, 0, &handle);
+  if (s.ok()) {
+    Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+    s = t->InternalGet2(options, k, block_handle, arg, saver);
+    cache_->Release(handle);
+  }
+  return s;
+}
+
+Status TableCache::GetTable(uint64_t file_number, TableHandle* table_handle) {
+  Cache::Handle* handle = NULL;
+  Status s = FindTable(file_number, 0, &handle);
+  if (s.ok()) {
+    Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+    table_handle->table_ = t;
+    table_handle->RegisterCleanup(&UnrefEntry, cache_, handle);
   }
   return s;
 }

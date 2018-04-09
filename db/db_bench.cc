@@ -17,6 +17,10 @@
 #include "util/mutexlock.h"
 #include "util/random.h"
 #include "util/testutil.h"
+#include "leveldb/index.h"
+
+uint64_t WRITE_LATENCY_IN_NS = 1000;
+uint64_t clflush_cnt = 0;
 
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
@@ -48,6 +52,7 @@ static const char* FLAGS_benchmarks =
     "overwrite,"
     "readrandom,"
     "readrandom,"  // Extra run to allow previous compactions to quiesce
+    "rangequery,"
     "readseq,"
     "readreverse,"
     "compact,"
@@ -325,6 +330,8 @@ class Benchmark {
   WriteOptions write_options_;
   int reads_;
   int heap_counter_;
+  int ranges_;
+  int range_size_;
 
   void PrintHeader() {
     const int kKeySize = 16;
@@ -490,6 +497,10 @@ class Benchmark {
         method = &Benchmark::ReadReverse;
       } else if (name == Slice("readrandom")) {
         method = &Benchmark::ReadRandom;
+      } else if (name == Slice("rangequery")) {
+        ranges_ = 10;
+        range_size_ = 10000;
+        method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;
       } else if (name == Slice("seekrandom")) {
@@ -718,6 +729,7 @@ class Benchmark {
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
+    options.index = new leveldb::Index();
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -813,6 +825,28 @@ class Benchmark {
     char msg[100];
     snprintf(msg, sizeof(msg), "(%d of %d found)", found, num_);
     thread->stats.AddMessage(msg);
+  }
+
+  void RangeQuery(ThreadState* thread) {
+    ReadOptions options;
+    std::string value;
+    int64_t bytes = 0;
+    for (int i = 0; i < ranges_; i++) {
+      const int k = abs((int)(thread->rand.Next() % FLAGS_num) - range_size_);
+      const int l = k + range_size_;
+      char begin[100];
+      snprintf(begin, sizeof(begin), "%016d", k);
+      char end[100];
+      snprintf(end, sizeof(end), "%016d", l);
+      Iterator* iter = db_->RangeQuery(options, begin, end);
+      while (iter->Valid()) {
+        bytes += iter->key().size() + iter->value().size();
+        thread->stats.FinishedSingleOp();
+        iter->Next();
+      }
+      delete iter;
+    }
+    thread->stats.AddBytes(bytes);
   }
 
   void ReadMissing(ThreadState* thread) {

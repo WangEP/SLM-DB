@@ -30,20 +30,17 @@ class PersistentSkiplist {
   Node* Tail() { return tail; }
 
  private:
-  static const size_t max_level = 32;
-
-  size_t current_level;
-  size_t current_size;
-
-  const Comparator* comparator;
-
-  Node* head;
-  Node* tail;;
-
   bool Equal(const Slice& a, const Slice& b) const { return (comparator->Compare(a, b) == 0); }
   size_t RandomLevel();
   Node* FindGreaterOrEqual(Slice key);
   Node* MakeNode(Slice key, Slice value, size_t level);
+
+  Node* head;
+  Node* tail;;
+  const Comparator* comparator;
+  static const size_t max_level = 16;
+  size_t current_level;
+  size_t current_size;
 };
 
 struct PersistentSkiplist::Node {
@@ -57,6 +54,8 @@ struct PersistentSkiplist::Node {
       : key(k.data(), k.size()),
         value(v.data(), v.size()),
         level(level) {
+    next.resize(level);
+    prev.reserve(level);
     for (auto i = 0; i < level; i++) {
       next.push_back(NULL);
       prev.push_back(NULL);
