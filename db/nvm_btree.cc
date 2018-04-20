@@ -216,6 +216,48 @@ vector<LeafEntry*> BTree::range(int64_t min, int64_t max) {
     return std::move(ret);
 }
 
+vector<LeafEntry*> BTree::range(int64_t min, size_t n) {
+    vector<lNode*> leaves;
+    size_t cnt = 0;
+    Node *p = root;
+    while (p->type == Node::Internal) {
+        p = (Node*)((iNode*)p)->search(min);
+        if (p == NULL) p == root;
+    }
+    lNode* l = (lNode*)p;
+    leaves.push_back(l);
+    cnt += l->count();
+    while (l->sibling != NULL) {
+        l = (lNode*)l->sibling;
+        cnt += l->count();
+        leaves.push_back(l);
+        if (n + lNode::CARDINALITY < cnt) break;
+    } // To ensure transactional property and efficient memory allocation.
+    vector<LeafEntry*> ret;
+    ret.reserve(leaves.size()*lNode::CARDINALITY);
+    for (int i = 0; i < leaves.size(); i++) {
+        if (i == 0) {
+            for (int j = 0; j < lNode::CARDINALITY; j++) {
+                if ((*leaves[i])[j].ptr != NULL 
+                        && (*leaves[i])[j].key >= min) {
+                    ret.push_back(&(*leaves[i])[j]);
+                }
+            }
+        } else {
+            for (int j = 0; j < lNode::CARDINALITY; j++) {
+                if ((*leaves[i])[j].ptr != NULL) {
+                    ret.push_back(&(*leaves[i])[j]);
+                }
+            }
+        }
+    }
+    std::sort(std::begin(ret), std::end(ret), [](LeafEntry* a, LeafEntry* b){
+                return a->key < b->key;
+            });
+    ret.resize(n);
+    return std::move(ret);
+}
+
 void BTree::remove(int64_t key) {
   Node* p = root, *lSib = NULL;
   iNode* parent = NULL, *grandParent = NULL;

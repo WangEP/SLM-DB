@@ -263,6 +263,7 @@ class BTree {
   void* update(int64_t, void*);
   void remove(int64_t);
   vector<LeafEntry*> range(int64_t, int64_t);
+  vector<LeafEntry*> range(int64_t, size_t);
 
   // Helper
   iNode* findParent(Node*);
