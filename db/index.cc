@@ -14,11 +14,12 @@ Index::Index()
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
-  auto result = tree_.search(Key(key.data(), key.size()));
+  int64_t k = fast_atoi(key.data(), key.size());
+  auto result = tree_.search(k);
   return reinterpret_cast<const IndexMeta *>(result);
 }
 
-void Index::Insert(const Key& key, IndexMeta* meta) {
+void Index::Insert(const int64_t& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
   edit_->AddToRecoveryList(m->file_number);
@@ -31,7 +32,9 @@ void Index::Insert(const Key& key, IndexMeta* meta) {
 }
 
 Iterator* Index::Range(const Slice& begin, const Slice& end, void* ptr) {
-  std::vector<LeafEntry*> entries = tree_.range(Key(begin.data(), begin.size()), Key(end.data(), end.size()));
+  int64_t k1 = fast_atoi(begin.data(), begin.size());
+  int64_t k2 = fast_atoi(end.data(), end.size());
+  std::vector<LeafEntry*> entries = tree_.range(k1, k2);
   Iterator* iter = new IndexIterator(entries, ptr);
   return iter;
 }

@@ -37,7 +37,7 @@ class IndexMeta {
 };
 
 struct KeyAndMeta{
-  Key key;
+  int64_t key;
   IndexMeta* meta;
 };
 
@@ -47,7 +47,7 @@ class Index {
 
   const IndexMeta* Get(const Slice& key);
 
-  void Insert(const Key& key, IndexMeta* meta);
+  void Insert(const int64_t& key, IndexMeta* meta);
 
   Iterator* Range(const Slice& begin, const Slice& end, void* ptr);
 

@@ -6,24 +6,13 @@
 
 using namespace std;
 
-
-ostream& operator<<(ostream& os, Key& _key) {
-  os << _key.arr;
-  return os;
-}
-
-istream& operator>>(istream& is, Key& _key) {
-  is >> _key.arr;
-  return is;
-}
-
 // BTree //
 BTree::BTree() {
   root = new lNode();
   failedSearch = 0;
 }
 
-void* BTree::insert(Key key, void* ptr) {
+void* BTree::insert(int64_t key, void* ptr) {
   Node* node = root, *lSib = nullptr;
   Split* split = nullptr;
   iNodeSearch:
@@ -111,7 +100,7 @@ void* BTree::insert(Key key, void* ptr) {
 #endif
       } else {
 #ifdef MULTITHREAD
-        if (split->original->splitKey != "") {
+        if (split->original->splitKey != -1) {
           parent->unlock();
           goto lSibAgain;
         }
@@ -157,7 +146,7 @@ void* BTree::insert(Key key, void* ptr) {
   return nullptr;
 }
 
-void* BTree::update(Key key, void *ptr) {
+void* BTree::update(int64_t key, void *ptr) {
   Node *p = root;
   while (p->type == Node::Internal) {
     p = ((iNode*) p)->search(key);
@@ -166,7 +155,7 @@ void* BTree::update(Key key, void *ptr) {
   return ((lNode *) p)->update(key, ptr);
 }
 
-void *BTree::search(Key key) {
+void *BTree::search(int64_t key) {
   Node* p = root;
   while (p->type == Node::Internal) {
     p = ((iNode*)p)->search(key);
@@ -180,7 +169,7 @@ void *BTree::search(Key key) {
   return result;
 }
 
-vector<LeafEntry*> BTree::range(Key min, Key max) {
+vector<LeafEntry*> BTree::range(int64_t min, int64_t max) {
     vector<lNode*> leaves;
     Node *p = root;
     while (p->type == Node::Internal) {
@@ -227,7 +216,49 @@ vector<LeafEntry*> BTree::range(Key min, Key max) {
     return std::move(ret);
 }
 
-void BTree::remove(Key key) {
+vector<LeafEntry*> BTree::range(int64_t min, size_t n) {
+  vector<lNode*> leaves;
+  size_t cnt = 0;
+  Node *p = root;
+  while (p->type == Node::Internal) {
+    p = (Node*)((iNode*)p)->search(min);
+    if (p == NULL) p == root;
+  }
+  lNode* l = (lNode*)p;
+  leaves.push_back(l);
+  cnt += l->count();
+  while (l->sibling != NULL) {
+    l = (lNode*)l->sibling;
+    cnt += l->count();
+    leaves.push_back(l);
+    if (n + lNode::CARDINALITY < cnt) break;
+  } // To ensure transactional property and efficient memory allocation.
+  vector<LeafEntry*> ret;
+  ret.reserve(leaves.size()*lNode::CARDINALITY);
+  for (int i = 0; i < leaves.size(); i++) {
+    if (i == 0) {
+      for (int j = 0; j < lNode::CARDINALITY; j++) {
+        if ((*leaves[i])[j].ptr != NULL
+            && (*leaves[i])[j].key >= min) {
+          ret.push_back(&(*leaves[i])[j]);
+        }
+      }
+    } else {
+      for (int j = 0; j < lNode::CARDINALITY; j++) {
+        if ((*leaves[i])[j].ptr != NULL) {
+          ret.push_back(&(*leaves[i])[j]);
+        }
+      }
+    }
+  }
+  std::sort(std::begin(ret), std::end(ret), [](LeafEntry* a, LeafEntry* b){
+    return a->key < b->key;
+  });
+  ret.resize(n);
+  return std::move(ret);
+}
+
+void BTree::remove(int64_t key) {
   Node* p = root, *lSib = nullptr;
   iNode* parent = nullptr;
   iNode::Direction dir = iNode::None;
@@ -485,13 +516,13 @@ void BTree::sanityCheck(Node* node) {
 }
 
 // Node //
-Node::Node(Type _type, Key _splitKey, Node* _sibling) {
+Node::Node(Type _type, int64_t _splitKey, Node* _sibling) {
   type = _type;
   splitKey = _splitKey;
   sibling = _sibling;
 }
 
-Node::Node(Type _type, Key _splitKey) {
+Node::Node(Type _type, int64_t _splitKey) {
   type = _type;
   splitKey = _splitKey;
   sibling = nullptr;
@@ -499,13 +530,13 @@ Node::Node(Type _type, Key _splitKey) {
 
 Node::Node(Type _type, Node* _sibling) {
   type = _type;
-  splitKey = "";
+  splitKey = -1;
   sibling = _sibling;
 }
 
 Node::Node(Type _type) {
   type = _type;
-  splitKey = "";
+  splitKey = -1;
   sibling = nullptr;
 }
 
@@ -530,7 +561,7 @@ void Node::print(stringstream& ss) {
 // Leaf Node //
 lNode::lNode() : Node(Node::Leaf) {
   for (auto &e : entry) {
-    e.key = "";
+    e.key = -1;
     e.ptr = nullptr;
   }
 }
@@ -544,7 +575,7 @@ bool lNode::overflow() {
   return true;
 }
 
-void lNode::insert(Key key, void* ptr) {
+void lNode::insert(int64_t key, void* ptr) {
   int32_t loc;
   for (loc = 0; loc < CARDINALITY; loc++) {
     if (entry[loc].ptr == nullptr) break;
@@ -555,12 +586,12 @@ void lNode::insert(Key key, void* ptr) {
   clflush((char*)&entry[loc], sizeof(LeafEntry));
 }
 
-void lNode::sInsert(int32_t idx, Key key, void* ptr) {
+void lNode::sInsert(int32_t idx, int64_t key, void* ptr) {
   entry[idx].key = key;
   entry[idx].ptr = ptr;
 }
 
-Split* lNode::split(Key key, void* ptr) {
+Split* lNode::split(int64_t key, void* ptr) {
   Split* split = new Split;
   array<LeafEntry, CARDINALITY> temp(entry);
   std::sort(temp.begin(), temp.end(),
@@ -570,7 +601,7 @@ Split* lNode::split(Key key, void* ptr) {
             } );
 
   int32_t mIdx   = CARDINALITY/2;
-  Key median = temp[mIdx].key;
+  int64_t median = temp[mIdx].key;
 
   lNode* left = new lNode();
   lNode* right = new lNode();
@@ -635,7 +666,7 @@ Merge* lNode::merge() {
     lNode* left    = new lNode();
     lNode* right   = new lNode();
     int32_t mIdx   = cnt/2;
-    Key median = temp[mIdx].key;
+    int64_t median = temp[mIdx].key;
 
     copy(temp.begin(), temp.begin()+mIdx, left->entry.begin());
     copy(temp.begin()+mIdx, temp.begin()+cnt, right->entry.begin());
@@ -655,7 +686,7 @@ Merge* lNode::merge() {
   return m;
 }
 
-void lNode::remove(Key key) {
+void lNode::remove(int64_t key) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != nullptr) {
       entry[i].ptr = nullptr;
@@ -665,7 +696,7 @@ void lNode::remove(Key key) {
   }
 }
 
-void* lNode::update(Key key, void *ptr) {
+void* lNode::update(int64_t key, void *ptr) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != nullptr) {
       void *p = entry[i].ptr;
@@ -680,7 +711,7 @@ void* lNode::update(Key key, void *ptr) {
   return nullptr;
 }
 
-void* lNode::search(Key key) {
+void* lNode::search(int64_t key) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != nullptr) {
       return entry[i].ptr;
@@ -744,7 +775,7 @@ iNode::iNode() : Node(Node::Internal) {
   cnt = 0;
   deleteCnt = 0;
   for (auto &e : entry) {
-    e.key = "";
+    e.key = -1;
     e.left = -1;
     e.right = -1;
     e.lPtr = nullptr;
@@ -757,7 +788,7 @@ iNode::iNode(Split* s) : Node(Node::Internal) {
   cnt = 0;
   deleteCnt = 0;
   for (auto &e : entry) {
-    e.key = "";
+    e.key = -1;
     e.left = -1;
     e.right = -1;
     e.lPtr = nullptr;
@@ -772,7 +803,7 @@ bool iNode::overflow() {
   return cnt >= CARDINALITY;
 }
 
-Node* iNode::search(Key key) {
+Node* iNode::search(int64_t key) {
   if (sibling && sibling->splitKey < key) {
     return ((iNode*)sibling)->search(key);
   }
@@ -792,7 +823,7 @@ Node* iNode::search(Key key) {
   }
 }
 
-int32_t iNode::insert(Key key, Node* _left, Node* _right) {
+int32_t iNode::insert(int64_t key, Node* _left, Node* _right) {
   int32_t loc = cnt++;
   clflush((char*)&cnt, sizeof(int32_t));
 
@@ -835,7 +866,7 @@ int32_t iNode::insert(Key key, Node* _left, Node* _right) {
   }
 }
 
-int32_t iNode::sInsert(Key key, Node* _left, Node* _right) {
+int32_t iNode::sInsert(int64_t key, Node* _left, Node* _right) {
   int32_t loc = cnt++;
 
   entry[loc].key = key;
@@ -873,7 +904,7 @@ int32_t iNode::sInsert(Key key, Node* _left, Node* _right) {
   }
 }
 
-Split* iNode::split(Key key, Node* _left, Node* _right) {
+Split* iNode::split(int64_t key, Node* _left, Node* _right) {
   int32_t cnt = 0;
   Node* leftmost = nullptr;
   LeafEntry* sorted = transform(cnt, leftmost);
@@ -885,7 +916,7 @@ Split* iNode::split(Key key, Node* _left, Node* _right) {
 
     int32_t ptrIdx = -1;
     int32_t mIdx   = cnt/2;
-    Key median = sorted[mIdx].key;
+    int64_t median = sorted[mIdx].key;
 
     // defragmentation(left, right, root, median);
     left->balancedInsert(sorted, 0, mIdx-1, ptrIdx, leftmost);
@@ -917,7 +948,7 @@ Split* iNode::split(Key key, Node* _left, Node* _right) {
 }
 
 // Both nodes share same parent entry
-void iNode::remove(Key key, Node* replacement) {
+void iNode::remove(int64_t key, Node* replacement) {
   int32_t cur = root;
   int32_t parent = root;
   iNode::Direction dir= iNode::None; // 0-left, 1-right
@@ -1172,7 +1203,7 @@ Merge* iNode::merge() {
     iNode* left  = new iNode();
     iNode* right = new iNode();
     int32_t mIdx   = cnt/2;
-    Key median = sorted[mIdx].key;
+    int64_t median = sorted[mIdx].key;
 
     left->balancedInsert(sorted, 0, mIdx-1, ptrIdx, leftmost);
     right->balancedInsert(sorted, mIdx+1, cnt-1, ptrIdx, (Node*)sorted[mIdx].ptr);
@@ -1296,7 +1327,7 @@ bool iNode::balancedInsert(LeafEntry* arr, int32_t from, int32_t to, int32_t& pt
   return false;
 }
 
-void iNode::defragmentation(iNode* left, iNode* right, int16_t idx, Key median) {
+void iNode::defragmentation(iNode* left, iNode* right, int16_t idx, int64_t median) {
   if (idx == -1) return;
   if (entry[idx].key < median) left->sInsert(entry[idx].key, entry[idx].lPtr, entry[idx].rPtr);
   else if (entry[idx].key > median) right->sInsert(entry[idx].key, entry[idx].lPtr, entry[idx].rPtr);

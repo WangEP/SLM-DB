@@ -129,7 +129,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->data_block.Add(key, value);
   // add to index queue block meta 
   KeyAndMeta key_meta;
-  key_meta.key = key;
+  key_meta.key = fast_atoi(key.data(), key.size());
   key_meta.meta = r->indexmeta;
   key_meta.meta->Ref();
   r->index_queue.push_back(key_meta);
