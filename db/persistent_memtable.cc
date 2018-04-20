@@ -30,7 +30,7 @@ void PersistentMemtable::Add(const Slice& key, const Slice& value) {
 
 bool PersistentMemtable::Get(const Slice& key, std::string* value) {
   auto node = table_->Find(key);
-  if (node != NULL) {
+  if (node != nullptr) {
     value->assign(node->value);
     return true;
   }

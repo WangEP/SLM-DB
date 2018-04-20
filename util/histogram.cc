@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include <math.h>
-#include <stdio.h>
+#include <cmath>
+#include <cstdio>
 #include "port/port.h"
 #include "util/histogram.h"
 
@@ -36,8 +36,8 @@ void Histogram::Clear() {
   num_ = 0;
   sum_ = 0;
   sum_squares_ = 0;
-  for (int i = 0; i < kNumBuckets; i++) {
-    buckets_[i] = 0;
+  for (double& bucket : buckets_) {
+    bucket = 0;
   }
 }
 
@@ -129,7 +129,7 @@ std::string Histogram::ToString() const {
     r.append(buf);
 
     // Add hash marks based on percentage; 20 marks for 100%.
-    int marks = static_cast<int>(20*(buckets_[b] / num_) + 0.5);
+    auto marks = static_cast<int>(20*(buckets_[b] / num_) + 0.5);
     r.append(marks, '#');
     r.push_back('\n');
   }

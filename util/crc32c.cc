@@ -6,8 +6,8 @@
 
 #include "util/crc32c.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #include "port/port.h"
 #include "util/coding.h"
@@ -243,7 +243,7 @@ const uint32_t kStrideExtensionTable3[256] = {
     0x9c221d09, 0x6e2e10f7, 0x7dd67004, 0x8fda7dfa};
 
 // CRCs are pre- and post- conditioned by xoring with all ones.
-static constexpr const uint32_t kCRC32Xor = static_cast<uint32_t>(0xffffffffU);
+constexpr const uint32_t kCRC32Xor = static_cast<uint32_t>(0xffffffffU);
 
 // Reads a little-endian 32-bit integer from a 32-bit-aligned buffer.
 inline uint32_t ReadUint32LE(const uint8_t* buffer) {
@@ -293,7 +293,7 @@ uint32_t Extend(uint32_t crc, const char* buf, size_t size) {
 // Process one of the 4 strides of 4-byte data.
 #define STEP4(s)                                                               \
   do {                                                                         \
-    crc##s = ReadUint32LE(p + s * 4) ^ kStrideExtensionTable3[crc##s & 0xff] ^ \
+    crc##s = ReadUint32LE(p + (s) * 4) ^ kStrideExtensionTable3[crc##s & 0xff] ^ \
              kStrideExtensionTable2[(crc##s >> 8) & 0xff] ^                    \
              kStrideExtensionTable1[(crc##s >> 16) & 0xff] ^                   \
              kStrideExtensionTable0[crc##s >> 24];                             \

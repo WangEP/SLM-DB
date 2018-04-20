@@ -5,7 +5,7 @@
 #ifndef STORAGE_LEVELDB_DB_LOG_WRITER_H_
 #define STORAGE_LEVELDB_DB_LOG_WRITER_H_
 
-#include <stdint.h>
+#include <cstdint>
 #include "db/log_format.h"
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
@@ -28,7 +28,7 @@ class Writer {
   // "*dest" must remain live while this Writer is in use.
   Writer(WritableFile* dest, uint64_t dest_length);
 
-  virtual ~Writer();
+  virtual ~Writer() = default;
 
   virtual Status AddRecord(const Slice& slice);
 

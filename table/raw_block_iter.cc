@@ -8,14 +8,13 @@ RawBlockIterator::RawBlockIterator(SequentialFile* file): stream_(file) {
   while (!stream_.eof()) {
     Slice key = stream_.Get();
     Slice value = stream_.Get();
-    vector_.push_back({key, value});
+    vector_.emplace_back(key, value);
   }
   iterator_ = vector_.begin();
   fnumber = 0;
 }
 
-RawBlockIterator::~RawBlockIterator() {
-}
+RawBlockIterator::~RawBlockIterator() = default;
 
 bool RawBlockIterator::Valid() const {
   return count < vector_.size();

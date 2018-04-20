@@ -1,5 +1,7 @@
 #ifndef NVB
 #define NVB
+#include <numa.h>
+#include <cstring>
 #include <cassert>
 #include <iostream>
 #include <array>
@@ -19,18 +21,87 @@
 // #define MULTITHREAD
 // #define EXTRA
 
+bool is_numa = numa_max_node() > 0;
+
 using namespace std;
+
+struct Key {
+  static constexpr size_t kKeySize = 64;
+  char arr[kKeySize];
+  Key() = default;
+  Key(const char* _key) {
+    auto len = strlen(_key);
+    strncpy(arr, _key, len < kKeySize? len : kKeySize);
+    arr[kKeySize-1] = '\0';
+  }
+  Key(const char* _key, size_t len) {
+    strncpy(arr, _key, len < kKeySize? len : kKeySize);
+    arr[kKeySize-1] = '\0';
+  }
+  Key& operator=(const char* _key) {
+    auto len = strlen(_key);
+    strncpy(arr, _key, len < kKeySize? len : kKeySize);
+    arr[kKeySize-1] = '\0';
+  }
+  Key& operator=(const leveldb::Slice& _key) {
+    auto len = _key.size();
+    strncpy(arr, _key.data(), len < kKeySize? len : kKeySize);
+    arr[kKeySize-1] = '\0';
+  }
+  Key& operator=(const string& _key) {
+    auto len = _key.size();
+    strncpy(arr, _key.data(), len < kKeySize? len : kKeySize);
+    arr[kKeySize-1] = '\0';
+  }
+  char operator[](size_t i) {
+    assert(i < kKeySize);
+    return arr[i];
+  }
+  bool operator<(const Key& _key) {
+    return strcmp(arr, _key.arr) < 0;
+  }
+  bool operator<=(const Key& _key) {
+    return strcmp(arr, _key.arr) <= 0;
+  }
+  bool operator==(const Key& _key) {
+    return strcmp(arr, _key.arr) == 0;
+  }
+  bool operator!=(const Key& _key) {
+    return strcmp(arr, _key.arr) != 0;
+  }
+  bool operator>(const Key& _key) {
+    return strcmp(arr, _key.arr) > 0;
+  }
+  bool operator>=(const Key& _key) {
+    return strcmp(arr, _key.arr) >= 0;
+  }
+  bool operator<(const char* _key) {
+    return strcmp(arr, _key) < 0;
+  }
+  bool operator==(const char* _key) {
+    return strcmp(arr, _key) == 0;
+  }
+  bool operator!=(const char* _key) {
+    return strcmp(arr, _key) != 0;
+  }
+  bool operator>(const char* _key) {
+    return strcmp(arr, _key) > 0;
+  }
+};
+
+ostream& operator<<(ostream&, Key&);
+istream& operator>>(istream&, Key&);
 
 class BTree;
 class Node;
 
 struct LeafEntry {
-  int64_t key;
+  Key key;
   void*   ptr;
 };
 
 struct InternalEntry {
-  int64_t key;
+  Key key;
   int32_t left;
   int32_t right;
   Node* lPtr;
@@ -41,18 +112,25 @@ class Node {
  public:
   enum Type : int32_t { Leaf = 0, Internal = 1 };
   Node(Type);
-  Node(Type, int64_t);
+  Node(Type, Key);
   Node(Type, Node*);
-  Node(Type, int64_t, Node*);
+  Node(Type, Key, Node*);
   virtual ~Node();
 
   void *operator new(size_t size) {
-    void *ret;
-    posix_memalign(&ret, 64, size);
-    return ret;
+    if (is_numa) {
+      return numa_alloc_onnode(size, 1);
+    } else {
+      void* ret;
+      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
+    }
   }
   void operator delete(void* buffer) {
-    free(buffer);
+    if (is_numa) {
+      numa_free(buffer, sizeof(Node));
+    } else {
+      free(buffer);
+    }
   }
 
   void print();
@@ -69,7 +147,7 @@ class Node {
 #endif
 
  private:
-  int64_t splitKey;
+  Key splitKey;
   Node* sibling;
   Type type;
 #ifdef MULTITHREAD
@@ -85,7 +163,7 @@ struct Split {
   Node* original;
   Node* left;
   Node* right;
-  int64_t splitKey;
+  Key splitKey;
 
   ~Split(){
     delete original;
@@ -109,34 +187,43 @@ class lNode : public Node {
 
   // Core
   lNode();
-  ~lNode();
-  void insert(int64_t, void*);
-  void sInsert(int32_t, int64_t, void*);
-  Split* split(int64_t, void*);
-  Merge* merge(void);
-  void remove(int64_t);
-  void* search(int64_t);
-  void* update(int64_t, void*);
+  ~lNode() override;
+  void insert(Key, void*);
+  void sInsert(int32_t, Key, void*);
+  Split* split(Key, void*);
+  Merge* merge();
+  void remove(Key);
+  void* search(Key);
+  void* update(Key, void*);
 
   void *operator new(size_t size) {
-    void *ret;
-    posix_memalign(&ret, 64, size);
-    return ret;
+    if (is_numa) {
+      return numa_alloc_onnode(size, 1);
+    } else {
+      void* ret;
+      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
+    }
   }
+
   void operator delete (void* buffer) {
-    free(buffer);
+    if (is_numa) {
+      numa_free(buffer, sizeof(lNode));
+    } else {
+      free(buffer);
+    }
   }
+
   inline LeafEntry& operator[](uint32_t idx) {
       return entry[idx];
   }
+  
   // Helper
-  bool overflow(void);
-  int32_t count(void);
+  bool overflow();
+  int32_t count();
 
   // Debug
   int print();
   int print(stringstream&);
-  void copy_debug(vector<int64_t> &);
   void sort();
 
  private:
@@ -153,45 +240,48 @@ class iNode : public Node {
   iNode();
   iNode(Split*);
   ~iNode();
-  bool overflow(void);
-  int32_t insert(int64_t, Node*, Node*);
-  int32_t sInsert(int64_t, Node*, Node*);
-  Split* split(int64_t, Node*, Node*);
-  void remove(int64_t, Node*);
+  bool overflow();
+  int32_t insert(Key, Node*, Node*);
+  int32_t sInsert(Key, Node*, Node*);
+  Split* split(Key, Node*, Node*);
+  void remove(Key, Node*);
   void remove(int32_t, int32_t, Node*, Node*);
   void update(int32_t, int32_t, Node*, Node*, Node*);
-  Merge* merge(void);
-  Node* search(int64_t);
+  Merge* merge();
+  Node* search(Key);
 
   void *operator new(size_t size) {
-    void *ret;
-    posix_memalign(&ret, 64, size);
-    return ret;
+    if (is_numa) {
+      return numa_alloc_onnode(size, 1);
+    } else {
+      void* ret;
+      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
+    }
   }
+
   // Helper
-  Node* getLeftmostPtr(void);
+  Node* getLeftmostPtr();
   Node* getLeftmostPtr(int32_t);
-  Node* getRightmostPtr(void);
+  Node* getRightmostPtr();
   Node* getRightmostPtr(int32_t);
   LeafEntry* transform(int32_t&, Node*&);
   void transform(LeafEntry*, int32_t&, int32_t&, Node*&, bool);
   bool balancedInsert(LeafEntry*, int32_t, int32_t, int32_t&, Node*);
-  void defragmentation(iNode* l, iNode* r, int16_t, int64_t);
+  void defragmentation(iNode* l, iNode* r, int16_t, Key);
   void block(int32_t, Direction);
   Node* getLeftSibling(int32_t, iNode::Direction);
   int32_t getParent(int32_t);
   int32_t getParent(Node*, Direction&);
   int32_t getCommonAncestor(int32_t);
-  int32_t count(void);
-  void rebalance(void);
+  int32_t count();
+  void rebalance();
 
   // Debug
-  void print(void);
+  void print();
   void print(int32_t loc);
   void print(stringstream&);
   void print(int32_t loc, stringstream&);
-  void copy_debug(vector<int64_t> &, queue<Node*> &, int32_t pos);
-  int32_t getCnt(void) {
+  int32_t getCnt() {
     return cnt;
   }
 
@@ -211,7 +301,7 @@ class iNode : public Node {
     }
     return getLeftSibling(cur, iNode::Right);
   }
-  int64_t test_getCommonAncestor() {
+  Key test_getCommonAncestor() {
     int32_t cur = root;
     cur = entry[cur].right;
     cur = entry[cur].left;
@@ -224,7 +314,7 @@ class iNode : public Node {
     block(cur, iNode::Right);
     return entry[cur].rPtr;
   }
-  int64_t test_getParent() {
+  Key test_getParent() {
     int32_t cur = root;
     cur = entry[cur].left;
     cur = entry[cur].right;
@@ -258,11 +348,11 @@ class BTree {
 
  public:
   BTree();
-  void* search(int64_t);
-  void* insert(int64_t, void*);
-  void* update(int64_t, void*);
-  void remove(int64_t);
-  vector<LeafEntry*> range(int64_t, int64_t);
+  void* search(Key);
+  void* insert(Key, void*);
+  void* update(Key, void*);
+  void remove(Key);
+  vector<LeafEntry*> range(Key, Key);
 
   // Helper
   iNode* findParent(Node*);
@@ -272,7 +362,6 @@ class BTree {
   }
 
   // DEBUG
-  void print();
   void sanityCheck();
   void sanityCheck(Node*);
 

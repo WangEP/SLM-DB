@@ -9,7 +9,7 @@ namespace log {
 
 class MockWriter : public Writer {
  public:
-  MockWriter(WritableFile *dest) : Writer(dest) {}
+  explicit MockWriter(WritableFile *dest) : Writer(dest) {}
 
   MockWriter(WritableFile *file, uint64_t size) : Writer(file, size) {
 

@@ -5,7 +5,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_OPTIONS_H_
 #define STORAGE_LEVELDB_INCLUDE_OPTIONS_H_
 
-#include <stddef.h>
+#include <cstddef>
 #include "leveldb/export.h"
 
 namespace leveldb {
@@ -85,7 +85,9 @@ struct LEVELDB_EXPORT Options {
   size_t write_buffer_size;
 
   size_t max_buffer_size;
-  size_t compaction_threshold;
+  int merge_threshold;
+  int compaction_max_size;
+  int forced_compaction_size;
 
   // Number of open files that can be used by the DB.  You may need to
   // increase this if your database has a large working set (budget
@@ -192,7 +194,7 @@ struct LEVELDB_EXPORT ReadOptions {
   ReadOptions()
       : verify_checksums(false),
         fill_cache(true),
-        snapshot(NULL) {
+        snapshot(nullptr) {
   }
 };
 

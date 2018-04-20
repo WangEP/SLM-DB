@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 2.8)
 
 project(PMDB C CXX)
 #set(CMAKE_DEBUG_POSTFIX "d")
@@ -6,6 +6,8 @@ project(PMDB C CXX)
 set(SNAPPY_LIBRARY "")
 
 string(REGEX MATCH "clang" CLANG ${CMAKE_CXX_COMPILER})
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     find_library(Pthread_LIBRARY pthread)
@@ -17,6 +19,11 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     set(Realtime_LIBRARY "")
     set(Stdcpp_LIBRARY "")
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
+
+find_package(Numa REQUIRED)
+include_directories(${NUMA_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        include)
 
 include_directories(${Boost_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -33,7 +40,7 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++14
+            -std=c++11
             -O2
             -DNDEBUG
     )
@@ -163,8 +170,7 @@ set(LEVEL_DB_FILES
         db/version_control.cc
         db/version_control.h
         db/zero_level_version_edit.cc
-        db/zero_level_version_edit.h
-        db/index_based_compaction.cc db/index_based_compaction.h)
+        db/zero_level_version_edit.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -195,6 +201,7 @@ target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
+        ${NUMA_LIBRARY}
         )
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
@@ -222,3 +229,6 @@ target_link_libraries(db_bench PUBLIC leveldb)
 
 add_executable(range_check bench/range_check.cc)
 target_link_libraries(range_check PUBLIC leveldb)
+
+add_executable(nvm_btree_test db/nvm_btree_test.cc)
+target_link_libraries(nvm_btree_test PUBLIC leveldb)

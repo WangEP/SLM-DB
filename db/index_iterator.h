@@ -36,7 +36,7 @@ class IndexIterator : public Iterator {
   VersionControl* vset_;
   TableHandle* table_handle_;
   Iterator* block_iterator_;
-  int it = 0;
+//  int it = 0;
 
   void IndexChange();
 };

@@ -687,7 +687,9 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
 }
 
 void PosixEnv::BGThread() {
-  while (true) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+  for (;;) {
     // Wait until there is an item that is ready to run
     PthreadCall("lock", pthread_mutex_lock(&mu_));
     while (queue_.empty()) {
@@ -701,6 +703,7 @@ void PosixEnv::BGThread() {
     PthreadCall("unlock", pthread_mutex_unlock(&mu_));
     (*function)(arg);
   }
+#pragma clang diagnostic pop
 }
 
 namespace {

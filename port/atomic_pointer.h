@@ -18,7 +18,7 @@
 #ifndef PORT_ATOMIC_POINTER_H_
 #define PORT_ATOMIC_POINTER_H_
 
-#include <stdint.h>
+#include <cstdint>
 #ifdef LEVELDB_ATOMIC_PRESENT
 #include <atomic>
 #endif
@@ -127,7 +127,7 @@ class AtomicPointer {
  private:
   void* rep_;
  public:
-  AtomicPointer() { }
+  AtomicPointer() = default;
   explicit AtomicPointer(void* p) : rep_(p) {}
   inline void* NoBarrier_Load() const { return rep_; }
   inline void NoBarrier_Store(void* v) { rep_ = v; }

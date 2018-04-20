@@ -13,8 +13,8 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_ENV_H_
 #define STORAGE_LEVELDB_INCLUDE_ENV_H_
 
-#include <stdarg.h>
-#include <stdint.h>
+#include <cstdarg>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include "leveldb/export.h"
@@ -31,7 +31,7 @@ class WritableFile;
 
 class LEVELDB_EXPORT Env {
  public:
-  Env() { }
+  Env() = default;
   virtual ~Env();
 
   // Return a default environment suitable for the current operating
@@ -172,7 +172,7 @@ class LEVELDB_EXPORT Env {
 // A file abstraction for reading sequentially through a file
 class LEVELDB_EXPORT SequentialFile {
  public:
-  SequentialFile() { }
+  SequentialFile() = default;
   virtual ~SequentialFile();
 
   // Read up to "n" bytes from the file.  "scratch[0..n-1]" may be
@@ -203,7 +203,7 @@ class LEVELDB_EXPORT SequentialFile {
 // A file abstraction for randomly reading the contents of a file.
 class LEVELDB_EXPORT RandomAccessFile {
  public:
-  RandomAccessFile() { }
+  RandomAccessFile() = default;
   virtual ~RandomAccessFile();
 
   // Read up to "n" bytes from the file starting at "offset".
@@ -229,7 +229,7 @@ class LEVELDB_EXPORT RandomAccessFile {
 // at a time to the file.
 class LEVELDB_EXPORT WritableFile {
  public:
-  WritableFile() { }
+  WritableFile() = default;
   virtual ~WritableFile();
 
   virtual Status Append(const Slice& data) = 0;
@@ -246,7 +246,7 @@ class LEVELDB_EXPORT WritableFile {
 // An interface for writing log messages.
 class LEVELDB_EXPORT Logger {
  public:
-  Logger() { }
+  Logger() = default;
   virtual ~Logger();
 
   // Write an entry to the log file with the specified format.
@@ -262,7 +262,7 @@ class LEVELDB_EXPORT Logger {
 // Identifies a locked file.
 class LEVELDB_EXPORT FileLock {
  public:
-  FileLock() { }
+  FileLock() = default;
   virtual ~FileLock();
  private:
   // No copying allowed

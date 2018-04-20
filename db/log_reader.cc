@@ -4,16 +4,13 @@
 
 #include "db/log_reader.h"
 
-#include <stdio.h>
+#include <cstdio>
 #include "leveldb/env.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
 
 namespace leveldb {
 namespace log {
-
-Reader::Reporter::~Reporter() {
-}
 
 Reader::Reader(SequentialFile* file, Reporter* reporter, bool checksum,
                uint64_t initial_offset)
@@ -185,7 +182,7 @@ void Reader::ReportCorruption(uint64_t bytes, const char* reason) {
 }
 
 void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
-  if (reporter_ != NULL &&
+  if (reporter_ != nullptr &&
       end_of_buffer_offset_ - buffer_.size() - bytes >= initial_offset_) {
     reporter_->Corruption(static_cast<size_t>(bytes), reason);
   }

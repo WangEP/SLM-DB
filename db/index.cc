@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include "util/coding.h"
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
@@ -14,28 +14,24 @@ Index::Index()
 }
 
 const IndexMeta* Index::Get(const Slice& key) {
-  auto result = tree_.search(fast_atoi(key.data(), key.size()));
+  auto result = tree_.search(Key(key.data(), key.size()));
   return reinterpret_cast<const IndexMeta *>(result);
 }
 
-void Index::Insert(const uint32_t& key, IndexMeta* meta, ZeroLevelVersionEdit* edit) {
+void Index::Insert(const Key& key, IndexMeta* meta) {
   IndexMeta* m = meta;
   clflush((char *) m, sizeof(IndexMeta));
-  clflush((char *) &key, sizeof(uint32_t));
+  edit_->AddToRecoveryList(m->file_number);
   void* ptr = tree_.insert(key, m);
-  if (ptr != NULL) {
-    m = reinterpret_cast<IndexMeta*>(ptr);
-    edit->DecreaseCount(m->file_number);
-    m->Unref();
+  if (ptr != nullptr) {
+    IndexMeta* old_m = reinterpret_cast<IndexMeta*>(ptr);
+    edit_->DecreaseCount(old_m->file_number);
+    old_m->Unref();
   }
 }
 
-void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta) {
-  tree_.update(key, meta);
-}
-
-Iterator* Index::Range(const uint32_t& begin, const uint32_t& end, void* ptr) {
-  std::vector<LeafEntry*> entries = tree_.range(begin, end);
+Iterator* Index::Range(const Slice& begin, const Slice& end, void* ptr) {
+  std::vector<LeafEntry*> entries = tree_.range(Key(begin.data(), begin.size()), Key(end.data(), end.size()));
   Iterator* iter = new IndexIterator(entries, ptr);
   return iter;
 }
@@ -44,7 +40,7 @@ void Index::AsyncInsert(const KeyAndMeta& key_and_meta) {
   mutex_.Lock();
   if (!bgstarted_) {
     bgstarted_ = true;
-    port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));
+    port::PthreadCall("create thread", pthread_create(&thread_, nullptr, &Index::ThreadWrapper, this));
   }
   if (queue_.empty()) {
     condvar_.Signal();
@@ -61,15 +57,16 @@ void Index::Runner() {
     for (;queue_.empty();) {
       condvar_.Wait();
     }
-    assert(queue_.size() > 0);
+    edit_->AllocateRecoveryList(queue_.size());
+    assert(!queue_.empty());
     for (;!queue_.empty();) {
       auto key = queue_.front().key;
       auto value = queue_.front().meta;
-      auto edit = queue_.front().edit;
       queue_.pop_front();
-      Insert(key, value, edit);
+      Insert(key, value);
     }
-    assert(queue_.size() == 0);
+    edit_->Unref();
+    assert(queue_.empty());
     mutex_.Unlock();
   }
 #pragma clang diagnostic pop
@@ -77,15 +74,16 @@ void Index::Runner() {
 
 void* Index::ThreadWrapper(void* index) {
   reinterpret_cast<Index*>(index)->Runner();
-  return NULL;
+  return nullptr;
 }
-void Index::AddQueue(std::deque<KeyAndMeta>& queue) {
+void Index::AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit) {
   mutex_.Lock();
-  assert(queue_.size() == 0);
+  assert(queue_.empty());
   queue_.swap(queue);
+  edit_ = edit;
   if (!bgstarted_) {
     bgstarted_ = true;
-    port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));
+    port::PthreadCall("create thread", pthread_create(&thread_, nullptr, &Index::ThreadWrapper, this));
   }
   condvar_.Signal();
   mutex_.Unlock();

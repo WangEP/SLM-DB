@@ -41,7 +41,7 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
 
   Index* index = vcontrol_->options()->index;
   const IndexMeta* index_meta = index->Get(user_key);
-  if (index_meta != NULL) {
+  if (index_meta != nullptr) {
     BlockHandle block_handle = index_meta->handle;
 
     Saver saver;
@@ -49,7 +49,8 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
     saver.ucmp = ucmp;
     saver.user_key = user_key;
     saver.value = val;
-    s = vcontrol_->cache()->Get2(options, index_meta->file_number, block_handle,
+    uint64_t fsize = GetFileSize(index_meta->file_number);
+    s = vcontrol_->cache()->Get2(options, index_meta->file_number, fsize, block_handle,
                                  ikey, &saver, SaveValue);
     if (!s.ok()) {
       return s;
@@ -76,7 +77,7 @@ void ZeroLevelVersion::Ref() {
 }
 
 void ZeroLevelVersion::Unref() {
-  assert(this != vcontrol_->next_version());
+//  assert(this != vcontrol_->next_version());
   assert(refs_ >= 1);
   --refs_;
   if (refs_ == 0) {
@@ -97,28 +98,21 @@ std::string ZeroLevelVersion::DebugString() const {
     r.append(iter.second->largest.DebugString());
     r.append("]\n");
   }
-  return std::__cxx11::string();
+  return r;
 }
 
 ZeroLevelVersion::~ZeroLevelVersion() {
   for (auto pair : files_) {
-    FileMetaData* f = pair.second;
-    assert(f->refs > 0);
-    f->refs--;
-    if (f->refs <= 0) {
-      delete f;
-    }
+    auto f = pair.second;
   }
 }
 
-void ZeroLevelVersion::AddFile(FileMetaData* f) {
-  f->refs++;
+void ZeroLevelVersion::AddFile(std::shared_ptr<FileMetaData> f) {
   files_.insert({f->number, f});
 }
 
-void ZeroLevelVersion::AddCompactionFile(FileMetaData* f) {
-  f->refs++;
-  to_compact_.push_back(f);
+void ZeroLevelVersion::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
+  merge_candidates_.insert({f->number, f});
 }
 
 } // namespace leveldb

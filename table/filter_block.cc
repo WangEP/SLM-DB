@@ -40,8 +40,8 @@ Slice FilterBlockBuilder::Finish() {
 
   // Append array of per-filter offsets
   const uint32_t array_offset = result_.size();
-  for (size_t i = 0; i < filter_offsets_.size(); i++) {
-    PutFixed32(&result_, filter_offsets_[i]);
+  for (unsigned int filter_offset : filter_offsets_) {
+    PutFixed32(&result_, filter_offset);
   }
 
   PutFixed32(&result_, array_offset);
@@ -78,8 +78,8 @@ void FilterBlockBuilder::GenerateFilter() {
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
     : policy_(policy),
-      data_(NULL),
-      offset_(NULL),
+      data_(nullptr),
+      offset_(nullptr),
       num_(0),
       base_lg_(0) {
   size_t n = contents.size();

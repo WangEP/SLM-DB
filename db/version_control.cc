@@ -1,3 +1,4 @@
+#include <util/random.h>
 #include "version_control.h"
 #include "filename.h"
 #include "log_reader.h"
@@ -6,10 +7,12 @@
 namespace leveldb {
 
 
+static Random generator(0);
+
 // Builder class
 
 class VersionControl::Builder {
-  std::vector<FileMetaData*> added_files_;
+  std::vector<std::shared_ptr<FileMetaData>> added_files_;
   std::set<uint64_t> deleted_files_;
   std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
   VersionControl* vcontrol_;
@@ -22,50 +25,65 @@ class VersionControl::Builder {
   }
 
   ~Builder() {
-    for (auto iter : added_files_) {
-      FileMetaData* f = iter;
-      f->refs--;
-      if (f->refs <= 0) {
-        delete f;
-      }
-    }
+    base_->Unref();
   }
 
   void Apply(ZeroLevelVersionEdit* edit) {
-    for (auto iter : edit->GetDeletedFiles()) {
+    for (auto iter : edit->deleted_files_) {
       deleted_files_.insert(iter);
     }
-    for (auto iter : edit->GetDeadKeyCounter()) {
+    for (auto iter : edit->dead_key_counter_) {
       dead_key_counter_.insert({iter.first, iter.second});
     }
-    for (auto iter : edit->GetNewFiles()) {
-      FileMetaData* f = new FileMetaData(iter);
-      f->refs = 1;
-      f->allowed_seeks = (f->file_size / 16384);
-      if (f->allowed_seeks < 100) f->allowed_seeks = 100;
+    for (const auto& iter : edit->new_files_) {
+      std::shared_ptr<FileMetaData> f = std::make_shared<FileMetaData>();
+      f->number = iter.number;
+      f->file_size = iter.file_size;
+      f->total = iter.total;
+      f->alive = iter.alive;
+      f->smallest = iter.smallest;
+      f->largest = iter.largest;
       deleted_files_.erase(f->number);
       added_files_.push_back(f);
     }
   }
 
   void SaveTo(ZeroLevelVersion* v, int threshold) {
-    for (auto iter : base_->GetFiles()) {
-      FileMetaData* f = iter.second;
-      uint64_t dead = 0;
-      try {
-        dead = dead_key_counter_.at(f->number);
-      } catch (std::exception& e) {}
-      f->alive -= dead;
-      if (f->total/f->alive > threshold) { // move to compaction list
-        v->AddCompactionFile(f);
-      } else if (deleted_files_.count(iter.first) <= 0) { // do not add if file got deleted
-        v->AddFile(f);
+    for (auto iter : base_->files_) {
+      assert(iter.first == iter.second->number);
+      auto f = iter.second;
+      if (deleted_files_.count(iter.first) <= 0) { // do not add if got deleted
+        uint64_t dead = 0;
+        try {
+          dead = dead_key_counter_.at(f->number);
+        } catch (std::exception& e) { }
+        if (f->alive > dead) {
+          f->alive -= dead;
+          if (100 * f->alive / f->total <= threshold) { // move to compaction list
+            v->AddCompactionFile(f);
+            vcontrol_->new_merge_candidates_ = true;
+          }
+        }
       }
-      f->refs--;
     }
-    for (auto iter : added_files_) {
-      assert(dead_key_counter_.find(iter->number) == dead_key_counter_.end());
-      v->AddFile(iter);
+    for (auto iter : base_->merge_candidates_) {
+      assert(iter.first == iter.second->number);
+      auto f = iter.second;
+      if (deleted_files_.count(iter.first) <= 0) { // do not add if got deleted
+        uint64_t dead = 0;
+        try {
+          dead = dead_key_counter_.at(f->number);
+        } catch (std::exception& e) { }
+        if (f->alive > dead) {
+          f->alive -= dead;
+          v->AddCompactionFile(f);
+          vcontrol_->new_merge_candidates_ = true;
+        }
+      }
+    }
+    for (const auto& f : added_files_) {
+      assert(dead_key_counter_.count(f->number) <= 0);
+      v->AddFile(f);
     }
   }
 
@@ -74,7 +92,7 @@ class VersionControl::Builder {
 // Compaction class
 
 ZeroLevelCompaction::~ZeroLevelCompaction() {
-  if (input_version_ != NULL) {
+  if (input_version_ != nullptr) {
     input_version_->Unref();
   }
 }
@@ -87,9 +105,9 @@ void ZeroLevelCompaction::AddInputDeletions(ZeroLevelVersionEdit* edit) {
 
 
 void ZeroLevelCompaction::ReleaseInputs() {
-  if (input_version_ != NULL) {
+  if (input_version_ != nullptr) {
     input_version_->Unref();
-    input_version_ = NULL;
+    input_version_ = nullptr;
   }
 }
 
@@ -112,23 +130,24 @@ VersionControl::VersionControl(const std::string& dbname,
       dbname_(dbname),
       options_(options),
       table_cache_(table_cache),
-      icmp_(cmp),
+      icmp_(*cmp),
       next_file_number_(2),
       manifest_file_number_(0),
       last_sequence_(0),
       log_number_(0),
       prev_log_number_(0),
-      descriptor_file_(NULL),
-      descriptor_log_(NULL),
-      next_(NULL),
-      current_(NULL) {
+      compaction_pointer_(0),
+      new_merge_candidates_(false),
+      descriptor_file_(nullptr),
+      descriptor_log_(nullptr),
+      current_(nullptr) {
   AppendVersion(new ZeroLevelVersion(this));
 }
 
 void VersionControl::AppendVersion(ZeroLevelVersion* v) {
   assert(v->refs_ == 0);
   assert(v != current_);
-  if (current_ != NULL) {
+  if (current_ != nullptr) {
     current_->Unref();
   }
   current_ = v;
@@ -184,11 +203,11 @@ Status VersionControl::Recover(bool* save_manifest) {
       ZeroLevelVersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
-        if (edit.HasCompartorName() &&
+        if (edit.HasComparatorName() &&
             edit.GetComparatorName() != icmp_.user_comparator()->Name()) {
           s = Status::InvalidArgument(
-              edit.GetComparatorName() + " does not match existing comparator ",
-              icmp_.user_comparator()->Name());
+              {edit.GetComparatorName() + " does not match existing comparator "},
+              {icmp_.user_comparator()->Name()});
         }
       }
 
@@ -219,7 +238,7 @@ Status VersionControl::Recover(bool* save_manifest) {
   }
 
   delete file;
-  file = NULL;
+  file = nullptr;
 
   if (s.ok()) {
     if (!have_next_file) {
@@ -240,8 +259,7 @@ Status VersionControl::Recover(bool* save_manifest) {
 
   if (s.ok()) {
     ZeroLevelVersion* v = new ZeroLevelVersion(this);
-    builder.SaveTo(v, options_->compaction_threshold);
-    Finalize(v);
+    builder.SaveTo(v, options_->merge_threshold);
     AppendVersion(v);
     manifest_file_number_ = next_file;
     next_file_number_ = next_file + 1;
@@ -279,17 +297,17 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   edit->SetLastSequence(last_sequence_);
 
   ZeroLevelVersion* v = new ZeroLevelVersion(this);
+  edit->Wait();
   {
     Builder builder(this, current_);
     builder.Apply(edit);
-    builder.SaveTo(v, options_->compaction_threshold);
+    builder.SaveTo(v, options_->merge_threshold);
   }
-  Finalize(v);
 
   std::string new_manifest_file;
   Status s;
-  if (descriptor_log_ == NULL) {
-    assert(descriptor_file_ == NULL);
+  if (descriptor_log_ == nullptr) {
+    assert(descriptor_file_ == nullptr);
     new_manifest_file = DescriptorFileName(dbname_, manifest_file_number_);
     edit->SetNextFile(next_file_number_);
     s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
@@ -328,8 +346,8 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
     if (!new_manifest_file.empty()) {
       delete descriptor_log_;
       delete descriptor_file_;
-      descriptor_log_ = NULL;
-      descriptor_file_ = NULL;
+      descriptor_log_ = nullptr;
+      descriptor_file_ = nullptr;
       env_->DeleteFile(new_manifest_file);
     }
   }
@@ -338,17 +356,73 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
 
 ZeroLevelCompaction* VersionControl::PickCompaction() {
   // get compaction and return
-  ZeroLevelCompaction* c;
+  if (current_->merge_candidates_.size() <= 1) return nullptr;
+  Log(options_->info_log, "Picking compaction");
+  srand(time(nullptr));
+  ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
+  auto rand_it = current_->merge_candidates_.begin();
+  int rand_index = std::rand() % current_->merge_candidates_.size();
+  while (--rand_index > 0) rand_it++;
+  auto candidate1 = rand_it->second;
+  assert(candidate1 != nullptr);
+  assert(candidate1->number >= 2);
+  assert(candidate1->number < next_file_number_);
+  Slice begin = candidate1->smallest.user_key();
+  Slice end = candidate1->largest.user_key();
+  c->AddInput(candidate1);
+  for (auto iter : current_->merge_candidates_) {
+    if (c->size() > options_->compaction_max_size) {
+      break;
+    }
+    if (iter.first != rand_it->first) {
+      auto f = iter.second;
+      const Slice file_start = f->smallest.user_key();
+      const Slice file_end = f->largest.user_key();
+      if (user_comparator()->Compare(file_end, begin) < 0) {
+        // skip it
+      } else if (user_comparator()->Compare(file_start, end) > 0) {
+        // skip it
+      } else {
+        c->AddInput(f);
+      }
+
+    }
+  }
+  if (c->num_input_files() <= 1) {
+    delete c;
+    c = nullptr;
+    new_merge_candidates_ = false;
+    Log(options_->info_log, "No compaction candidates");
+    if (current_->merge_candidates_.size() >= config::kL0_SlowdownWritesTrigger) {
+      return ForcedCompaction();
+    }
+  } else {
+    Log(options_->info_log, "Picked %zu candidates for merge", c->num_input_files());
+    std::string msg;
+    for (int i = 0; i < c->num_input_files(); i++) {
+      msg.append(std::to_string(c->input(i)->number));
+      msg.append(" ");
+    }
+    Log(options_->info_log, "Merge %s", msg.c_str());
+  }
   return c;
 }
 
-void VersionControl::Finalize(ZeroLevelVersion* v) {
-  // search for compaction
+ZeroLevelCompaction* VersionControl::ForcedCompaction() {
+  Log(options_->info_log, "Forced compaction");
+  ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
+  for (auto iter: current_->merge_candidates_) {
+    if (c->size() > options_->forced_compaction_size) {
+      break;
+    }
+    c->AddInput(iter.second);
+  }
+  return c;
 }
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-
+  return new_merge_candidates_ || current_->merge_candidates_.size() > config::kL0_CompactionTrigger;
 }
 
 Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {
@@ -385,9 +459,13 @@ void VersionControl::SetLastSequence(uint64_t s) {
 Status VersionControl::WriteSnapshot(log::Writer* log) {
   ZeroLevelVersionEdit edit;
   edit.SetComparatorName(icmp_.user_comparator()->Name());
-  for (auto iter : current()->GetFiles()) {
-    const FileMetaData* f = iter.second;
+  for (auto iter : current_->files_) {
+    auto f = iter.second;
     edit.AddFile(f->number, f->file_size, f->total, f->alive, f->smallest, f->largest);
+  }
+  for (auto iter : current_->merge_candidates_) {
+    auto f = iter.second;
+    edit.AddMergeCandidates(f->number, f->file_size, f->total, f->alive, f->smallest, f->largest);
   }
   std::string record;
   edit.EncodeTo(&record);
@@ -395,7 +473,7 @@ Status VersionControl::WriteSnapshot(log::Writer* log) {
 }
 
 const char* VersionControl::Summary(SummaryStorage* scratch) const {
-  snprintf(scratch->buffer, sizeof(scratch->buffer), "files %d", int(current_->NumFiles()));
+  snprintf(scratch->buffer, sizeof(scratch->buffer), "total files %d", int(current_->NumFiles()));
   return scratch->buffer;
 }
 

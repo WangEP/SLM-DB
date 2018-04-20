@@ -33,19 +33,29 @@ Status BuildTable(const std::string& dbname,
     if (!s.ok()) {
       return s;
     }
-
-    TableBuilder* builder = new TableBuilder(options, file, meta->number, edit);
+    edit->Ref();
+    TableBuilder* builder = new TableBuilder(options, file, meta->number);
     meta->smallest.DecodeFrom(iter->key());
+    Slice prev_key;
+    Slice prev_value;
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
-      meta->largest.DecodeFrom(key);
-      meta->total++;
-      builder->Add(key, iter->value());
+      Slice value = iter->value();
+      if (prev_key.empty()) {
+        prev_key = key;
+      } else if (options.comparator->Compare(ExtractUserKey(prev_key), ExtractUserKey(key)) != 0) {
+        builder->Add(prev_key, prev_value);
+        prev_key = key;
+      }
+      prev_value = value;
     }
-    meta->alive = meta->total;
+    builder->Add(prev_key, prev_value);
+    meta->largest.DecodeFrom(prev_key);
+    meta->total = builder->NumEntries();
+    meta->alive = builder->NumEntries();
 
     // Finish and check for builder errors
-    s = builder->Finish();
+    s = builder->Finish(edit);
     if (s.ok()) {
       meta->file_size = builder->FileSize();
       assert(meta->file_size > 0);
@@ -60,7 +70,7 @@ Status BuildTable(const std::string& dbname,
       s = file->Close();
     }
     delete file;
-    file = NULL;
+    file = nullptr;
 
     if (s.ok()) {
       // Verify that the table is usable

@@ -8,7 +8,7 @@
 #define STORAGE_LEVELDB_DB_TABLE_CACHE_H_
 
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include "db/dbformat.h"
 #include "leveldb/cache.h"
 #include "leveldb/table.h"
@@ -21,7 +21,7 @@ class Env;
 struct TableHandle {
   typedef void (*CleanupFunction)(void* arg1, void* arg2);
 
-  TableHandle() : table_(NULL), func(NULL), arg1(NULL), arg2(NULL) { }
+  TableHandle() : table_(nullptr), func(nullptr), arg1(nullptr), arg2(nullptr) { }
 
   void RegisterCleanup(CleanupFunction arg, void* cache, void* handle) {
     func = arg;
@@ -54,7 +54,7 @@ class TableCache {
   Iterator* NewIterator(const ReadOptions& options,
                         uint64_t file_number,
                         uint64_t file_size,
-                        Table** tableptr = NULL);
+                        Table** tableptr = nullptr);
 
   // If a seek to internal key "k" in specified file finds an entry,
   // call (*handle_result)(arg, found_key, found_value).
@@ -67,12 +67,13 @@ class TableCache {
 
   Status Get2(const ReadOptions& options,
               uint64_t file_number,
+              uint64_t file_size,
               const BlockHandle& block_handle,
               const Slice& k,
               void* arg,
               void(*handle_result)(void*, const Slice&, const Slice&));
 
-  Status GetTable(uint64_t file_number, TableHandle* table_handle);
+  Status GetTable(uint64_t file_number, uint64_t, TableHandle* table_handle);
 
   // Evict any entry for the specified file number
   void Evict(uint64_t file_number);

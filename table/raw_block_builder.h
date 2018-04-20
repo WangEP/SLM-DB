@@ -1,7 +1,7 @@
 #ifndef STORAGE_LEVELDB_DB_RAW_BUILDER_H_
 #define STORAGE_LEVELDB_DB_RAW_BUILDER_H_
 
-#include <stdint.h>
+#include <cstdint>
 #include <leveldb/options.h>
 #include <leveldb/slice.h>
 
@@ -9,7 +9,7 @@ namespace leveldb {
 
 class RawBlockBuilder {
  public:
-  RawBlockBuilder(const Options *options);
+  explicit RawBlockBuilder(const Options *options);
 
   ~RawBlockBuilder();
 
@@ -25,7 +25,7 @@ class RawBlockBuilder {
 
 
   bool empty() const {
-    return buffer_.size() == 0;
+    return buffer_.empty();
   }
 
  private:

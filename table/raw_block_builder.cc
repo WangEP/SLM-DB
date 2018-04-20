@@ -27,7 +27,7 @@ void RawBlockBuilder::Add(const Slice &key, const Slice &value) {
 }
 
 Slice RawBlockBuilder::Finish() {
-  return Slice(buffer_.c_str(), buffer_.size());
+  return {buffer_.c_str(), buffer_.size()};
 }
 
 size_t RawBlockBuilder::CurrentSizeEstimate() const {

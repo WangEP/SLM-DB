@@ -2,11 +2,12 @@
 #include <chrono>
 #include <thread>
 #include "leveldb/db.h"
+#include "leveldb/index.h"
 
 uint64_t clflush_cnt = 0;
 uint64_t WRITE_LATENCY_IN_NS = 1000;
 int data_cnt = 5000000;
-int val_size = 1 << 12;
+int val_size = 100;
 
 std::string gen_random(const uint64_t len) {
   std::string s;
@@ -31,9 +32,10 @@ int main(int argc, char** argv) {
   struct timespec start, end;
   leveldb::DB* db;
   leveldb::Options options;
-  options.filter_policy = NULL;
+  options.filter_policy = nullptr;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
+  options.index = new leveldb::Index;
   char *c = argv[1];
   std::string dbpath(c);
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);

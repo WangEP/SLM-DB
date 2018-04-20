@@ -3,7 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <algorithm>
-#include <stdint.h>
+#include <cstdint>
 #include "leveldb/comparator.h"
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -11,12 +11,12 @@
 
 namespace leveldb {
 
-Comparator::~Comparator() { }
+Comparator::~Comparator() = default;
 
 namespace {
 class BytewiseComparatorImpl : public Comparator {
  public:
-  BytewiseComparatorImpl() { }
+  BytewiseComparatorImpl() = default;
 
   virtual const char* Name() const {
     return "leveldb.BytewiseComparator";

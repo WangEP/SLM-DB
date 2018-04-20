@@ -16,7 +16,7 @@ class ZeroLevelVersionEdit;
 
 class IndexMeta {
  private:
-  ~IndexMeta() { }
+  ~IndexMeta() = default;
   uint64_t refs;
  public:
   uint64_t file_number;
@@ -37,9 +37,8 @@ class IndexMeta {
 };
 
 struct KeyAndMeta{
-  uint32_t key;
+  Key key;
   IndexMeta* meta;
-  ZeroLevelVersionEdit* edit;
 };
 
 class Index {
@@ -48,15 +47,13 @@ class Index {
 
   const IndexMeta* Get(const Slice& key);
 
-  void Insert(const uint32_t& key, IndexMeta* meta, ZeroLevelVersionEdit* edit);
+  void Insert(const Key& key, IndexMeta* meta);
 
-  void Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta);
-
-  Iterator* Range(const uint32_t& begin, const uint32_t& end, void* ptr);
+  Iterator* Range(const Slice& begin, const Slice& end, void* ptr);
 
   void AsyncInsert(const KeyAndMeta& key_and_meta);
 
-  void AddQueue(std::deque<KeyAndMeta>& queue);
+  void AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit);
 
   bool Acceptable() {
     return queue_.empty() && free_;
@@ -86,6 +83,7 @@ class Index {
   bool free_;
 
   std::deque<KeyAndMeta> queue_;
+  ZeroLevelVersionEdit* edit_;
 
   Index(const Index&);
   void operator=(const Index&);

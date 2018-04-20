@@ -6,6 +6,6 @@
 
 namespace leveldb {
 
-FilterPolicy::~FilterPolicy() { }
+FilterPolicy::~FilterPolicy() = default;
 
 }  // namespace leveldb

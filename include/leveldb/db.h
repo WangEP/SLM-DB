@@ -5,8 +5,8 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_DB_H_
 #define STORAGE_LEVELDB_INCLUDE_DB_H_
 
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
 #include "leveldb/export.h"
 #include "leveldb/iterator.h"
 #include "leveldb/options.h"
@@ -35,7 +35,7 @@ struct LEVELDB_EXPORT Range {
   Slice start;          // Included in the range
   Slice limit;          // Not included in the range
 
-  Range() { }
+  Range() = default;
   Range(const Slice& s, const Slice& l) : start(s), limit(l) { }
 };
 
@@ -53,7 +53,7 @@ class LEVELDB_EXPORT DB {
                      const std::string& name,
                      DB** dbptr);
 
-  DB() { }
+  DB() = default;
   virtual ~DB();
 
   // Set the database entry for "key" to "value".  Returns OK on success,
@@ -90,7 +90,7 @@ class LEVELDB_EXPORT DB {
   //
   // Caller should delete the iterator when it is no longer needed.
   // The returned iterator should be deleted before this db is deleted.
-  // virtual Iterator* NewIterator(const ReadOptions& options) = 0;
+  virtual Iterator* NewIterator(const ReadOptions& options) = 0;
 
   // Return a handle to the current DB state.  Iterators created with
   // this handle will all observe a stable snapshot of the current DB
@@ -128,8 +128,8 @@ class LEVELDB_EXPORT DB {
   // sizes will be one-tenth the size of the corresponding user data size.
   //
   // The results may not include the sizes of recently written data.
-  // virtual void GetApproximateSizes(const Range* range, int n,
-  //                                 uint64_t* sizes) = 0;
+  virtual void GetApproximateSizes(const Range* range, int n,
+                                   uint64_t* sizes) = 0;
 
   // Compact the underlying storage for the key range [*begin,*end].
   // In particular, deleted and overwritten versions are discarded,
@@ -141,7 +141,7 @@ class LEVELDB_EXPORT DB {
   // end==NULL is treated as a key after all keys in the database.
   // Therefore the following call will compact the entire database:
   //    db->CompactRange(NULL, NULL);
-  // virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
+  virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
 
   virtual Iterator* RangeQuery(const ReadOptions&, const Slice& begin, const Slice& end) = 0;
 

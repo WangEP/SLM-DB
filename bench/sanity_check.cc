@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   uint64_t tsize = 0;
   leveldb::DB* db;
   leveldb::Options options;
-  options.filter_policy = NULL;
+  options.filter_policy = nullptr;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
   options.index = new leveldb::Index();
@@ -26,9 +26,13 @@ int main(int argc, char** argv) {
   std::string dbpath(c);
   leveldb::Status status = leveldb::DB::Open(options, dbpath, &db);
   assert(status.ok());
+
+  // write
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = data_begin; i < data_begin+data_cnt; i++) {
-    std::string key = std::to_string(i);
+    char k[100];
+    snprintf(k, sizeof(k), "%016d", i);
+    std::string key = k;
     std::string value = "valuevalue" + std::to_string(i);
     tsize += key.size() + value.size();
     status = db->Put(leveldb::WriteOptions(), key, value);
@@ -38,10 +42,30 @@ int main(int argc, char** argv) {
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(data_cnt/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
   std::cout << clflush_cnt << "\tclflush count" << std::endl;
   std::cout << tsize << "\tbytes written" << std::endl;
+
+  // rewrite
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  for (auto i = data_begin; i < data_begin+data_cnt; i++) {
+    char k[100];
+    snprintf(k, sizeof(k), "%016d", i);
+    std::string key = k;
+    std::string value = "valuevalue" + std::to_string(i);
+    tsize += key.size() + value.size();
+    status = db->Put(leveldb::WriteOptions(), key, value);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);
+  std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(data_cnt/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
+  std::cout << clflush_cnt << "\tclflush count" << std::endl;
+  std::cout << tsize << "\tbytes written" << std::endl;
+
+  // read
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = data_begin; i < data_begin+data_cnt; i++) {
     std::string v = "valuevalue" + std::to_string(i);
-    std::string key = std::to_string(i);
+    char k[100];
+    snprintf(k, sizeof(k), "%016d", i);
+    std::string key = k;
     std::string value;
     status = db->Get(leveldb::ReadOptions(), key, &value);
     if (!status.ok()) {

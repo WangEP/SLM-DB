@@ -5,7 +5,7 @@
 #ifndef STORAGE_LEVELDB_DB_LOG_READER_H_
 #define STORAGE_LEVELDB_DB_LOG_READER_H_
 
-#include <stdint.h>
+#include <cstdint>
 
 #include "db/log_format.h"
 #include "leveldb/slice.h"
@@ -22,7 +22,7 @@ class Reader {
   // Interface for reporting errors.
   class Reporter {
    public:
-    virtual ~Reporter();
+    virtual ~Reporter() = default;
 
     // Some corruption was detected.  "size" is the approximate number
     // of bytes dropped due to the corruption.

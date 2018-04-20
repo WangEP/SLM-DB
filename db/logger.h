@@ -11,7 +11,7 @@ class Logger {
   int32_t type;
 
  public:
-  Logger(int32_t _level);
+  explicit Logger(int32_t _level);
 
   Logger();
 

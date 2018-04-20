@@ -5,8 +5,8 @@
 #ifndef STORAGE_LEVELDB_UTIL_TESTHARNESS_H_
 #define STORAGE_LEVELDB_UTIL_TESTHARNESS_H_
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <sstream>
 #include "leveldb/env.h"
 #include "leveldb/slice.h"

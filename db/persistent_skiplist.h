@@ -57,8 +57,8 @@ struct PersistentSkiplist::Node {
     next.resize(level);
     prev.reserve(level);
     for (auto i = 0; i < level; i++) {
-      next.push_back(NULL);
-      prev.push_back(NULL);
+      next.push_back(nullptr);
+      prev.push_back(nullptr);
     }
   }
 

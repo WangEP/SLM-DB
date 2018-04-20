@@ -30,9 +30,9 @@ WriteBatch::WriteBatch() {
   Clear();
 }
 
-WriteBatch::~WriteBatch() { }
+WriteBatch::~WriteBatch() = default;
 
-WriteBatch::Handler::~Handler() { }
+WriteBatch::Handler::~Handler() = default;
 
 void WriteBatch::Clear() {
   rep_.clear();

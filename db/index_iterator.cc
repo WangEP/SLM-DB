@@ -1,15 +1,19 @@
 #include <util/coding.h>
+
+#include <utility>
+
+#include <utility>
 #include "index_iterator.h"
 #include "dbformat.h"
 
 namespace leveldb {
 
 IndexIterator::IndexIterator(std::vector<LeafEntry*> entries, void* ptr)
-    : entries_(entries),
+    : entries_(std::move(std::move(entries))),
       vset_(reinterpret_cast<VersionControl*>(ptr)),
-      index_ptr_(NULL),
-      table_handle_(NULL),
-      block_iterator_(NULL) {
+      index_ptr_(nullptr),
+      table_handle_(nullptr),
+      block_iterator_(nullptr) {
   SeekToFirst();
 }
 
@@ -72,7 +76,7 @@ Status IndexIterator::status() const {
 
 void IndexIterator::IndexChange() {
   bool changed = false;
-  it++;
+//  it++;
   if (index_ptr_ != (*iterator_)->ptr) {
     if (index_ptr_) index_ptr_->Unref();
     index_ptr_ = reinterpret_cast<IndexMeta*>((*iterator_)->ptr);
@@ -83,14 +87,15 @@ void IndexIterator::IndexChange() {
     delete table_handle_;
     table_handle_ = new TableHandle;
     file_number_ = index_ptr_->file_number;
-    vset_->cache()->GetTable(file_number_, table_handle_);
+    uint64_t fsize = vset_->current()->GetFileSize(file_number_);
+    vset_->cache()->GetTable(file_number_, fsize, table_handle_);
   }
   if (changed) {
     delete block_iterator_;
     block_iterator_ = table_handle_->table_->BlockReader2(
         table_handle_->table_, options_, index_ptr_->handle);
     char k[100];
-    snprintf(k, sizeof(k), "%016d", (*iterator_)->key);
+    snprintf(k, sizeof(k), "%016li", (*iterator_)->key);
     std::string key = k;
     LookupKey lkey(k, vset_->LastSequence());
     block_iterator_->Seek(lkey.internal_key());

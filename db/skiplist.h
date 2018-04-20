@@ -27,8 +27,8 @@
 //
 // ... prev vs. next pointer ordering ...
 
-#include <assert.h>
-#include <stdlib.h>
+#include <cassert>
+#include <cstdlib>
 #include "port/port.h"
 #include "util/arena.h"
 #include "util/random.h"
@@ -139,8 +139,8 @@ class SkipList {
   Node* FindLast() const;
 
   // No copying allowed
-  SkipList(const SkipList&);
-  void operator=(const SkipList&);
+  SkipList(const SkipList&) = delete;
+  void operator=(const SkipList&) = delete;
 };
 
 // Implementation details follow
@@ -378,11 +378,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
 template<typename Key, class Comparator>
 bool SkipList<Key,Comparator>::Contains(const Key& key) const {
   Node* x = FindGreaterOrEqual(key, NULL);
-  if (x != NULL && Equal(key, x->key)) {
-    return true;
-  } else {
-    return false;
-  }
+  return x != NULL && Equal(key, x->key);
 }
 
 }  // namespace leveldb

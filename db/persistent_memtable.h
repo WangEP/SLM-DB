@@ -1,7 +1,7 @@
 #ifndef STORAGE_LEVELDB_DB_PERSISTENT_MEMTABLE_H_
 #define STORAGE_LEVELDB_DB_PERSISTENT_MEMTABLE_H_
 
-#include <assert.h>
+#include <cassert>
 #include "persistent_skiplist.h"
 #include "port/port_posix.h"
 
@@ -54,7 +54,7 @@ class MemtableIterator : public Iterator {
   MemtableIterator(PersistentSkiplist* list, PersistentSkiplist::Node* node)
       : list_(list), node_(node) { }
 
-  ~MemtableIterator() { }
+  ~MemtableIterator() = default;
 
   bool Valid() const  { return node_ != list_->Tail() && node_ != list_->Head(); }
 
@@ -64,9 +64,9 @@ class MemtableIterator : public Iterator {
 
   void Seek(const Slice& target) { node_ = list_->Find(target); }
 
-  void Next() { assert(node_->next[0] != NULL); node_ = node_->next[0]; }
+  void Next() { assert(node_->next[0] != nullptr); node_ = node_->next[0]; }
 
-  void Prev() { assert(node_->prev[0] != NULL); node_ = node_->prev[0]; }
+  void Prev() { assert(node_->prev[0] != nullptr); node_ = node_->prev[0]; }
 
   Slice key() const { return node_->key; }
 

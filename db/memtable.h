@@ -6,6 +6,7 @@
 #define STORAGE_LEVELDB_DB_MEMTABLE_H_
 
 #include <string>
+#include <utility>
 #include "util/persist.h"
 #include "leveldb/db.h"
 #include "db/dbformat.h"
@@ -15,7 +16,6 @@
 namespace leveldb {
 
 class InternalKeyComparator;
-class Mutex;
 class MemTableIterator;
 
 class MemTable {
@@ -66,7 +66,7 @@ class MemTable {
 
   struct KeyComparator {
     const InternalKeyComparator comparator;
-    explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) { }
+    explicit KeyComparator(InternalKeyComparator c) : comparator(std::move(c)) { }
     int operator()(const char* a, const char* b) const;
   };
   friend class MemTableIterator;

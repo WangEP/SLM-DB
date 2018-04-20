@@ -1,5 +1,6 @@
 #include "logger.h"
 
+#include <utility>
 
 namespace leveldb {
 
@@ -17,7 +18,7 @@ void Logger::log(string str, int _level) {
 }
 
 void Logger::log(string str) {
-  log(str, 0);
+  log(std::move(str), 0);
 }
 
 } // namespace leveldb

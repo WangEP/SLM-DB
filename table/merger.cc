@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <utility>
+
+#include <utility>
+
 #include "table/merger.h"
 
 #include "leveldb/comparator.h"
@@ -17,7 +21,7 @@ class MergingIterator : public Iterator {
       : comparator_(comparator),
         children_(new IteratorWrapper[n]),
         n_(n),
-        current_(NULL),
+        current_(nullptr),
         direction_(kForward) {
     for (int i = 0; i < n; i++) {
       children_[i].Set(children[i]);
@@ -29,7 +33,7 @@ class MergingIterator : public Iterator {
   }
 
   virtual bool Valid() const {
-    return (current_ != NULL);
+    return (current_ != nullptr);
   }
 
   virtual void SeekToFirst() {
@@ -153,11 +157,11 @@ class MergingIterator : public Iterator {
 };
 
 void MergingIterator::FindSmallest() {
-  IteratorWrapper* smallest = NULL;
+  IteratorWrapper* smallest = nullptr;
   for (int i = 0; i < n_; i++) {
     IteratorWrapper* child = &children_[i];
     if (child->Valid()) {
-      if (smallest == NULL) {
+      if (smallest == nullptr) {
         smallest = child;
       } else if (comparator_->Compare(child->key(), smallest->key()) < 0) {
         smallest = child;
@@ -168,11 +172,11 @@ void MergingIterator::FindSmallest() {
 }
 
 void MergingIterator::FindLargest() {
-  IteratorWrapper* largest = NULL;
+  IteratorWrapper* largest = nullptr;
   for (int i = n_-1; i >= 0; i--) {
     IteratorWrapper* child = &children_[i];
     if (child->Valid()) {
-      if (largest == NULL) {
+      if (largest == nullptr) {
         largest = child;
       } else if (comparator_->Compare(child->key(), largest->key()) > 0) {
         largest = child;
@@ -208,7 +212,7 @@ class RangeIterator : public Iterator {
 
 RangeIterator::RangeIterator(const Comparator* comparator,
                              std::vector<Iterator*> iterators, int n)
-    : comparator_(comparator), iterators_(iterators), size_(n) {
+    : comparator_(comparator), iterators_(std::move(std::move(iterators))), size_(n) {
   Slice key;
   for (int i = 0; i < size_; i++) {
     if (key.empty() || comparator_->Compare(key, iterators_[i]->key()) > 0) {
@@ -218,7 +222,10 @@ RangeIterator::RangeIterator(const Comparator* comparator,
 }
 
 RangeIterator::~RangeIterator() {
-}
+  for (auto iter : iterators_) {
+    delete iter;
+  }
+};
 
 bool RangeIterator::Valid() const {
   for (auto iter : iterators_)

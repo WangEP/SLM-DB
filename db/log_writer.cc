@@ -4,7 +4,7 @@
 
 #include "db/log_writer.h"
 
-#include <stdint.h>
+#include <cstdint>
 #include "leveldb/env.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
@@ -28,9 +28,6 @@ Writer::Writer(WritableFile* dest)
 Writer::Writer(WritableFile* dest, uint64_t dest_length)
     : dest_(dest), block_offset_(dest_length % kBlockSize) {
   InitTypeCrc(type_crc_);
-}
-
-Writer::~Writer() {
 }
 
 Status Writer::AddRecord(const Slice& slice) {

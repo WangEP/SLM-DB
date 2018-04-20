@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   uint64_t tsize = 0;
   leveldb::DB* db;
   leveldb::Options options;
-  options.filter_policy = NULL;
+  options.filter_policy = nullptr;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
   options.index = new leveldb::Index();

@@ -11,8 +11,8 @@ namespace leveldb {
 
 class Histogram {
  public:
-  Histogram() { }
-  ~Histogram() { }
+  Histogram() = default;
+  ~Histogram() = default;
 
   void Clear();
   void Add(double value);

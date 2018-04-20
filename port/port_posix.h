@@ -45,7 +45,7 @@
 #ifdef HAVE_SNAPPY
 #include <snappy.h>
 #endif  // defined(HAVE_SNAPPY)
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <cstring>
 #include <stdexcept>

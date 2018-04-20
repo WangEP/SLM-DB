@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <cassert>
 #include "leveldb/table_builder.h"
-
-#include <assert.h>
 #include "leveldb/comparator.h"
 #include "leveldb/env.h"
 #include "leveldb/filter_policy.h"
@@ -15,6 +14,7 @@
 #include "util/coding.h"
 #include "util/crc32c.h"
 #include "leveldb/index.h"
+#include "db/zero_level_version_edit.h"
 
 namespace leveldb {
 
@@ -35,7 +35,6 @@ struct TableBuilder::Rep {
   FilterBlockBuilder* filter_block;
   Index* index;
   IndexMeta* indexmeta;
-  ZeroLevelVersionEdit* edit;
 
 
   // We do not emit the index entry for a block until we have seen the
@@ -52,7 +51,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  Rep(const Options& opt, WritableFile* f, uint64_t number, ZeroLevelVersionEdit* e)
+  Rep(const Options& opt, WritableFile* f, uint64_t number)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -61,20 +60,19 @@ struct TableBuilder::Rep {
         index_block(&index_block_options),
         num_entries(0),
         closed(false),
-        filter_block(opt.filter_policy == NULL ? NULL
-                     : new FilterBlockBuilder(opt.filter_policy)),
+        filter_block(opt.filter_policy == nullptr ? nullptr
+                                                  : new FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false),
         index(options.index),
         fnumber(number),
-        total_size(0),
-        edit(e) {
+        total_size(0) {
     index_block_options.block_restart_interval = 1;
   }
 };
 
-TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number, ZeroLevelVersionEdit* edit)
-    : rep_(new Rep(options, file, number, edit)) {
-  if (rep_->filter_block != NULL) {
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint64_t number)
+    : rep_(new Rep(options, file, number)) {
+  if (rep_->filter_block != nullptr) {
     rep_->filter_block->StartBlock(0);
   }
 }
@@ -122,7 +120,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->pending_index_entry = false;
   }
 
-  if (r->filter_block != NULL) {
+  if (r->filter_block != nullptr) {
     r->filter_block->AddKey(key);
   }
 
@@ -131,10 +129,9 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->data_block.Add(key, value);
   // add to index queue block meta 
   KeyAndMeta key_meta;
-  key_meta.key = fast_atoi(key.data(), key.size()-8);
+  key_meta.key = key;
   key_meta.meta = r->indexmeta;
-  key_meta.edit = r->edit;
-  r->indexmeta->Ref();
+  key_meta.meta->Ref();
   r->index_queue.push_back(key_meta);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
@@ -154,7 +151,7 @@ void TableBuilder::Flush() {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
   }
-  if (r->filter_block != NULL) {
+  if (r->filter_block != nullptr) {
     r->filter_block->StartBlock(r->offset);
   }
 //  if (ok()) {
@@ -232,18 +229,18 @@ Status TableBuilder::status() const {
   return rep_->status;
 }
 
-Status TableBuilder::Finish() {
+Status TableBuilder::Finish(ZeroLevelVersionEdit* edit) {
   Rep* r = rep_;
   Flush();
   assert(!r->closed);
   r->closed = true;
-  r->index->AddQueue(r->index_queue);
-  assert(r->index_queue.size() == 0);
+  r->index->AddQueue(r->index_queue, edit);
+  assert(r->index_queue.empty());
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
   // Write filter block
-  if (ok() && r->filter_block != NULL) {
+  if (ok() && r->filter_block != nullptr) {
     WriteRawBlock(r->filter_block->Finish(), kNoCompression,
                   &filter_block_handle);
   }
@@ -251,7 +248,7 @@ Status TableBuilder::Finish() {
   // Write metaindex block
   if (ok()) {
     BlockBuilder meta_index_block(&r->options);
-    if (r->filter_block != NULL) {
+    if (r->filter_block != nullptr) {
       // Add mapping from "filter.Name" to location of filter data
       std::string key = "filter.";
       key.append(r->options.filter_policy->Name());

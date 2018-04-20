@@ -18,7 +18,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_CACHE_H_
 #define STORAGE_LEVELDB_INCLUDE_CACHE_H_
 
-#include <stdint.h>
+#include <cstdint>
 #include "leveldb/export.h"
 #include "leveldb/slice.h"
 
@@ -32,7 +32,7 @@ LEVELDB_EXPORT Cache* NewLRUCache(size_t capacity);
 
 class LEVELDB_EXPORT Cache {
  public:
-  Cache() { }
+  Cache() = default;
 
   // Destroys all existing entries by calling the "deleter"
   // function that was passed to the constructor.

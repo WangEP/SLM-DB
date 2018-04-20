@@ -12,7 +12,7 @@ PersistentSkiplist::PersistentSkiplist(const Comparator* cmp)
     tail->prev[i] = head;
   }
   clflush((char*)head->next[0], sizeof(Node));
-  srand(std::time(NULL));
+  srand(std::time(nullptr));
   current_size = 0;
 }
 
@@ -44,7 +44,7 @@ PersistentSkiplist::PersistentSkiplist(const Comparator* cmp,
 
 PersistentSkiplist::~PersistentSkiplist() {
   auto node = head;
-  while (node != NULL) {
+  while (node != nullptr) {
     auto next = node->next[0];
     delete node;
     node = next;
@@ -95,7 +95,7 @@ PersistentSkiplist::Node* PersistentSkiplist::Find(const Slice &key) {
   if (Equal(key, node->key)) {
     return node;
   } else {
-    return NULL;
+    return nullptr;
   }
 }
 

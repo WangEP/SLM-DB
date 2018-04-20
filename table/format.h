@@ -6,7 +6,7 @@
 #define STORAGE_LEVELDB_TABLE_FORMAT_H_
 
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
 #include "leveldb/table_builder.h"
@@ -47,7 +47,7 @@ class BlockHandle {
 // end of every table file.
 class Footer {
  public:
-  Footer() { }
+  Footer() = default;
 
   // The block handle for the metaindex block of the table
   const BlockHandle& metaindex_handle() const { return metaindex_handle_; }

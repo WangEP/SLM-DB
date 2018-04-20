@@ -16,8 +16,8 @@ namespace leveldb {
 // cache locality.
 class IteratorWrapper {
  public:
-  IteratorWrapper(): iter_(NULL), valid_(false) { }
-  explicit IteratorWrapper(Iterator* iter): iter_(NULL) {
+  IteratorWrapper(): iter_(nullptr), valid_(false) { }
+  explicit IteratorWrapper(Iterator* iter): iter_(nullptr) {
     Set(iter);
   }
   ~IteratorWrapper() { delete iter_; }
@@ -28,7 +28,7 @@ class IteratorWrapper {
   void Set(Iterator* iter) {
     delete iter_;
     iter_ = iter;
-    if (iter_ == NULL) {
+    if (iter_ == nullptr) {
       valid_ = false;
     } else {
       Update();

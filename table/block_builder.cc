@@ -29,7 +29,7 @@
 #include "table/block_builder.h"
 
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 #include "leveldb/comparator.h"
 #include "leveldb/table_builder.h"
 #include "util/coding.h"
@@ -62,8 +62,8 @@ size_t BlockBuilder::CurrentSizeEstimate() const {
 
 Slice BlockBuilder::Finish() {
   // Append restart array
-  for (size_t i = 0; i < restarts_.size(); i++) {
-    PutFixed32(&buffer_, restarts_[i]);
+  for (unsigned int restart : restarts_) {
+    PutFixed32(&buffer_, restart);
   }
   PutFixed32(&buffer_, restarts_.size());
   finished_ = true;

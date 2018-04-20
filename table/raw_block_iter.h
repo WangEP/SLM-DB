@@ -10,7 +10,7 @@ namespace leveldb {
 
 class LEVELDB_EXPORT RawBlockIterator : public Iterator{
  public:
-  RawBlockIterator(SequentialFile* file);
+  explicit RawBlockIterator(SequentialFile* file);
 
   ~RawBlockIterator();
 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <unordered_map>
+#include <util/persist.h>
 #include "dbformat.h"
 #include "zero_level_version.h"
 
@@ -11,8 +12,24 @@ namespace leveldb {
 
 class ZeroLevelVersionEdit {
  public:
-  ZeroLevelVersionEdit() { Clear(); };
-  ~ZeroLevelVersionEdit() { };
+  ZeroLevelVersionEdit() : signal_(&mutex_) { Clear(); };
+  ~ZeroLevelVersionEdit() = default;;
+
+  void Ref() { refs_++; };
+  void Unref() {
+    assert(refs_ > 0);
+    refs_--;
+    if (refs_ <= 0) {
+//      printf("debug %zu\n", next_file_number_);
+      signal_.SignalAll();
+    }
+  };
+
+  void Wait() {
+    if (refs_ > 0) {
+      signal_.Wait();
+    }
+  }
 
   void Clear();
 
@@ -28,15 +45,11 @@ class ZeroLevelVersionEdit {
   uint64_t GetNextFile() { return next_file_number_; }
   uint64_t GetLastSequence() { return last_sequence_; }
 
-  bool HasCompartorName() { return has_comparator_; }
+  bool HasComparatorName() { return has_comparator_; }
   bool HasLogNumber() { return has_log_number_; }
   bool HasPrevLogNumber() { return has_prev_log_number_; }
   bool HasNextFileNumber() { return has_next_file_number_; }
   bool HasLastSequence() { return has_last_sequence_; }
-
-  std::vector<uint64_t> GetDeletedFiles() const { return deleted_files_; }
-  std::vector<FileMetaData> GetNewFiles() const { return new_files_; }
-  std::unordered_map<uint64_t, uint64_t> GetDeadKeyCounter() const { return dead_key_counter_; };
 
   void DecreaseCount(uint64_t fnumber) {
     if (dead_key_counter_.find(fnumber) != dead_key_counter_.end()) {
@@ -66,14 +79,47 @@ class ZeroLevelVersionEdit {
     new_files_.push_back(f);
   }
 
+  void AddMergeCandidates(uint64_t file,
+               uint64_t file_size,
+               uint64_t total,
+               uint64_t alive,
+               const InternalKey& smallest,
+               const InternalKey& largest) {
+    FileMetaData f;
+    f.number = file;
+    f.file_size = file_size;
+    f.total = total;
+    f.alive = alive;
+    f.smallest = smallest;
+    f.largest = largest;
+    merge_candidates_.push_back(f);
+  }
+
+  void AllocateRecoveryList(uint64_t size) {
+    // NVM alloc
+    recovery_list_ = new uint64_t[size];
+    recovery_list_iter_ = 0;
+  }
+
+  void AddToRecoveryList(uint64_t fnumber) {
+    recovery_list_[recovery_list_iter_] = fnumber;
+    clflush((char*)&recovery_list_[recovery_list_iter_], sizeof(uint64_t));
+    recovery_list_iter_++;
+  }
+
   void EncodeTo(std::string* dst) const;
   Status DecodeFrom(const Slice& src);
 
   std::string DebugString() const;
+  friend class VersionControl;
  private:
   std::vector<FileMetaData> new_files_;
+  std::vector<FileMetaData> merge_candidates_;
   std::vector<uint64_t> deleted_files_;
   std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
+
+  uint64_t* recovery_list_;
+  uint64_t recovery_list_iter_;
 
   std::string comparator_;
   uint64_t log_number_;
@@ -85,6 +131,10 @@ class ZeroLevelVersionEdit {
   bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
+
+  volatile uint64_t refs_;
+  port::Mutex mutex_;
+  port::CondVar signal_;
 };
 
 } // namespace leveldb

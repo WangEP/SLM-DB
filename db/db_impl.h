@@ -42,6 +42,9 @@ class DBImpl : public DB {
   virtual void ReleaseSnapshot(const Snapshot* snapshot);
   virtual bool GetProperty(const Slice& property, std::string* value);
   virtual Iterator* RangeQuery(const ReadOptions&, const Slice& begin, const Slice& end);
+  virtual void CompactRange(const Slice* begin, const Slice* end) { }
+  virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes) { }
+  virtual Iterator* NewIterator(const ReadOptions&) { return nullptr; }
 
  private:
   friend class DB;
@@ -70,7 +73,7 @@ class DBImpl : public DB {
                         ZeroLevelVersionEdit* edit, SequenceNumber* max_sequence)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit, ZeroLevelVersion* base)
+  Status WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)

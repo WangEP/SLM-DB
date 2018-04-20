@@ -9,9 +9,9 @@
 #define STORAGE_LEVELDB_UTIL_POSIX_LOGGER_H_
 
 #include <algorithm>
-#include <stdio.h>
+#include <cstdio>
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 #include "leveldb/env.h"
 
 namespace leveldb {
@@ -45,7 +45,7 @@ class PosixLogger : public Logger {
       char* limit = base + bufsize;
 
       struct timeval now_tv;
-      gettimeofday(&now_tv, NULL);
+      gettimeofday(&now_tv, nullptr);
       const time_t seconds = now_tv.tv_sec;
       struct tm t;
       localtime_r(&seconds, &t);

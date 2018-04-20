@@ -18,7 +18,7 @@ static inline void cpu_pause() {
   __asm__ volatile ("pause" ::: "memory");
 }
 
-static inline unsigned long read_tsc(void) {
+static inline unsigned long read_tsc() {
   unsigned long var;
   unsigned int hi, lo;
   asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
@@ -30,11 +30,11 @@ inline void mfence() {
   asm volatile("mfence":::"memory");
 }
 
-inline void clflush(char *data, int len) {
-  if (data == NULL) return;
+inline void clflush(const char* data, int len) {
+  if (data == nullptr) return;
   volatile char *ptr = (char *)((unsigned long)data &~(CACHE_LINE_SIZE-1));
   mfence();
-  for (; ptr<data+len; ptr+=CACHE_LINE_SIZE) {
+  for (; ptr< const_cast<volatile char*>(data+len); ptr+=CACHE_LINE_SIZE) {
     unsigned long etsc = read_tsc() + (unsigned long)(WRITE_LATENCY_IN_NS*CPU_FREQ_MHZ/1000);
     asm volatile("clflush %0" : "+m" (*(volatile char *)ptr));
     while (read_tsc() < etsc)

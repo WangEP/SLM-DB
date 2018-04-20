@@ -15,7 +15,7 @@ static Slice GetLengthPrefixedSlice(const char* data) {
   uint32_t len;
   const char* p = data;
   p = GetVarint32Ptr(p, p + 5, &len);  // +5: we assume "p" is not corrupted
-  return Slice(p, len);
+  return {p, len};
 }
 
 MemTable::MemTable(const InternalKeyComparator& cmp)
@@ -71,8 +71,8 @@ class MemTableIterator: public Iterator {
   std::string tmp_;       // For passing to EncodeKey
 
   // No copying allowed
-  MemTableIterator(const MemTableIterator&);
-  void operator=(const MemTableIterator&);
+  MemTableIterator(const MemTableIterator&) = delete;
+  void operator=(const MemTableIterator&) = delete;
 };
 
 Iterator* MemTable::NewIterator() {
