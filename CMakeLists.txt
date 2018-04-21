@@ -40,8 +40,8 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++17
-            -O3
+            -std=c++11
+            -O2
     )
 endif()
 
