@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(PMDB C CXX)
-#set(CMAKE_DEBUG_POSTFIX "d")
+project(leveldb C CXX)
+set(CMAKE_DEBUG_POSTFIX "d")
 
 set(SNAPPY_LIBRARY "")
 
 string(REGEX MATCH "clang" CLANG ${CMAKE_CXX_COMPILER})
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     find_library(Pthread_LIBRARY pthread)
@@ -17,6 +19,11 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     set(Realtime_LIBRARY "")
     set(Stdcpp_LIBRARY "")
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
+
+find_package(Numa REQUIRED)
+include_directories(${NUMA_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        include)
 
 include_directories(${Boost_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -188,6 +195,7 @@ target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
+        ${NUMA_LIBRARY}
         )
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
