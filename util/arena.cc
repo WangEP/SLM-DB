@@ -12,11 +12,16 @@ static const int kBlockSize = 4096;
 Arena::Arena() : memory_usage_(0) {
   alloc_ptr_ = NULL;  // First allocation will allocate a block
   alloc_bytes_remaining_ = 0;
+  numa_ = numa_max_node() > 0;
 }
 
 Arena::~Arena() {
-  for (size_t i = 0; i < blocks_.size(); i++) {
-    delete[] blocks_[i];
+  for (auto& block : blocks_) {
+    if (numa_) {
+      numa_free(block.first, block.second);
+    } else {
+      delete[] block.first;
+    }
   }
 }
 
@@ -58,8 +63,13 @@ char* Arena::AllocateAligned(size_t bytes) {
 }
 
 char* Arena::AllocateNewBlock(size_t block_bytes) {
-  char *result = new char[block_bytes];
-  blocks_.push_back(result);
+  char *result;
+  if (numa_) {
+    result = (char*)(numa_alloc_onnode(block_bytes, 1));
+  } else {
+    result = new char[block_bytes];
+  }
+  blocks_.push_back({result, block_bytes});
   memory_usage_.NoBarrier_Store(
       reinterpret_cast<void*>(MemoryUsage() + block_bytes + sizeof(char*)));
   return result;
