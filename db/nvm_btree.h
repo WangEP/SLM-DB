@@ -192,6 +192,14 @@ class iNode : public Node {
     }
   }
 
+  void operator delete (void* buffer) {
+    if (is_numa) {
+      numa_free(buffer, sizeof(lNode));
+    } else {
+      free(buffer);
+    }
+  }
+
   // Helper
   Node* getLeftmostPtr();
   Node* getLeftmostPtr(int32_t);

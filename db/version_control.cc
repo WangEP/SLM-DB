@@ -62,6 +62,8 @@ class VersionControl::Builder {
           if (100 * f->alive / f->total <= threshold) { // move to compaction list
             v->AddCompactionFile(f);
             vcontrol_->new_merge_candidates_ = true;
+          } else {
+            v->AddFile(f);
           }
         }
       }
