@@ -25,7 +25,7 @@ void Index::Insert(const uint32_t& key, IndexMeta* meta) {
 }
 
 void Index::Update(const uint32_t& key, const uint32_t& fnumber, IndexMeta* meta) {
-  tree_.update(key, fnumber, meta);
+  tree_.update(key,  meta);
 }
 
 Iterator* Index::Range(const uint32_t& begin, const uint32_t& end, void* ptr) {
