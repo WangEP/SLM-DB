@@ -15,6 +15,8 @@ enum Tag {
 };
 
 void ZeroLevelVersionEdit::Clear() {
+  recovery_list_ = nullptr;
+  recovery_list_iter_ = 0;
   comparator_.clear();
   refs_ = 0;
   log_number_ = 0;

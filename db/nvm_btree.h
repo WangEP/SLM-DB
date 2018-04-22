@@ -21,7 +21,7 @@
 // #define MULTITHREAD
 // #define EXTRA
 
-static bool is_numa = numa_max_node() > 0;
+static bool is_numa = false;
 
 using namespace std;
 

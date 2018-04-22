@@ -60,7 +60,7 @@ void Index::Runner() {
     for (;queue_.empty();) {
       condvar_.Wait();
     }
-    edit_->AllocateRecoveryList(queue_.size());
+    edit_->AllocateRecoveryList(queue_.size(), is_numa);
     assert(!queue_.empty());
     for (;!queue_.empty();) {
       auto key = queue_.front().key;

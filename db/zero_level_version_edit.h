@@ -5,22 +5,31 @@
 #include <cstdint>
 #include <unordered_map>
 #include <util/persist.h>
+#include <numa.h>
 #include "dbformat.h"
 #include "zero_level_version.h"
+#include "nvm_btree.h"
 
 namespace leveldb {
 
 class ZeroLevelVersionEdit {
  public:
   ZeroLevelVersionEdit() : signal_(&mutex_) { Clear(); };
-  ~ZeroLevelVersionEdit() = default;;
+  ~ZeroLevelVersionEdit() {
+    if (recovery_list_ != nullptr) {
+      if (is_numa) {
+        numa_free(recovery_list_, recovery_list_iter_ * sizeof(uint64_t));
+      } else {
+        delete[] recovery_list_;
+      }
+    }
+  }
 
   void Ref() { refs_++; };
   void Unref() {
     assert(refs_ > 0);
     refs_--;
     if (refs_ <= 0) {
-//      printf("debug %zu\n", next_file_number_);
       signal_.SignalAll();
     }
   };
@@ -95,9 +104,13 @@ class ZeroLevelVersionEdit {
     merge_candidates_.push_back(f);
   }
 
-  void AllocateRecoveryList(uint64_t size) {
+  void AllocateRecoveryList(uint64_t size, bool numa) {
     // NVM alloc
-    recovery_list_ = new uint64_t[size];
+    if (numa) {
+      recovery_list_ = (uint64_t*) numa_alloc_onnode(size*sizeof(uint64_t), 1);
+    } else {
+      recovery_list_ = new uint64_t[size];
+    }
     recovery_list_iter_ = 0;
   }
 
