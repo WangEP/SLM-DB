@@ -1,7 +1,5 @@
 #ifndef NVB
 #define NVB
-#include <numa.h>
-#include <cstring>
 #include <cassert>
 #include <iostream>
 #include <array>
@@ -17,11 +15,10 @@
 // #define WritingTime
 // #define MergeTime
 // #define RemoveTime
-#define PAGESIZE (256)
-// #define MULTITHREAD
+#define PAGESIZE (4096)
+#define MULTITHREAD
 // #define EXTRA
 
-static bool is_numa = numa_max_node() > 0;
 
 using namespace std;
 
@@ -51,19 +48,11 @@ class Node {
   virtual ~Node();
 
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
   void operator delete(void* buffer) {
-    if (is_numa) {
-      numa_free(buffer, sizeof(Node));
-    } else {
-      free(buffer);
-    }
+    free(buffer);
   }
 
   void print();
@@ -130,26 +119,19 @@ class lNode : public Node {
   void* update(int64_t, void*);
 
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
 
   void operator delete (void* buffer) {
-    if (is_numa) {
-      numa_free(buffer, sizeof(lNode));
-    } else {
-      free(buffer);
-    }
+    free(buffer);
   }
 
+  
   inline LeafEntry& operator[](uint32_t idx) {
       return entry[idx];
   }
-  
+
   // Helper
   bool overflow();
   int32_t count();
@@ -184,14 +166,14 @@ class iNode : public Node {
   Node* search(int64_t);
 
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
-
+  
+  void operator delete (void* buffer) {
+    free(buffer);
+  }
+  
   // Helper
   Node* getLeftmostPtr();
   Node* getLeftmostPtr(int32_t);
@@ -296,6 +278,7 @@ class BTree {
   }
 
   // DEBUG
+  void print();
   void sanityCheck();
   void sanityCheck(Node*);
 

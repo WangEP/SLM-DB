@@ -5,15 +5,11 @@
 #ifndef STORAGE_LEVELDB_UTIL_ARENA_H_
 #define STORAGE_LEVELDB_UTIL_ARENA_H_
 
-#include <numa.h>
 #include <vector>
-#include <cassert>
-#include <cstddef>
-#include <cstdint>
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include "port/port.h"
-#if QUARTZ
-#include "quartz/src/lib/pmalloc.h"
-#endif
 
 namespace leveldb {
 
@@ -43,13 +39,10 @@ class Arena {
   size_t alloc_bytes_remaining_;
 
   // Array of new[] allocated memory blocks
-  std::vector<std::pair<char*, size_t>> blocks_;
+  std::vector<char*> blocks_;
 
   // Total memory usage of the arena.
   port::AtomicPointer memory_usage_;
-
-  // If NUMA machine
-  bool numa_;
 
   // No copying allowed
   Arena(const Arena&);
