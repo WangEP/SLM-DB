@@ -10,6 +10,7 @@ using namespace std;
 BTree::BTree() {
   root = new lNode();
   failedSearch = 0;
+  is_numa = numa_max_node() > 0;
 }
 
 void* BTree::insert(int64_t key, void* ptr) {
