@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <stdio.h>
+#include <table/format.h>
 #include "db/filename.h"
 #include "db/log_reader.h"
 #include "db/log_writer.h"
@@ -15,6 +16,7 @@
 #include "leveldb/table_builder.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
+#include "leveldb/index.h"
 #include "util/coding.h"
 #include "util/logging.h"
 
@@ -108,14 +110,14 @@ static bool AfterFile(const Comparator* ucmp,
                       const Slice* user_key, const FileMetaData* f) {
   // NULL user_key occurs before all keys and is therefore never after *f
   return (user_key != NULL &&
-          ucmp->Compare(*user_key, f->largest.Encode()) > 0);
+          ucmp->Compare(*user_key, f->largest.user_key()) > 0);
 }
 
 static bool BeforeFile(const Comparator* ucmp,
                        const Slice* user_key, const FileMetaData* f) {
   // NULL user_key occurs after all keys and is therefore never before *f
   return (user_key != NULL &&
-          ucmp->Compare(*user_key, f->smallest.Encode()) < 0);
+          ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
 }
 
 bool SomeFileOverlapsRange(
@@ -295,8 +297,8 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
   tmp.reserve(files_[0].size());
   for (uint32_t i = 0; i < files_[0].size(); i++) {
     FileMetaData* f = files_[0][i];
-    if (ucmp->Compare(user_key, f->smallest.Encode()) >= 0 &&
-        ucmp->Compare(user_key, f->largest.Encode()) <= 0) {
+    if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&
+        ucmp->Compare(user_key, f->largest.user_key()) <= 0) {
       tmp.push_back(f);
     }
   }
@@ -318,7 +320,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
     uint32_t index = FindFile(vset_->icmp_, files_[level], internal_key);
     if (index < num_files) {
       FileMetaData* f = files_[level][index];
-      if (ucmp->Compare(user_key, f->smallest.Encode()) < 0) {
+      if (ucmp->Compare(user_key, f->smallest.user_key()) < 0) {
         // All of "f" is past any data for user_key
       } else {
         if (!(*func)(arg, level, f)) {
@@ -428,6 +430,88 @@ Status Version::Get(const ReadOptions& options,
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
+Status Version::Get2(const ReadOptions& options,
+                    const LookupKey& k,
+                    std::string* value,
+                    GetStats* stats) {
+  Status s;
+  Slice ikey = k.internal_key();
+  Slice user_key = k.user_key();
+  const Comparator* ucmp = vset_->icmp_.user_comparator();
+
+  Index* index = vset_->options_->index;
+  const IndexMeta* index_meta = index->Get(user_key);
+
+  if (index_meta != NULL) {
+    BlockHandle block_handle = index_meta->handle;
+
+    Saver saver;
+    saver.state = kNotFound;
+    saver.ucmp = ucmp;
+    saver.user_key = user_key;
+    saver.value = value;
+    s = vset_->table_cache_->Get2(options, index_meta->file_number, block_handle,
+                                  ikey, &saver, SaveValue);
+    if (!s.ok()) {
+      return s;
+    }
+    switch (saver.state) {
+      case kNotFound:
+        s = Status::NotFound(Slice());
+        return s;
+      case kFound:
+        return s;
+      case kDeleted:
+        s = Status::NotFound(Slice());  // Use empty error message for speed
+        return s;
+      case kCorrupt:
+        s = Status::Corruption("corrupted key for ", user_key);
+        return s;
+    }
+  }
+  return Status::NotFound(Slice());  // Use an empty error message for speed
+}
+
+Status Version::Get3(const ReadOptions& options,
+                     const LookupKey& k,
+                     std::string* value,
+                     IndexMeta* index_meta) {
+
+  Status s;
+  Slice ikey = k.internal_key();
+  Slice user_key = k.user_key();
+  const Comparator* ucmp = vset_->icmp_.user_comparator();
+
+  Saver saver;
+  saver.state = kNotFound;
+  saver.ucmp = ucmp;
+  saver.user_key = user_key;
+  saver.value = value;
+
+  BlockHandle block_handle = index_meta->handle;
+  s = vset_->table_cache_->Get2(options, index_meta->file_number, block_handle,
+                                ikey, &saver, SaveValue);
+  if (!s.ok()) {
+    return s;
+  }
+  switch (saver.state) {
+    case kNotFound:
+      s = Status::NotFound(Slice());
+      return s;
+    case kFound:
+      return s;
+    case kDeleted:
+      s = Status::NotFound(Slice());  // Use empty error message for speed
+      return s;
+    case kCorrupt:
+      s = Status::Corruption("corrupted key for ", user_key);
+      return s;
+  }
+
+  return Status::NotFound(Slice());  // Use an empty error message for speed
+}
+
+
 bool Version::UpdateStats(const GetStats& stats) {
   FileMetaData* f = stats.seek_file;
   if (f != NULL) {
@@ -506,10 +590,8 @@ int Version::PickLevelForMemTableOutput(
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
-    InternalKey start;
-    start.DecodeFrom(smallest_user_key);
-    InternalKey limit;
-    limit.DecodeFrom(largest_user_key);
+    InternalKey start(smallest_user_key, kMaxSequenceNumber, kValueTypeForSeek);
+    InternalKey limit(largest_user_key, 0, static_cast<ValueType>(0));
     std::vector<FileMetaData*> overlaps;
     while (level < config::kMaxMemCompactLevel) {
       if (OverlapInLevel(level + 1, &smallest_user_key, &largest_user_key)) {
@@ -540,16 +622,16 @@ void Version::GetOverlappingInputs(
   inputs->clear();
   Slice user_begin, user_end;
   if (begin != NULL) {
-    user_begin = begin->Encode();
+    user_begin = begin->user_key();
   }
   if (end != NULL) {
-    user_end = end->Encode();
+    user_end = end->user_key();
   }
   const Comparator* user_cmp = vset_->icmp_.user_comparator();
   for (size_t i = 0; i < files_[level].size(); ) {
     FileMetaData* f = files_[level][i++];
-    const Slice file_start = f->smallest.Encode();
-    const Slice file_limit = f->largest.Encode();
+    const Slice file_start = f->smallest.user_key();
+    const Slice file_limit = f->largest.user_key();
     if (begin != NULL && user_cmp->Compare(file_limit, user_begin) < 0) {
       // "f" is completely before specified range; skip it
     } else if (end != NULL && user_cmp->Compare(file_start, user_end) > 0) {
@@ -1087,7 +1169,7 @@ void VersionSet::Finalize(Version* v) {
       // setting, or very high compression ratios, or lots of
       // overwrites/deletions).
       score = v->files_[level].size() /
-          static_cast<double>(config::kL0_CompactionTrigger);
+              static_cast<double>(config::kL0_CompactionTrigger);
     } else {
       // Compute the ratio of current size to size limit.
       const uint64_t level_bytes = TotalFileSize(v->files_[level]);
@@ -1294,25 +1376,6 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   return result;
 }
 
-Compaction* VersionSet::MemtableCompaction(const Slice& mem_begin, const Slice& mem_end) {
-  int level = 0;
-  Compaction* c = new Compaction(options_, 0);
-  const Comparator* user_cmp = icmp_.user_comparator();
-  for (size_t i = 0; i < current_->files_[level].size(); ) {
-    FileMetaData* f = current_->files_[level][i++];
-    const Slice file_start = f->smallest.Encode();
-    const Slice file_end = f->largest.Encode();
-    if (user_cmp->Compare(file_end, mem_begin) < 0) {
-      // "f" is completely before specified range; skip it
-    } else if (user_cmp->Compare(file_start, mem_end) > 0) {
-      // "f" is completely after specified range; skip it
-    } else {
-      c->inputs_[0].push_back(f);
-    }
-  }
-  return c;
-}
-
 Compaction* VersionSet::PickCompaction() {
   Compaction* c;
   int level;
@@ -1388,7 +1451,7 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
     const int64_t expanded0_size = TotalFileSize(expanded0);
     if (expanded0.size() > c->inputs_[0].size() &&
         inputs1_size + expanded0_size <
-            ExpandedCompactionByteSizeLimit(options_)) {
+        ExpandedCompactionByteSizeLimit(options_)) {
       InternalKey new_start, new_limit;
       GetRange(expanded0, &new_start, &new_limit);
       std::vector<FileMetaData*> expanded1;
@@ -1487,7 +1550,7 @@ bool Compaction::IsTrivialMove() const {
   // Otherwise, the move could create a parent file that will require
   // a very expensive merge later on.
   return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
-      TotalFileSize(grandparents_) <=
+          TotalFileSize(grandparents_) <=
           MaxGrandParentOverlapBytes(vset->options_));
 }
 
@@ -1525,8 +1588,8 @@ bool Compaction::ShouldStopBefore(const Slice& internal_key) {
   // Scan to find earliest grandparent file that contains key.
   const InternalKeyComparator* icmp = &vset->icmp_;
   while (grandparent_index_ < grandparents_.size() &&
-      icmp->Compare(internal_key,
-                    grandparents_[grandparent_index_]->largest.Encode()) > 0) {
+         icmp->Compare(internal_key,
+                       grandparents_[grandparent_index_]->largest.Encode()) > 0) {
     if (seen_key_) {
       overlapped_bytes_ += grandparents_[grandparent_index_]->file_size;
     }

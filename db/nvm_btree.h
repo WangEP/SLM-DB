@@ -116,8 +116,8 @@ class lNode : public Node {
   Merge* merge(void);
   void remove(int64_t);
   void* search(int64_t);
-  void* update(int64_t, int64_t, void*);
-  
+  void* update(int64_t, void*);
+
   void *operator new(size_t size) {
     void* ret;
     return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
@@ -127,7 +127,7 @@ class lNode : public Node {
     free(buffer);
   }
 
-  
+
   inline LeafEntry& operator[](uint32_t idx) {
       return entry[idx];
   }
@@ -169,11 +169,11 @@ class iNode : public Node {
     void* ret;
     return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
-  
+
   void operator delete (void* buffer) {
     free(buffer);
   }
-  
+
   // Helper
   Node* getLeftmostPtr(void);
   Node* getLeftmostPtr(int32_t);
@@ -266,7 +266,7 @@ class BTree {
   BTree();
   void* search(int64_t);
   void insert(int64_t, void*);
-  void* update(int64_t, int64_t, void*);
+  void* update(int64_t, void*);
   void remove(int64_t);
   vector<LeafEntry*> range(int64_t, int64_t);
 

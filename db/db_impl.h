@@ -7,7 +7,6 @@
 
 #include <deque>
 #include <set>
-#include <memory>
 #include "db/dbformat.h"
 #include "db/log_writer.h"
 #include "db/snapshot.h"
@@ -15,7 +14,6 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
-#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -43,7 +41,7 @@ class DBImpl : public DB {
   virtual bool GetProperty(const Slice& property, std::string* value);
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes);
   virtual void CompactRange(const Slice* begin, const Slice* end);
-  virtual Iterator* RangeQuery(int64_t min, int64_t max);
+  virtual Iterator* RangeQuery(const ReadOptions&, const Slice& begin, const Slice& end);
 
   Status CompactMemTableSynchronous();
   // Extra methods (for testing) that are not in the public DB interface
@@ -79,13 +77,11 @@ class DBImpl : public DB {
 
   Status NewDB();
 
-  Status ReadFromTables(const Slice& key, std::string* value);
-
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
   Status Recover(VersionEdit* edit, bool* save_manifest)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void MaybeIgnoreError(Status* s) const;
 
@@ -99,14 +95,13 @@ class DBImpl : public DB {
 
   Status RecoverLogFile(uint64_t log_number, bool last_log, bool* save_manifest,
                         VersionEdit* edit, SequenceNumber* max_sequence)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status MakeMemtableCompaction(PersistentMemtable* mem);
   Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   WriteBatch* BuildBatchGroup(Writer** last_writer);
 
   void RecordBackgroundError(const Status& s);
@@ -116,14 +111,14 @@ class DBImpl : public DB {
   void BackgroundCall();
   void  BackgroundCompaction() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void CleanupCompaction(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status DoCompactionWork(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status OpenCompactionOutputFile(CompactionState* compact);
-  Status FinishCompactionOutputFile(CompactionState* compact);
+  Status FinishCompactionOutputFile(CompactionState* compact, Iterator* input);
   Status InstallCompactionResults(CompactionState* compact)
-  EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Constant after construction
   Env* const env_;
@@ -136,6 +131,9 @@ class DBImpl : public DB {
 
   // table_cache_ provides its own synchronization
   TableCache* table_cache_;
+
+  // B-tree data block indexing
+  Index* index_;
 
   // Lock over the persistent DB state.  Non-NULL iff successfully acquired.
   FileLock* db_lock_;
@@ -151,7 +149,6 @@ class DBImpl : public DB {
   uint64_t logfile_number_;
   log::Writer* log_;
   uint32_t seed_;                // For sampling.
-  Index* index_;
 
   // Queue of writers.
   std::deque<Writer*> writers_;

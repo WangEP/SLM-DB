@@ -20,7 +20,6 @@
 #include "db/memtable.h"
 #include "db/write_batch_internal.h"
 #include "util/coding.h"
-#include "persistent_memtable.h"
 
 namespace leveldb {
 
@@ -144,7 +143,7 @@ void WriteBatchInternal::SetContents(WriteBatch* b, const Slice& contents) {
 }
 
 void WriteBatchInternal::Append(WriteBatch* dst, const WriteBatch* src) {
-  SetCount(dst, Count(dst) + Count(src));                                        
+  SetCount(dst, Count(dst) + Count(src));
   assert(src->rep_.size() >= kHeader);
   dst->rep_.append(src->rep_.data() + kHeader, src->rep_.size() - kHeader);
 }

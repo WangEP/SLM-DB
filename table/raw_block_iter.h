@@ -37,9 +37,9 @@ class LEVELDB_EXPORT RawBlockIterator : public Iterator{
   uint64_t GetFileNumber();
 
  private:
-  Streamer stream_;
   std::vector<std::pair<Slice, Slice>> vector_;
   std::vector<std::pair<Slice, Slice>>::iterator iterator_;
+  Streamer stream_;
   uint64_t count;
   uint64_t fnumber;
 };

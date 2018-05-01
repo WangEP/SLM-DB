@@ -7,7 +7,6 @@
 
 #include "db/dbformat.h"
 #include "leveldb/write_batch.h"
-#include "persistent_memtable.h"
 
 namespace leveldb {
 

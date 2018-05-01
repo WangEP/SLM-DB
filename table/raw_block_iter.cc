@@ -36,13 +36,13 @@ void RawBlockIterator::Seek(const Slice &target) {
 }
 
 void RawBlockIterator::Next() {
-  iterator_++;
-  count++;
+  ++iterator_;
+  ++count;
 }
 
 void RawBlockIterator::Prev() {
-  iterator_--;
-  count--;
+  --iterator_;
+  --count;
 }
 
 Slice RawBlockIterator::key() const {

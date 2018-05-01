@@ -15,7 +15,6 @@
 #include "leveldb/options.h"
 #include "leveldb/status.h"
 #include "leveldb/write_batch.h"
-#include "leveldb/index.h"
 
 using leveldb::Cache;
 using leveldb::Comparator;
@@ -41,7 +40,6 @@ using leveldb::Status;
 using leveldb::WritableFile;
 using leveldb::WriteBatch;
 using leveldb::WriteOptions;
-using leveldb::Index;
 
 extern "C" {
 
@@ -454,10 +452,6 @@ void leveldb_options_set_max_file_size(leveldb_options_t* opt, size_t s) {
 
 void leveldb_options_set_compression(leveldb_options_t* opt, int t) {
   opt->rep.compression = static_cast<CompressionType>(t);
-}
-
-void leveldb_options_create_global_index(leveldb_options_t* opt) {
-  opt->rep.index = new Index();
 }
 
 leveldb_comparator_t* leveldb_comparator_create(

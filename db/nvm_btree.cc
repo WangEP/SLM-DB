@@ -30,8 +30,9 @@ void BTree::insert(int64_t key, void* ptr) {
   lNode* leaf = (lNode*)node;
   // update if key exists
   if (leaf->search(key)!= NULL) {
-    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, 0, ptr));
-    delete meta;
+    leveldb::IndexMeta* meta = reinterpret_cast<leveldb::IndexMeta *>(leaf->update(key, ptr));
+    if (meta != NULL)
+      meta->Unref();
     return;
   }
   if (!leaf->overflow()) {
@@ -147,13 +148,13 @@ void BTree::insert(int64_t key, void* ptr) {
   }
 }
 
-void* BTree::update(int64_t key, int64_t fnumber, void *ptr) {
+void* BTree::update(int64_t key, void *ptr) {
   Node *p = root;
   while (p->type == Node::Internal) {
     p = ((iNode*) p)->search(key);
     if (p == NULL) p = root;
   }
-  return ((lNode *) p)->update(key, fnumber, ptr);
+  return ((lNode *) p)->update(key, ptr);
 }
 
 void *BTree::search(int64_t key) {
@@ -214,7 +215,7 @@ vector<LeafEntry*> BTree::range(int64_t min, int64_t max) {
     std::sort(std::begin(ret), std::end(ret), [](LeafEntry* a, LeafEntry* b){
                 return a->key < b->key;
             });
-    return ret;
+    return std::move(ret);
 }
 
 void BTree::remove(int64_t key) {
@@ -695,21 +696,18 @@ void lNode::remove(int64_t key) {
   }
 }
 
-void* lNode::update(int64_t key, int64_t fnumber, void *ptr) {
+void* lNode::update(int64_t key, void *ptr) {
   for (int32_t i = 0; i < CARDINALITY; i++) {
     if (entry[i].key == key && entry[i].ptr != NULL) {
       void *p = entry[i].ptr;
       leveldb::IndexMeta* m = reinterpret_cast<leveldb::IndexMeta*>(p);
-      if (m->file_number == fnumber || fnumber == 0) {
-        entry[i].ptr = ptr;
-        clflush((char*) &entry[i].ptr, sizeof(void*));
-        return p;
-      } else
-        break;
+      entry[i].ptr = ptr;
+      clflush((char*) &entry[i].ptr, sizeof(void*));
+      return p;
     }
   }
   if (sibling && sibling->splitKey < key) {
-    return ((lNode*) sibling)->update(key, fnumber, ptr);
+    return ((lNode*) sibling)->update(key, ptr);
   }
   return nullptr;
 }

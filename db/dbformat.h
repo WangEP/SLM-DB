@@ -25,10 +25,10 @@ static const int kNumLevels = 7;
 static const int kL0_CompactionTrigger = 4;
 
 // Soft limit on number of level-0 files.  We slow down writes at this point.
-static const int kL0_SlowdownWritesTrigger = 15;
+static const int kL0_SlowdownWritesTrigger = 8;
 
 // Maximum number of level-0 files.  We stop writes at this point.
-static const int kL0_StopWritesTrigger = 20;
+static const int kL0_StopWritesTrigger = 12;
 
 // Maximum level to which a new compacted memtable is pushed if it
 // does not create overlap.  We try to push to level 2 to avoid the
@@ -125,8 +125,6 @@ class InternalKeyComparator : public Comparator {
   const Comparator* user_comparator() const { return user_comparator_; }
 
   int Compare(const InternalKey& a, const InternalKey& b) const;
-
-  int CompareMem(const Slice &akey, const Slice &bkey) const;
 };
 
 // Filter policy wrapper that converts from internal keys to user keys

@@ -36,26 +36,14 @@ class PersistentMemtable {
 
   bool Get(const Slice& key, std::string* value);
 
-  // Get new memtable to from current one to make compaction
-  PersistentMemtable* Compact();
-
   std::pair<const Slice&, const Slice&> GetRange();
 
  private:
-  ~PersistentMemtable();
-
   PersistentSkiplist* table_;
   const Comparator* cmp_;
   int refs_;
 
-  // access control
-  port::Mutex* mutex;
-
-  const static size_t compaction_target_size = 1 << 21; // 2mb
-
-  // compaction iterator ranges
-  MemtableIterator* compaction_iter;
-
+  ~PersistentMemtable();
   // no copy allowed
   PersistentMemtable(const PersistentMemtable&);
   void operator=(const PersistentMemtable&);
@@ -68,7 +56,7 @@ class MemtableIterator : public Iterator {
 
   ~MemtableIterator() { }
 
-  bool Valid() const  { return node_ != list_->Tail(); }
+  bool Valid() const  { return node_ != list_->Tail() && node_ != list_->Head(); }
 
   void SeekToFirst() { node_ = list_->Head(); }
 
