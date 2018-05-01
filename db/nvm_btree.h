@@ -7,7 +7,6 @@
 #include <queue>
 #include <thread>
 #include <sstream>
-#include <numa.h>
 #include "util/persist.h"
 
 #define CAS(_p, _u, _v)  (__atomic_compare_exchange_n (_p, _u, _v, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE))
@@ -20,8 +19,6 @@
 // #define MULTITHREAD
 // #define EXTRA
 
-
-static bool is_numa = numa_max_node() > 0;
 
 using namespace std;
 
@@ -51,19 +48,11 @@ class Node {
   virtual ~Node();
 
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
   void operator delete(void* buffer) {
-    if (is_numa) {
-      numa_free(buffer, sizeof(Node));
-    } else {
-      free(buffer);
-    }
+    free(buffer);
   }
 
   void print();
@@ -130,20 +119,12 @@ class lNode : public Node {
   void* update(int64_t, int64_t, void*);
   
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
 
   void operator delete (void* buffer) {
-    if (is_numa) {
-      numa_free(buffer, sizeof(lNode));
-    } else {
-      free(buffer);
-    }
+    free(buffer);
   }
 
   
@@ -185,20 +166,12 @@ class iNode : public Node {
   Node* search(int64_t);
 
   void *operator new(size_t size) {
-    if (is_numa) {
-      return numa_alloc_onnode(size, 1);
-    } else {
-      void* ret;
-      return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
-    }
+    void* ret;
+    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
   }
   
   void operator delete (void* buffer) {
-    if (is_numa) {
-      numa_free(buffer, sizeof(lNode));
-    } else {
-      free(buffer);
-    }
+    free(buffer);
   }
   
   // Helper

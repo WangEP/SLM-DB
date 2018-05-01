@@ -20,10 +20,10 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     set(Stdcpp_LIBRARY "")
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
 
-find_package(Numa REQUIRED)
-include_directories(${NUMA_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        include)
+#find_package(Numa REQUIRED)
+#include_directories(${NUMA_INCLUDE_DIRS}
+#        ${CMAKE_CURRENT_SOURCE_DIR}
+#        include)
 
 include_directories(${Boost_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -41,7 +41,8 @@ else()
     add_compile_options(
             -Wno-sign-compare
             -std=c++17
-            -O3
+            -O2
+            -DNDEBUG
     )
 endif()
 
@@ -149,6 +150,8 @@ set(LEVEL_DB_FILES
         util/persist.h
         util/testharness.h
         util/testharness.cc
+        util/testutil.h
+        util/testutil.cc
         port/port.h
         port/atomic_pointer.h
         table/raw_block_iter.cc
@@ -189,7 +192,7 @@ target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
-        ${NUMA_LIBRARY}
+#        ${NUMA_LIBRARY}
         )
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
@@ -212,5 +215,5 @@ target_link_libraries(file_io_test PUBLIC leveldb)
 add_executable(raw_table_test table/raw_table_test.cc)
 target_link_libraries(raw_table_test PUBLIC leveldb)
 
-add_executable(persistent_skiplist_test db/persistent_skiplist_test.cc)
-target_link_libraries(persistent_skiplist_test PUBLIC leveldb)
+add_executable(db_bench db/db_bench.cc)
+target_link_libraries(db_bench PUBLIC leveldb)

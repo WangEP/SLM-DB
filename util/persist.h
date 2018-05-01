@@ -9,10 +9,7 @@
 
 #define CACHE_LINE_SIZE (64)
 
-extern uint64_t WRITE_LATENCY_IN_NS;
-
-// NVM PERSIST OPERATIONS //
-extern uint64_t clflush_cnt;
+static uint64_t WRITE_LATENCY_IN_NS = 500;
 
 static inline void cpu_pause() {
   __asm__ volatile ("pause" ::: "memory");
@@ -39,7 +36,6 @@ inline void clflush(char* data, uint64_t len) {
     asm volatile("clflush %0" : "+m" (*(volatile char *)ptr));
     while (read_tsc() < etsc)
       cpu_pause();
-    clflush_cnt++;
   }
   mfence();
 }
