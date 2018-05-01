@@ -3,8 +3,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include "db/db_impl.h"
 #include "db/version_set.h"
 #include "leveldb/cache.h"
@@ -19,8 +19,6 @@
 #include "util/testutil.h"
 #include "leveldb/index.h"
 
-uint64_t WRITE_LATENCY_IN_NS = 1000;
-uint64_t clflush_cnt = 0;
 
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
@@ -499,7 +497,7 @@ class Benchmark {
         method = &Benchmark::ReadRandom;
       } else if (name == Slice("rangequery")) {
         ranges_ = 10;
-        range_size_ = 10000;
+        range_size_ = 1000;
         method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;

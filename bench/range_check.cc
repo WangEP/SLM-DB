@@ -4,8 +4,6 @@
 #include "leveldb/db.h"
 #include "leveldb/index.h"
 
-uint64_t clflush_cnt = 0;
-uint64_t WRITE_LATENCY_IN_NS = 1000;
 int data_cnt = 5000000;
 int data_begin = 0;
 int ranges_ = 10;
