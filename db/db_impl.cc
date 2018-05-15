@@ -946,7 +946,7 @@ Iterator* DBImpl::RangeQuery(const ReadOptions& options,
     imm_->Ref();
   }
 
-  // add btree range query
+  // add BTree range query
   list.push_back(index_->Range(begin, end, versions_));
 
   // put all together

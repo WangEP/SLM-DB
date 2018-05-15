@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0)
 
 project(PMDB C CXX)
 #set(CMAKE_DEBUG_POSTFIX "d")
@@ -19,11 +19,6 @@ else(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
     set(Realtime_LIBRARY "")
     set(Stdcpp_LIBRARY "")
 endif(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
-
-find_package(Numa REQUIRED)
-include_directories(${NUMA_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        include)
 
 include_directories(${Boost_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -101,9 +96,9 @@ set(LEVEL_DB_FILES
 #        db/version_set.h
         db/write_batch.cc
         db/write_batch_internal.h
-        db/index.cc
-        db/nvm_btree.cc
-        db/nvm_btree.h
+        index/index.cc
+        index/nvm_btree.cc
+        index/nvm_btree.h
         db/logger.cc
         db/logger.h
         table/block.cc
@@ -122,10 +117,6 @@ set(LEVEL_DB_FILES
         table/table_builder.cc
         table/two_level_iterator.cc
         table/two_level_iterator.h
-        table/raw_block_builder.cc
-        table/raw_block_builder.h
-        table/raw_table_builder.cc
-        table/raw_table_builder.h
         util/arena.cc
         util/arena.h
         util/bloom.cc
@@ -152,9 +143,6 @@ set(LEVEL_DB_FILES
         util/testharness.cc
         port/port.h
         port/atomic_pointer.h
-        table/raw_block_iter.cc
-        table/raw_block_iter.h
-        util/streamer.h
         util/thread_pool.h
         db/persistent_skiplist.h
         db/persistent_memtable.cc
@@ -163,14 +151,16 @@ set(LEVEL_DB_FILES
         util/int_based_comparator.h
         util/testutil.h
         util/testutil.cc
-        db/index_iterator.cc
-        db/index_iterator.h
+        index/index_iterator.cc
+        index/index_iterator.h
         db/zero_level_version.cc
         db/zero_level_version.h
         db/version_control.cc
         db/version_control.h
         db/zero_level_version_edit.cc
-        db/zero_level_version_edit.h)
+        db/zero_level_version_edit.h
+        index/fast_pm_btree.cc
+        index/fast_pm_btree.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -201,7 +191,6 @@ target_link_libraries(leveldb
         PRIVATE
         ${Boost_LIBRARIES}
         ${Pthread_LIBRARY}
-        ${NUMA_LIBRARY}
         )
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
@@ -218,17 +207,11 @@ target_link_libraries(simple_bench PUBLIC leveldb)
 add_executable(sanity_check bench/sanity_check.cc)
 target_link_libraries(sanity_check PUBLIC leveldb)
 
-add_executable(raw_table_test table/raw_table_test.cc)
-target_link_libraries(raw_table_test PUBLIC leveldb)
-
-add_executable(persistent_skiplist_test db/persistent_skiplist_test.cc)
-target_link_libraries(persistent_skiplist_test PUBLIC leveldb)
-
 add_executable(db_bench db/db_bench.cc)
 target_link_libraries(db_bench PUBLIC leveldb)
 
 add_executable(range_check bench/range_check.cc)
 target_link_libraries(range_check PUBLIC leveldb)
 
-add_executable(nvm_btree_test db/nvm_btree_test.cc)
+add_executable(nvm_btree_test index/nvm_btree_test.cc)
 target_link_libraries(nvm_btree_test PUBLIC leveldb)

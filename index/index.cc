@@ -2,8 +2,8 @@
 #include "util/coding.h"
 #include "leveldb/slice.h"
 #include "leveldb/index.h"
-#include "db/index_iterator.h"
-#include "zero_level_version_edit.h"
+#include "index_iterator.h"
+#include "db/zero_level_version_edit.h"
 
 namespace leveldb {
 

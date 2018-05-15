@@ -4,7 +4,7 @@
 
 #include <utility>
 #include "index_iterator.h"
-#include "dbformat.h"
+#include "db/dbformat.h"
 
 namespace leveldb {
 

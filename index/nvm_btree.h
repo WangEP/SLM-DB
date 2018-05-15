@@ -1,5 +1,5 @@
-#ifndef NVB
-#define NVB
+#ifndef STORAGE_LEVELDB_INDEX_NVM_BTREE_H_
+#define STORAGE_LEVELDB_INDEX_NVM_BTREE_H_
 #include <cassert>
 #include <iostream>
 #include <array>
@@ -289,4 +289,4 @@ class BTree {
   int64_t failedSearch;
 };
 
-#endif
+#endif // STORAGE_LEVELDB_INDEX_NVM_BTREE_H_

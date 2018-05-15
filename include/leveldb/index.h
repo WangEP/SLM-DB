@@ -1,12 +1,12 @@
-#ifndef STORAGE_LEVELDB_DB_INDEX_H_
-#define STORAGE_LEVELDB_DB_INDEX_H_
+#ifndef STORAGE_LEVELDB_INCLUDE_INDEX_H_
+#define STORAGE_LEVELDB_INCLUDE_INDEX_H_
 
 #include <cstdint>
 #include <map>
 #include <deque>
 #include "port/port.h"
 #include "table/format.h"
-#include "db/nvm_btree.h"
+#include "index/nvm_btree.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
 
@@ -91,4 +91,4 @@ class Index {
 
 } // namespace leveldb
 
-#endif //STORAGE_LEVELDB_DB_GLOBAL_INDEX_H_
+#endif // STORAGE_LEVELDB_INCLUDE_INDEX_H_

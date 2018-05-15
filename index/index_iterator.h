@@ -1,13 +1,13 @@
-#ifndef STORAGE_LEVELDB_DB_INDEX_ITERATOR_H
-#define STORAGE_LEVELDB_DB_INDEX_ITERATOR_H
+#ifndef STORAGE_LEVELDB_INDEX_INDEX_ITERATOR_H_
+#define STORAGE_LEVELDB_INDEX_INDEX_ITERATOR_H_
 
 #include <vector>
 #include "leveldb/iterator.h"
 #include "leveldb/index.h"
-#include "db/nvm_btree.h"
+#include "index/nvm_btree.h"
 #include "table/format.h"
-#include "version_control.h"
-#include "table_cache.h"
+#include "db/version_control.h"
+#include "db/table_cache.h"
 
 namespace leveldb {
 
@@ -43,4 +43,4 @@ class IndexIterator : public Iterator {
 
 }
 
-#endif //STORAGE_LEVELDB_DB_INDEX_ITERATOR_H
+#endif //STORAGE_LEVELDB_INDEX_INDEX_ITERATOR_H_

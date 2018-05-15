@@ -8,7 +8,7 @@
 #include <numa.h>
 #include "dbformat.h"
 #include "zero_level_version.h"
-#include "nvm_btree.h"
+#include "index/nvm_btree.h"
 
 namespace leveldb {
 
