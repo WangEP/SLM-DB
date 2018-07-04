@@ -48,7 +48,7 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
     saver.ucmp = ucmp;
     saver.user_key = user_key;
     saver.value = val;
-    uint64_t fsize = GetFileSize(index_meta.file_number);
+//    uint64_t fsize = GetFileSize(index_meta.file_number);
     s = vcontrol_->cache()->Get(options, index_meta.file_number, index_meta.offset, index_meta.size,
                                 ikey, &saver, SaveValue);
     if (!s.ok()) {
@@ -86,15 +86,28 @@ void ZeroLevelVersion::Unref() {
 
 std::string ZeroLevelVersion::DebugString() const {
   std::string r;
-  for (auto iter : files_) {
+  r.append("Files:\n");
+  for (const auto& file : files_) {
     r.push_back(' ');
-    AppendNumberTo(&r, iter.second->number);
+    AppendNumberTo(&r, file.second->number);
     r.push_back(':');
-    AppendNumberTo(&r, iter.second->file_size);
+    AppendNumberTo(&r, file.second->file_size);
     r.append("[");
-    r.append(iter.second->smallest.DebugString());
+    r.append(file.second->smallest.DebugString());
     r.append(" .. ");
-    r.append(iter.second->largest.DebugString());
+    r.append(file.second->largest.DebugString());
+    r.append("]\n");
+  }
+  r.append("Files to merge:\n");
+  for (const auto& file : merge_candidates_) {
+    r.push_back(' ');
+    AppendNumberTo(&r, file.second->number);
+    r.push_back(':');
+    AppendNumberTo(&r, file.second->file_size);
+    r.append("[");
+    r.append(file.second->smallest.DebugString());
+    r.append(" .. ");
+    r.append(file.second->largest.DebugString());
     r.append("]\n");
   }
   return r;

@@ -113,8 +113,8 @@ class ZeroLevelVersionEdit {
 
   void EncodeTo(std::string* dst) const;
   Status DecodeFrom(const Slice& src);
-
   std::string DebugString() const;
+
   friend class VersionControl;
  private:
   std::vector<FileMetaData> new_files_;
