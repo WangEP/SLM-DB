@@ -8,11 +8,9 @@
 #define CAS(_p, _u, _v)  (__atomic_compare_exchange_n (_p, _u, _v, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE))
 
 #define CACHE_LINE_SIZE (64)
+#define PAGESIZE 512
 
-extern uint64_t WRITE_LATENCY_IN_NS;
-
-// NVM PERSIST OPERATIONS //
-extern uint64_t clflush_cnt;
+static uint64_t WRITE_LATENCY_IN_NS = 500;
 
 static inline void cpu_pause() {
   __asm__ volatile ("pause" ::: "memory");
@@ -39,7 +37,6 @@ inline void clflush(const char* data, int len) {
     asm volatile("clflush %0" : "+m" (*(volatile char *)ptr));
     while (read_tsc() < etsc)
       cpu_pause();
-    clflush_cnt++;
   }
   mfence();
 }

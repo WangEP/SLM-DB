@@ -4,9 +4,6 @@
 #include "util/testutil.h"
 #include "nvm_btree.h"
 
-uint64_t WRITE_LATENCY_IN_NS = 0;
-uint64_t clflush_cnt = 0;
-
 int num_ = 185000000;
 
 int main() {

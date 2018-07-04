@@ -4,8 +4,6 @@
 #include "leveldb/db.h"
 #include "leveldb/index.h"
 
-uint64_t clflush_cnt = 0;
-uint64_t WRITE_LATENCY_IN_NS = 1000;
 int data_cnt = 5000000;
 int val_size = 100;
 
@@ -49,7 +47,6 @@ int main(int argc, char** argv) {
   clock_gettime(CLOCK_MONOTONIC, &end);
   int64_t elapsed = (end.tv_sec - start.tv_sec)*1000000000 + (end.tv_nsec - start.tv_nsec);
   std::cout << elapsed/1000 << "\tusec\t" << (uint64_t)(1000000*(data_cnt/(elapsed/1000.0))) << "\tOps/sec\tInsertion" << std::endl;
-  std::cout << clflush_cnt << "\tclflush count" << std::endl;
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (auto i = 0; i < data_cnt; i++) {
     std::string key = std::to_string(i);

@@ -59,19 +59,25 @@ class TableCache {
   // If a seek to internal key "k" in specified file finds an entry,
   // call (*handle_result)(arg, found_key, found_value).
   Status Get(const ReadOptions& options,
+             const uint16_t& file_number,
+             const uint32_t& offset,
+             const uint16_t& size,
+             const Slice& k,
+             void* arg,
+             void(*handle_result)(void*, const Slice&, const Slice&));
+
+  Status Get(const ReadOptions& options,
              uint64_t file_number,
              uint64_t file_size,
              const Slice& k,
              void* arg,
              void (*handle_result)(void*, const Slice&, const Slice&));
 
-  Status Get2(const ReadOptions& options,
-              uint64_t file_number,
-              uint64_t file_size,
-              const BlockHandle& block_handle,
-              const Slice& k,
-              void* arg,
-              void(*handle_result)(void*, const Slice&, const Slice&));
+  Status GetBlockIterator(const ReadOptions& options,
+                          const u_int16_t file_number,
+                          const uint32_t& offset,
+                          const uint16_t& size,
+                          Iterator** iterator);
 
   Status GetTable(uint64_t file_number, uint64_t, TableHandle* table_handle);
 

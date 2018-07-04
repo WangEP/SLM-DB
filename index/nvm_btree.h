@@ -15,8 +15,8 @@
 // #define WritingTime
 // #define MergeTime
 // #define RemoveTime
-#define PAGESIZE (4096)
-#define MULTITHREAD
+// #define PAGESIZE (4096)
+// #define MULTITHREAD
 // #define EXTRA
 
 

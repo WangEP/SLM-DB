@@ -4,56 +4,51 @@
 #include <cstdint>
 #include <map>
 #include <deque>
+#include <shared_mutex>
 #include "port/port.h"
 #include "table/format.h"
 #include "index/nvm_btree.h"
+#include "index/ff_btree.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
 
 namespace leveldb {
 
-class ZeroLevelVersionEdit;
+class TableCache;
 
-class IndexMeta {
- private:
-  ~IndexMeta() = default;
-  uint64_t refs;
- public:
-  uint64_t file_number;
-  BlockHandle handle;
+struct IndexMeta {
+public:
+  uint32_t offset;
+  uint16_t size;
+  uint16_t file_number;
 
-  IndexMeta(uint32_t offset, uint32_t size, uint32_t file_number) :
-      handle(size, offset), file_number(file_number), refs(0) { }
+  IndexMeta() : offset(0), size(0), file_number(0) { }
 
-  void Ref() {
-    ++refs;
-  }
-
-  void Unref() {
-    if (--refs == 0)
-      delete this;
-  }
-
+  IndexMeta(uint32_t offset, uint16_t size, uint16_t file_number) :
+    offset(offset), size(size), file_number(file_number) { }
 };
 
+void* convert(IndexMeta meta);
+IndexMeta convert(void* ptr);
+
 struct KeyAndMeta{
-  int64_t key;
-  IndexMeta* meta;
+  uint32_t key;
+  std::shared_ptr<IndexMeta> meta;
 };
 
 class Index {
- public:
+public:
   Index();
 
-  const IndexMeta* Get(const Slice& key);
+  IndexMeta Get(const Slice& key);
 
-  void Insert(const int64_t& key, IndexMeta* meta);
-
-  Iterator* Range(const Slice& begin, const Slice& end, void* ptr);
+  void Insert(const uint32_t& key, IndexMeta meta);
 
   void AsyncInsert(const KeyAndMeta& key_and_meta);
 
   void AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit);
+
+  Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
 
   bool Acceptable() {
     return queue_.empty() && free_;
@@ -73,9 +68,9 @@ class Index {
 
   static void* ThreadWrapper(void* index);
 
- private:
+private:
 
-  BTree tree_; // Temporary
+  FFBtree tree_; // Temporary
   bool bgstarted_;
   pthread_t thread_;
   port::Mutex mutex_;

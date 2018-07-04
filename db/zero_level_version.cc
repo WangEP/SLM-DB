@@ -40,18 +40,17 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
   const Comparator* ucmp = vcontrol_->user_comparator();
 
   Index* index = vcontrol_->options()->index;
-  const IndexMeta* index_meta = index->Get(user_key);
-  if (index_meta != nullptr) {
-    BlockHandle block_handle = index_meta->handle;
+  IndexMeta index_meta = index->Get(user_key);
+  if (convert(index_meta) != 0) {
 
     Saver saver;
     saver.state = kNotFound;
     saver.ucmp = ucmp;
     saver.user_key = user_key;
     saver.value = val;
-    uint64_t fsize = GetFileSize(index_meta->file_number);
-    s = vcontrol_->cache()->Get2(options, index_meta->file_number, fsize, block_handle,
-                                 ikey, &saver, SaveValue);
+    uint64_t fsize = GetFileSize(index_meta.file_number);
+    s = vcontrol_->cache()->Get(options, index_meta.file_number, index_meta.offset, index_meta.size,
+                                ikey, &saver, SaveValue);
     if (!s.ok()) {
       return s;
     }

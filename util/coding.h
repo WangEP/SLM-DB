@@ -107,6 +107,10 @@ inline uint32_t fast_atoi(const char* str, size_t size) {
   return val;
 }
 
+inline uint32_t fast_atoi(Slice slice) {
+  return fast_atoi(slice.data(), slice.size());
+}
+
 }  // namespace leveldb
 
 #endif  // STORAGE_LEVELDB_UTIL_CODING_H_

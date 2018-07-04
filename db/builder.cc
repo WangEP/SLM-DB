@@ -61,14 +61,6 @@ Status BuildTable(const std::string& dbname,
       assert(meta->file_size > 0);
     }
     delete builder;
-
-    // Finish and check for file errors
-    if (s.ok()) {
-      s = file->Sync();
-    }
-    if (s.ok()) {
-      s = file->Close();
-    }
     delete file;
     file = nullptr;
 

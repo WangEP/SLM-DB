@@ -3,8 +3,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include "db/db_impl.h"
 #include "db/version_set.h"
 #include "leveldb/cache.h"
@@ -18,9 +18,8 @@
 #include "util/random.h"
 #include "util/testutil.h"
 #include "leveldb/index.h"
+#include "util/perf_log.h"
 
-uint64_t WRITE_LATENCY_IN_NS = 1000;
-uint64_t clflush_cnt = 0;
 
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
@@ -46,25 +45,12 @@ uint64_t clflush_cnt = 0;
 //      sstables    -- Print sstable info
 //      heapprofile -- Dump a heap profile (if supported by this port)
 static const char* FLAGS_benchmarks =
-    "fillseq,"
-    "fillsync,"
-    "fillrandom,"
-    "overwrite,"
-    "readrandom,"
-    "readrandom,"  // Extra run to allow previous compactions to quiesce
-    "rangequery,"
-    "readseq,"
-    "readreverse,"
-    "compact,"
-    "readrandom,"
-    "readseq,"
-    "readreverse,"
-    "fill100K,"
-    "crc32c,"
-    "snappycomp,"
-    "snappyuncomp,"
-    "acquireload,"
-    ;
+  "fillseq,"
+  "fillrandom,"
+  "readrandom,"
+  "readrandom,"
+  "rangequery,"
+;
 
 // Number of key/values to place in database
 static int FLAGS_num = 1000000;
@@ -116,9 +102,6 @@ static bool FLAGS_use_existing_db = false;
 // If true, reuse existing log/MANIFEST files when re-opening a database.
 static bool FLAGS_reuse_logs = false;
 
-// Merge candidate pick threshold
-static int FLAGS_merge_threshold = 50;
-
 // Use the db with the following name.
 static const char* FLAGS_db = NULL;
 
@@ -129,11 +112,11 @@ leveldb::Env* g_env = NULL;
 
 // Helper for quickly generating random data.
 class RandomGenerator {
- private:
+private:
   std::string data_;
   int pos_;
 
- public:
+public:
   RandomGenerator() {
     // We use a limited amount of data over and over again and ensure
     // that it is larger than the compression window (32KB), and also
@@ -182,7 +165,7 @@ static void AppendWithSpace(std::string* str, Slice msg) {
 }
 
 class Stats {
- private:
+private:
   double start_;
   double finish_;
   double seconds_;
@@ -193,7 +176,7 @@ class Stats {
   Histogram hist_;
   std::string message_;
 
- public:
+public:
   Stats() { Start(); }
 
   void Start() {
@@ -315,15 +298,15 @@ struct ThreadState {
   SharedState* shared;
 
   ThreadState(int index)
-      : tid(index),
-        rand(1000 + index) {
+    : tid(index),
+      rand(1000 + index) {
   }
 };
 
 }  // namespace
 
 class Benchmark {
- private:
+private:
   Cache* cache_;
   const FilterPolicy* filter_policy_;
   DB* db_;
@@ -410,18 +393,18 @@ class Benchmark {
 #endif
   }
 
- public:
+public:
   Benchmark()
-  : cache_(FLAGS_cache_size >= 0 ? NewLRUCache(FLAGS_cache_size) : NULL),
-    filter_policy_(FLAGS_bloom_bits >= 0
-                   ? NewBloomFilterPolicy(FLAGS_bloom_bits)
-                   : NULL),
-    db_(NULL),
-    num_(FLAGS_num),
-    value_size_(FLAGS_value_size),
-    entries_per_batch_(1),
-    reads_(FLAGS_reads < 0 ? FLAGS_num : FLAGS_reads),
-    heap_counter_(0) {
+    : cache_(FLAGS_cache_size >= 0 ? NewLRUCache(FLAGS_cache_size) : NULL),
+      filter_policy_(FLAGS_bloom_bits >= 0
+                     ? NewBloomFilterPolicy(FLAGS_bloom_bits)
+                     : NULL),
+      db_(NULL),
+      num_(FLAGS_num),
+      value_size_(FLAGS_value_size),
+      entries_per_batch_(1),
+      reads_(FLAGS_reads < 0 ? FLAGS_num : FLAGS_reads),
+      heap_counter_(0) {
     std::vector<std::string> files;
     g_env->GetChildren(FLAGS_db, &files);
     for (size_t i = 0; i < files.size(); i++) {
@@ -542,26 +525,13 @@ class Benchmark {
         }
       }
 
-      if (fresh_db) {
-        if (FLAGS_use_existing_db) {
-          fprintf(stdout, "%-12s : skipped (--use_existing_db is true)\n",
-                  name.ToString().c_str());
-          method = NULL;
-        } else {
-          delete db_;
-          db_ = NULL;
-          DestroyDB(FLAGS_db, Options());
-          Open();
-        }
-      }
-
       if (method != NULL) {
         RunBenchmark(num_threads, name, method);
       }
     }
   }
 
- private:
+private:
   struct ThreadArg {
     Benchmark* bm;
     SharedState* shared;
@@ -733,7 +703,6 @@ class Benchmark {
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
     options.index = new leveldb::Index();
-    options.merge_threshold = FLAGS_merge_threshold;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -791,13 +760,18 @@ class Benchmark {
     Iterator* iter = db_->NewIterator(ReadOptions());
     int i = 0;
     int64_t bytes = 0;
+    string value;
     for (iter->SeekToFirst(); i < reads_ && iter->Valid(); iter->Next()) {
       bytes += iter->key().size() + iter->value().size();
+      value = iter->value().ToString();
       thread->stats.FinishedSingleOp();
       ++i;
     }
     delete iter;
     thread->stats.AddBytes(bytes);
+    char msg[100];
+    snprintf(msg, sizeof(msg), "(%d of reads)", i);
+    thread->stats.AddMessage(msg);
   }
 
   void ReadReverse(ThreadState* thread) {
@@ -842,11 +816,13 @@ class Benchmark {
       snprintf(begin, sizeof(begin), "%016d", k);
       char end[100];
       snprintf(end, sizeof(end), "%016d", l);
-      Iterator* iter = db_->RangeQuery(options, begin, end);
-      while (iter->Valid()) {
+      Iterator* iter = db_->NewIterator(options);
+      int r = 0;
+      for (iter->Seek(begin); r < range_size_ && iter->Valid(); iter->Next()) {
         bytes += iter->key().size() + iter->value().size();
+        value = iter->value().ToString();
         thread->stats.FinishedSingleOp();
-        iter->Next();
+        ++r;
       }
       delete iter;
     }
@@ -992,6 +968,9 @@ class Benchmark {
 }  // namespace leveldb
 
 int main(int argc, char** argv) {
+#ifdef PERF_LOG
+  leveldb::createPerfLog();
+#endif
   FLAGS_write_buffer_size = leveldb::Options().write_buffer_size;
   FLAGS_max_file_size = leveldb::Options().max_file_size;
   FLAGS_block_size = leveldb::Options().block_size;
@@ -1035,8 +1014,6 @@ int main(int argc, char** argv) {
       FLAGS_bloom_bits = n;
     } else if (sscanf(argv[i], "--open_files=%d%c", &n, &junk) == 1) {
       FLAGS_open_files = n;
-    } else if (sscanf(argv[i], "--merge_threshold=%d%c", &n, &junk) == 1) {
-      FLAGS_merge_threshold = n;
     } else if (strncmp(argv[i], "--db=", 5) == 0) {
       FLAGS_db = argv[i] + 5;
     } else {
@@ -1049,12 +1026,15 @@ int main(int argc, char** argv) {
 
   // Choose a location for the test database if none given with --db=<path>
   if (FLAGS_db == NULL) {
-      leveldb::g_env->GetTestDirectory(&default_db_path);
-      default_db_path += "/dbbench";
-      FLAGS_db = default_db_path.c_str();
+    leveldb::g_env->GetTestDirectory(&default_db_path);
+    default_db_path += "/dbbench";
+    FLAGS_db = default_db_path.c_str();
   }
 
   leveldb::Benchmark benchmark;
   benchmark.Run();
+#ifdef PERF_LOG
+  leveldb::closePerfLog();
+#endif
   return 0;
 }

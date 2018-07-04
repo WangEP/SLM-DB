@@ -17,11 +17,7 @@ class ZeroLevelVersionEdit {
   ZeroLevelVersionEdit() : signal_(&mutex_) { Clear(); };
   ~ZeroLevelVersionEdit() {
     if (recovery_list_ != nullptr) {
-      if (is_numa) {
-        numa_free(recovery_list_, recovery_list_iter_ * sizeof(uint64_t));
-      } else {
-        delete[] recovery_list_;
-      }
+      delete[] recovery_list_;
     }
   }
 
@@ -104,13 +100,8 @@ class ZeroLevelVersionEdit {
     merge_candidates_.push_back(f);
   }
 
-  void AllocateRecoveryList(uint64_t size, bool numa) {
-    // NVM alloc
-    if (numa) {
-      recovery_list_ = (uint64_t*) numa_alloc_onnode(size*sizeof(uint64_t), 1);
-    } else {
-      recovery_list_ = new uint64_t[size];
-    }
+  void AllocateRecoveryList(uint64_t size) {
+    recovery_list_ = new uint64_t[size];
     recovery_list_iter_ = 0;
   }
 

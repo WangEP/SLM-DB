@@ -8,6 +8,7 @@
 #include "leveldb/env.h"
 #include "leveldb/table.h"
 #include "util/coding.h"
+#include "table/format.h"
 
 namespace leveldb {
 
@@ -104,6 +105,25 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
   }
   return result;
 }
+Status TableCache::Get(const ReadOptions& options,
+                       const uint16_t& file_number,
+                       const uint32_t& offset,
+                       const uint16_t& size,
+                       const Slice& k,
+                       void* arg,
+                       void(*saver)(void*, const Slice&, const Slice&)) {
+  Iterator* block_iter = nullptr;
+  Status s = GetBlockIterator(options, file_number, offset, size, &block_iter);
+  if (block_iter != nullptr) {
+    block_iter->Seek(k);
+    if (block_iter->Valid()) {
+      (*saver)(arg, block_iter->key(), block_iter->value());
+    }
+    s = block_iter->status();
+    delete block_iter;
+  }
+  return s;
+}
 
 Status TableCache::Get(const ReadOptions& options,
                        uint64_t file_number,
@@ -111,7 +131,7 @@ Status TableCache::Get(const ReadOptions& options,
                        const Slice& k,
                        void* arg,
                        void (*saver)(void*, const Slice&, const Slice&)) {
-  Cache::Handle* handle = nullptr;
+  Cache::Handle* handle = NULL;
   Status s = FindTable(file_number, file_size, &handle);
   if (s.ok()) {
     Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
@@ -121,20 +141,19 @@ Status TableCache::Get(const ReadOptions& options,
   return s;
 }
 
-Status TableCache::Get2(const ReadOptions& options,
-            uint64_t file_number,
-            uint64_t file_size,
-            const BlockHandle& block_handle,
-            const Slice& k,
-            void* arg,
-            void(*saver)(void*, const Slice&, const Slice&)) {
+Status TableCache::GetBlockIterator(const ReadOptions& options,
+                                    const u_int16_t file_number,
+                                    const uint32_t& offset,
+                                    const uint16_t& size,
+                                    Iterator** iterator) {
   Cache::Handle* handle = nullptr;
-  Status s = FindTable(file_number, file_size, &handle);
+  Status s = FindTable(file_number, 0, &handle);
   if (s.ok()) {
-    Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
-    s = t->InternalGet2(options, k, block_handle, arg, saver);
+    Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+    *iterator = table->BlockIterator(options, BlockHandle(size, offset));
     cache_->Release(handle);
   }
+  assert(s.ok());
   return s;
 }
 

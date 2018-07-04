@@ -41,15 +41,18 @@ class DBImpl : public DB {
   virtual const Snapshot* GetSnapshot();
   virtual void ReleaseSnapshot(const Snapshot* snapshot);
   virtual bool GetProperty(const Slice& property, std::string* value);
-  virtual Iterator* RangeQuery(const ReadOptions&, const Slice& begin, const Slice& end);
   virtual void CompactRange(const Slice* begin, const Slice* end) { }
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes) { }
-  virtual Iterator* NewIterator(const ReadOptions&) { return nullptr; }
+  virtual Iterator* NewIterator(const ReadOptions&);
 
  private:
   friend class DB;
   struct CompactionState;
   struct Writer;
+
+  Iterator* NewInternalIterator(const ReadOptions&,
+                                SequenceNumber* latest_snapshot,
+                                uint32_t* seed);
 
   Status NewDB();
 

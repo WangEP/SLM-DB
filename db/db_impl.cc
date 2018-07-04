@@ -711,13 +711,6 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   delete compact->builder;
   compact->builder = nullptr;
 
-  // Finish and check for file errors
-  if (s.ok()) {
-    s = compact->outfile->Sync();
-  }
-  if (s.ok()) {
-    s = compact->outfile->Close();
-  }
   delete compact->outfile;
   compact->outfile = nullptr;
 
@@ -831,7 +824,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         compact->compaction->IsBaseLevelForKey(ikey.user_key),
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
-    if (!compact->compaction->IsInput(index_->Get(key)->file_number)) {
+    if (!compact->compaction->IsInput(index_->Get(key).file_number)) {
       drop = true;
     }
 
@@ -901,7 +894,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 namespace {
 struct IterState {
   port::Mutex* mu;
-  ZeroLevelVersion* version;
   MemTable* mem;
   MemTable* imm;
 };
@@ -911,58 +903,10 @@ static void CleanupIteratorState(void* arg1, void* arg2) {
   state->mu->Lock();
   state->mem->Unref();
   if (state->imm != nullptr) state->imm->Unref();
-  state->version->Unref();
   state->mu->Unlock();
   delete state;
 }
 }  // namespace
-
-Iterator* DBImpl::RangeQuery(const ReadOptions& options,
-                             const Slice& begin,
-                             const Slice& end) {
-  IterState* cleanup = new IterState;
-  std::vector<Iterator*> list;
-  mutex_.Lock();
-  //
-  versions_->current()->Ref();
-  SequenceNumber snapshot;
-  if (options.snapshot != nullptr) {
-    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
-  } else {
-    snapshot = versions_->LastSequence();
-  }
-  LookupKey k(begin, snapshot);
-  // add mem iterator
-  Iterator* mem_iter = mem_->NewIterator();
-  mem_iter->Seek(k.memtable_key());
-  list.push_back(mem_iter);
-  mem_->Ref();
-
-  // add imm iterator
-  if (imm_ != nullptr) {
-    Iterator* imm_iter = imm_->NewIterator();
-    imm_iter->Seek(k.memtable_key());
-    list.push_back(imm_iter);
-    imm_->Ref();
-  }
-
-  // add BTree range query
-  list.push_back(index_->Range(begin, end, versions_));
-
-  // put all together
-  Iterator* range_iterator = NewRangeIterator(&internal_comparator_,
-                                                std::move(list),
-                                                list.size());
-  // init cleaner
-  cleanup->mu = &mutex_;
-  cleanup->mem = mem_;
-  cleanup->imm = imm_;
-  cleanup->version = versions_->current();
-  range_iterator->RegisterCleanup(CleanupIteratorState, cleanup, nullptr);
-
-  mutex_.Unlock();
-  return range_iterator;
-}
 
 Status DBImpl::Get(const ReadOptions& options,
                    const Slice& key,
@@ -1002,6 +946,47 @@ Status DBImpl::Get(const ReadOptions& options,
   if (imm != nullptr) imm->Unref();
   current->Unref();
   return s;
+}
+
+Iterator* DBImpl::NewIterator(const ReadOptions& options) {
+  SequenceNumber latest_snapshot;
+  uint32_t seed;
+  Iterator* iter = NewInternalIterator(options, &latest_snapshot, &seed);
+  return NewDBIterator(
+    this, user_comparator(), iter,
+    (options.snapshot != NULL
+     ? reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_
+     : latest_snapshot),
+    seed);
+}
+
+Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
+                                      SequenceNumber* latest_snapshot,
+                                      uint32_t* seed) {
+  IterState* cleanup = new IterState;
+  mutex_.Lock();
+  *latest_snapshot = versions_->LastSequence();
+
+  // Collect together all needed child iterators
+  std::vector<Iterator*> list;
+  list.push_back(mem_->NewIterator());
+  mem_->Ref();
+  if (imm_ != NULL) {
+    list.push_back(imm_->NewIterator());
+    imm_->Ref();
+  }
+  list.push_back(index_->NewIterator(options, table_cache_));
+  Iterator* internal_iter =
+    NewMergingIterator(&internal_comparator_, &list[0], list.size());
+
+  cleanup->mu = &mutex_;
+  cleanup->mem = mem_;
+  cleanup->imm = imm_;
+  internal_iter->RegisterCleanup(CleanupIteratorState, cleanup, NULL);
+
+  *seed = ++seed_;
+  mutex_.Unlock();
+  return internal_iter;
 }
 
 const Snapshot* DBImpl::GetSnapshot() {
@@ -1301,7 +1286,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
   bool save_manifest = false;
   Status s;
   // do not recover from logs
-   s = impl->Recover(&edit, &save_manifest);
+  s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == nullptr) {
     // Create new log and a corresponding memtable.
     if (!options.disable_recovery_log) {

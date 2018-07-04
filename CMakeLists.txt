@@ -35,7 +35,7 @@ if(MSVC)
 else()
     add_compile_options(
             -Wno-sign-compare
-            -std=c++11
+            -std=c++17
             -O2
             -DNDEBUG
     )
@@ -46,9 +46,9 @@ add_definitions(-DOS_LINUX)
 add_definitions(-DLEVELDB_PLATFORM_POSIX)
 add_definitions(-fno-builtin-memcmp)
 add_definitions(-Wint-to-pointer-cast)
+add_definitions(-DPERF_LOG=1)
 
 set(LEVEL_DB_FILES
-#        include/leveldb/c.h
         include/leveldb/cache.h
         include/leveldb/comparator.h
         include/leveldb/db.h
@@ -65,13 +65,12 @@ set(LEVEL_DB_FILES
         include/leveldb/write_batch.h
         include/leveldb/export.h
         include/leveldb/index.h
-#        db/c.cc
         db/builder.cc
         db/builder.h
         db/db_impl.cc
         db/db_impl.h
-#        db/db_iter.cc
-#        db/db_iter.h
+        db/db_iter.cc
+        db/db_iter.h
         db/dbformat.cc
         db/dbformat.h
         db/dumpfile.cc
@@ -87,18 +86,16 @@ set(LEVEL_DB_FILES
         db/snapshot.h
         db/memtable.cc
         db/memtable.h
-#        db/repair.cc
         db/table_cache.cc
         db/table_cache.h
-#        db/version_edit.cc
-#        db/version_edit.h
-#        db/version_set.cc
-#        db/version_set.h
         db/write_batch.cc
         db/write_batch_internal.h
-        index/index.cc
-        index/nvm_btree.cc
-        index/nvm_btree.h
+        db/zero_level_version.cc
+        db/zero_level_version.h
+        db/version_control.cc
+        db/version_control.h
+        db/zero_level_version_edit.cc
+        db/zero_level_version_edit.h
         db/logger.cc
         db/logger.h
         table/block.cc
@@ -141,26 +138,23 @@ set(LEVEL_DB_FILES
         util/persist.h
         util/testharness.h
         util/testharness.cc
-        port/port.h
-        port/atomic_pointer.h
         util/thread_pool.h
-        db/persistent_skiplist.h
-        db/persistent_memtable.cc
-        db/persistent_memtable.h
-        db/persistent_skiplist.cc
         util/int_based_comparator.h
         util/testutil.h
         util/testutil.cc
+        util/perf_log.h
+        util/perf_log.cc
+        port/port.h
+        port/atomic_pointer.h
+        index/index.cc
+        index/nvm_btree.cc
+        index/nvm_btree.h
         index/index_iterator.cc
         index/index_iterator.h
-        db/zero_level_version.cc
-        db/zero_level_version.h
-        db/version_control.cc
-        db/version_control.h
-        db/zero_level_version_edit.cc
-        db/zero_level_version_edit.h
-        index/fast_pm_btree.cc
-        index/fast_pm_btree.h)
+        index/ff_btree.cc
+        index/ff_btree.h
+        index/ff_btree_iterator.cc
+        index/ff_btree_iterator.h)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES
@@ -209,9 +203,6 @@ target_link_libraries(sanity_check PUBLIC leveldb)
 
 add_executable(db_bench db/db_bench.cc)
 target_link_libraries(db_bench PUBLIC leveldb)
-
-add_executable(range_check bench/range_check.cc)
-target_link_libraries(range_check PUBLIC leveldb)
 
 add_executable(nvm_btree_test index/nvm_btree_test.cc)
 target_link_libraries(nvm_btree_test PUBLIC leveldb)

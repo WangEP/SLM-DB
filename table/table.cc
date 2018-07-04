@@ -14,6 +14,9 @@
 #include "table/format.h"
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
+#ifdef PERF_LOG
+#include "util/perf_log.h"
+#endif
 
 namespace leveldb {
 
@@ -230,7 +233,14 @@ Iterator* Table::BlockReader2(void* arg,
     if (cache_handle != nullptr) {
       block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
     } else {
+#ifdef PERF_LOG
+      uint64_t start_micros = NowMicros();
+#endif
       s = ReadBlock(table->rep_->file, options, handle, &contents);
+#ifdef PERF_LOG
+      uint64_t micros = NowMicros() - start_micros;
+      logMicro(micros);
+#endif
       if (s.ok()) {
         block = new Block(contents);
         if (contents.cachable && options.fill_cache) {
@@ -240,7 +250,14 @@ Iterator* Table::BlockReader2(void* arg,
       }
     }
   } else {
+#ifdef PERF_LOG
+    uint64_t start_micros = NowMicros();
+#endif
     s = ReadBlock(table->rep_->file, options, handle, &contents);
+#ifdef PERF_LOG
+    uint64_t micros = NowMicros() - start_micros;
+        logMicro(micros);
+#endif
     if (s.ok()) {
       block = new Block(contents);
     }
@@ -251,6 +268,66 @@ Iterator* Table::BlockReader2(void* arg,
     iter = block->NewIterator(table->rep_->options.comparator);
     if (cache_handle == nullptr) {
       iter->RegisterCleanup(&DeleteBlock, block, nullptr);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
+  } else {
+    iter = NewErrorIterator(s);
+  }
+  return iter;
+}
+
+Iterator* Table::BlockIterator(const ReadOptions& options,
+                               const BlockHandle& handle) {
+  Status s;
+  Cache* block_cache = rep_->options.block_cache;
+  Cache::Handle* cache_handle = NULL;
+  Block* block = NULL;
+  BlockContents contents;
+  if (block_cache != NULL) {
+    char cache_key_buffer[16];
+    EncodeFixed64(cache_key_buffer, rep_->cache_id);
+    EncodeFixed64(cache_key_buffer+8, handle.offset());
+    Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+    cache_handle = block_cache->Lookup(key);
+    if (cache_handle != NULL) {
+      block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+    } else {
+#ifdef PERF_LOG
+      uint64_t start_micros = NowMicros();
+#endif
+      s = ReadBlock(rep_->file, options, handle, &contents);
+#ifdef PERF_LOG
+      uint64_t micros = NowMicros() - start_micros;
+      logMicro(micros);
+#endif
+      if (s.ok()) {
+        block = new Block(contents);
+        if (contents.cachable && options.fill_cache) {
+          cache_handle = block_cache->Insert(
+            key, block, block->size(), &DeleteCachedBlock);
+        }
+      }
+    }
+  } else {
+#ifdef PERF_LOG
+    uint64_t start_micros = NowMicros();
+#endif
+    s = ReadBlock(rep_->file, options, handle, &contents);
+#ifdef PERF_LOG
+    uint64_t micros = NowMicros() - start_micros;
+    logMicro(micros);
+#endif
+    if (s.ok()) {
+      block = new Block(contents);
+    }
+  }
+
+  Iterator* iter;
+  if (block != NULL) {
+    iter = block->NewIterator(rep_->options.comparator);
+    if (cache_handle == NULL) {
+      iter->RegisterCleanup(&DeleteBlock, block, NULL);
     } else {
       iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
     }

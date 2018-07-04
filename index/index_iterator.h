@@ -4,16 +4,15 @@
 #include <vector>
 #include "leveldb/iterator.h"
 #include "leveldb/index.h"
-#include "index/nvm_btree.h"
+#include "index/ff_btree_iterator.h"
 #include "table/format.h"
-#include "db/version_control.h"
 #include "db/table_cache.h"
 
 namespace leveldb {
 
 class IndexIterator : public Iterator {
- public:
-  IndexIterator(std::vector<LeafEntry*> entries, void* ptr);
+public:
+  IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, TableCache* table_cache);
   ~IndexIterator();
 
   virtual bool Valid() const;
@@ -26,21 +25,20 @@ class IndexIterator : public Iterator {
   virtual Slice value() const;
   virtual Status status() const;
 
- private:
-  std::vector<LeafEntry*> entries_;
-  std::vector<LeafEntry*>::iterator iterator_;
-  std::string key_;
+private:
+  FFBtreeIterator* btree_iterator_;
+  Cache* cache_;
+  Cache::Handle* handle_;
+  IndexMeta index_meta_;
   ReadOptions options_;
-  uint64_t file_number_;
-  IndexMeta* index_ptr_;
-  VersionControl* vset_;
-  TableHandle* table_handle_;
+  TableCache* table_cache_;
   Iterator* block_iterator_;
-//  int it = 0;
+  Status status_;
 
-  void IndexChange();
+  void CacheLookup();
+  void Advance();
 };
 
 }
 
-#endif //STORAGE_LEVELDB_INDEX_INDEX_ITERATOR_H_
+#endif // STORAGE_LEVELDB_INDEX_INDEX_ITERATOR_H_
