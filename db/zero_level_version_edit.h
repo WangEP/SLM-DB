@@ -15,11 +15,7 @@ namespace leveldb {
 class ZeroLevelVersionEdit {
  public:
   ZeroLevelVersionEdit() : signal_(&mutex_) { Clear(); };
-  ~ZeroLevelVersionEdit() {
-    if (recovery_list_ != nullptr) {
-      delete[] recovery_list_;
-    }
-  }
+  ~ZeroLevelVersionEdit() = default;
 
   void Ref() { refs_++; };
   void Unref() {
@@ -101,14 +97,12 @@ class ZeroLevelVersionEdit {
   }
 
   void AllocateRecoveryList(uint64_t size) {
-    recovery_list_ = new uint64_t[size];
-    recovery_list_iter_ = 0;
+    recovery_list_.reserve(size);
   }
 
   void AddToRecoveryList(uint64_t fnumber) {
-    recovery_list_[recovery_list_iter_] = fnumber;
-    clflush((char*)&recovery_list_[recovery_list_iter_], sizeof(uint64_t));
-    recovery_list_iter_++;
+    recovery_list_.push_back(fnumber);
+    clflush((char*)&recovery_list_[recovery_list_.size()-1], sizeof(uint64_t));
   }
 
   void EncodeTo(std::string* dst) const;
@@ -122,8 +116,7 @@ class ZeroLevelVersionEdit {
   std::vector<uint64_t> deleted_files_;
   std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
 
-  uint64_t* recovery_list_;
-  uint64_t recovery_list_iter_;
+  std::vector<uint64_t> recovery_list_;
 
   std::string comparator_;
   uint64_t log_number_;

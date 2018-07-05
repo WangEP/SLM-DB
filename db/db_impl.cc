@@ -557,7 +557,7 @@ void DBImpl::CompactMemTable() {
     imm_->Unref();
     imm_ = nullptr;
     has_imm_.Release_Store(nullptr);
-    // DeleteObsoleteFiles();
+    DeleteObsoleteFiles();
   } else {
     RecordBackgroundError(s);
   }
@@ -680,7 +680,6 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
-    compact->compaction->edit()->Ref();
     compact->builder = new TableBuilder(options_, compact->outfile, file_number);
   }
   return s;

@@ -39,7 +39,12 @@ IndexMeta Index::Get(const Slice& key) {
 }
 
 void Index::Insert(const uint32_t& key, IndexMeta meta) {
-  tree_.Insert(key, convert(meta));
+  edit_->AddToRecoveryList(meta.file_number);
+  // TODO: check btree if updated
+  void* old_meta = tree_.Insert(key, convert(meta));
+  if (old_meta != nullptr) {
+    edit_->DecreaseCount(convert(old_meta).file_number);
+  }
 }
 
 void Index::AsyncInsert(const KeyAndMeta& key_and_meta) {
@@ -63,6 +68,7 @@ void Index::Runner() {
     for (;queue_.empty();) {
       condvar_.Wait();
     }
+    edit_->AllocateRecoveryList(queue_.size());
     assert(queue_.size() > 0);
     for (;!queue_.empty();) {
       auto key = queue_.front().key;
@@ -86,6 +92,7 @@ void Index::AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit) 
   assert(queue_.size() == 0);
   queue_.swap(queue);
   edit_ = edit;
+  edit_->Ref();
   if (!bgstarted_) {
     bgstarted_ = true;
     port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));

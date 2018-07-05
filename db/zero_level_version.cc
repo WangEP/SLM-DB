@@ -96,7 +96,12 @@ std::string ZeroLevelVersion::DebugString() const {
     r.append(file.second->smallest.DebugString());
     r.append(" .. ");
     r.append(file.second->largest.DebugString());
-    r.append("]\n");
+    r.append("]");
+    r.append(" {");
+    AppendNumberTo(&r, file.second->alive);
+    r.append(" / ");
+    AppendNumberTo(&r, file.second->total);
+    r.append("}\n");
   }
   r.append("Files to merge:\n");
   for (const auto& file : merge_candidates_) {
@@ -108,15 +113,14 @@ std::string ZeroLevelVersion::DebugString() const {
     r.append(file.second->smallest.DebugString());
     r.append(" .. ");
     r.append(file.second->largest.DebugString());
-    r.append("]\n");
+    r.append("]");
+    r.append(" {");
+    AppendNumberTo(&r, file.second->alive);
+    r.append(" / ");
+    AppendNumberTo(&r, file.second->total);
+    r.append("}\n");
   }
   return r;
-}
-
-ZeroLevelVersion::~ZeroLevelVersion() {
-  for (auto pair : files_) {
-    auto f = pair.second;
-  }
 }
 
 void ZeroLevelVersion::AddFile(std::shared_ptr<FileMetaData> f) {

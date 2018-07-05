@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <set>
+#include <utility>
 #include "leveldb/env.h"
 #include "log_writer.h"
 #include "table_cache.h"
@@ -27,7 +28,7 @@ struct FileMetaData {
                InternalKey smallest_, InternalKey largest_)
       : number(number_), file_size(file_size_),
         total(total_), alive(alive_),
-        smallest(smallest_), largest(largest_) { }
+        smallest(std::move(smallest_)), largest(std::move(largest_)) { }
 };
 
 class ZeroLevelVersion {
@@ -72,7 +73,7 @@ class ZeroLevelVersion {
   VersionControl* vcontrol_;
   int refs_;
 
-  ~ZeroLevelVersion();
+  ~ZeroLevelVersion() = default;
   // no copy
   ZeroLevelVersion(const ZeroLevelVersion&);
   void operator=(const ZeroLevelVersion&);

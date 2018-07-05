@@ -36,14 +36,14 @@ private:
 
   void setNewRoot(void* new_root);
   // store the key into the node at the given level
-  void InsertInternal(void* left, entry_key_t key, void* right, uint32_t level);
+  void* InsertInternal(void* left, entry_key_t key, void* right, uint32_t level);
   void RemoveInternal(entry_key_t left, void* ptr, uint32_t level,
                       entry_key_t* deleted_key, bool* is_leftmost_node, Page** left_sibling);
 
 public:
   FFBtree();
 // insert the key in the leaf node
-  void Insert(entry_key_t key, void* right);
+  void* Insert(entry_key_t key, void* right);
   void Remove(entry_key_t key);
   void* Search(entry_key_t key);
   FFBtreeIterator* GetIterator();
@@ -371,7 +371,7 @@ public:
     return true;
   }
 
-  inline void
+  inline void*
   insert_key(entry_key_t key, void* ptr, int* num_entries, bool flush = true,
              bool update_last_index = true) {
     // update switch_counter
@@ -380,8 +380,8 @@ public:
 
     // FAST
     if (*num_entries == 0) {  // this page is empty
-      Entry* new_entry = (Entry*) &records[0];
-      Entry* array_end = (Entry*) &records[1];
+      Entry* new_entry = &records[0];
+      Entry* array_end = &records[1];
       new_entry->key = (entry_key_t) key;
       new_entry->ptr = ptr;
 
@@ -391,7 +391,7 @@ public:
         clflush((char*) this, CACHE_LINE_SIZE);
       }
     } else {
-      int i = *num_entries - 1, inserted = 0, to_flush_cnt = 0;
+      int i, inserted = 0, to_flush_cnt = 0;
       records[*num_entries + 1].ptr = records[*num_entries].ptr;
       if (flush) {
         if ((uint64_t) &(records[*num_entries + 1].ptr) % CACHE_LINE_SIZE == 0)
@@ -402,11 +402,12 @@ public:
       if (hdr.leftmost_ptr == nullptr) {
         for (i = *num_entries - 1; i >= 0; i--) {
           if (key == records[i].key) {
+            void* old_ptr = records[i].ptr;
             records[i].ptr = ptr;
             if (flush) {
               clflush((char*) &records[i].ptr, sizeof(void*));
             }
-            return;
+            return old_ptr;
           }
         }
       }
@@ -454,11 +455,12 @@ public:
       hdr.last_index = *num_entries;
     }
     ++(*num_entries);
+    return nullptr;
   }
 
   // Insert a new key - FAST and FAIR
   Page* store(FFBtree* bt, void* left, entry_key_t key, void* right,
-              bool flush, Page* invalid_sibling = NULL) {
+              bool flush, Page* invalid_sibling = NULL, void** upd_ptr = NULL) {
     // If this node has a sibling node,
     if (hdr.sibling_ptr && (hdr.sibling_ptr != invalid_sibling)) {
       // Compare this key with the first key of the sibling
@@ -472,7 +474,7 @@ public:
 
     // FAST
     if (num_entries < cardinality - 1) {
-      insert_key(key, right, &num_entries, flush);
+      *upd_ptr = insert_key(key, right, &num_entries, flush);
       return this;
     } else {// FAIR
       // overflow
@@ -485,7 +487,7 @@ public:
       int sibling_cnt = 0;
       if (hdr.leftmost_ptr == NULL) { // leaf node
         for (int i = m; i < num_entries; ++i) {
-          sibling->insert_key(records[i].key, records[i].ptr, &sibling_cnt, false);
+          *upd_ptr = sibling->insert_key(records[i].key, records[i].ptr, &sibling_cnt, false);
         }
       } else { // internal node
         for (int i = m + 1; i < num_entries; ++i) {
@@ -526,12 +528,15 @@ public:
 
       // Set a new root or insert the split key to the parent
       if (bt->root == this) { // only one node can update the root ptr
-        Page* new_root = new Page((Page*) this, split_key, sibling,
+        Page* new_root = new Page(this, split_key, sibling,
                                   hdr.level + 1);
         bt->setNewRoot(new_root);
       } else {
-        bt->InsertInternal(NULL, split_key, sibling,
+        void* tmp = bt->InsertInternal(NULL, split_key, sibling,
                            hdr.level + 1);
+        if (tmp) {
+          printf("debug\n");
+        }
       }
 
       return ret;

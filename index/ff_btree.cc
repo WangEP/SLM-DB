@@ -40,31 +40,35 @@ void* FFBtree::Search(entry_key_t key){
   return (char *)t;
 }
 
-void FFBtree::Insert(entry_key_t key, void* right){ //need to be string
+void* FFBtree::Insert(entry_key_t key, void* right){ //need to be string
   Page* p = (Page*)root;
 
   while(p->hdr.leftmost_ptr != NULL) {
     p = (Page*)p->linear_search(key);
   }
 
-  if(!p->store(this, NULL, key, right, true)) { // store
-    Insert(key, right);
+  void* ret = nullptr;
+  if(!p->store(this, NULL, key, right, true, nullptr, &ret)) { // store
+    return Insert(key, right);
   }
+  return ret;
 }
 
-void FFBtree::InsertInternal(void* left, entry_key_t key,
+void* FFBtree::InsertInternal(void* left, entry_key_t key,
                              void* right, uint32_t level) {
   if(level > ((Page *)root)->hdr.level)
-    return;
+    return nullptr;
 
   Page *p = (Page *)this->root;
 
   while(p->hdr.level > level)
     p = (Page *)p->linear_search(key);
 
-  if(!p->store(this, NULL, key, right, true)) {
-    InsertInternal(left, key, right, level);
+  void* ret = nullptr;
+  if(!p->store(this, NULL, key, right, true, nullptr, &ret)) {
+    return InsertInternal(left, key, right, level);
   }
+  return ret;
 }
 
 void FFBtree::Remove(entry_key_t key) {

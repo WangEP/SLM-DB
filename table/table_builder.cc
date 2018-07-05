@@ -232,7 +232,6 @@ Status TableBuilder::Finish(ZeroLevelVersionEdit* edit) {
   Flush();
   assert(!r->closed);
   r->closed = true;
-  assert(r->index_queue.empty());
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
@@ -289,7 +288,7 @@ Status TableBuilder::Finish(ZeroLevelVersionEdit* edit) {
     r->status = r->file->Close();
   }
   r->index->AddQueue(r->index_queue, edit);
-  assert(r->index_queue.size() == 0);
+  assert(r->index_queue.empty());
   return r->status;
 }
 

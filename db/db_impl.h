@@ -19,9 +19,7 @@ namespace leveldb {
 
 class MemTable;
 class TableCache;
-class Version;
 class VersionEdit;
-class VersionSet;
 class VersionControl;
 class ZeroLevelVersion;
 class ZeroLevelVersionEdit;

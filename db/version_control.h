@@ -16,6 +16,7 @@ class VersionControl {
                  const Options* options,
                  TableCache* table_cache,
                  const InternalKeyComparator*);
+  ~VersionControl();
 
   struct SummaryStorage {
     char buffer[100];

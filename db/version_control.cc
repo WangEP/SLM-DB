@@ -146,6 +146,12 @@ VersionControl::VersionControl(const std::string& dbname,
   AppendVersion(new ZeroLevelVersion(this));
 }
 
+VersionControl::~VersionControl() {
+  delete descriptor_log_;
+  delete descriptor_file_;
+  current_->Unref();
+}
+
 void VersionControl::AppendVersion(ZeroLevelVersion* v) {
   assert(v->refs_ == 0);
   assert(v != current_);
@@ -424,7 +430,7 @@ ZeroLevelCompaction* VersionControl::ForcedCompaction() {
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-  return new_merge_candidates_ || current_->merge_candidates_.size() > config::kL0_CompactionTrigger;
+  return current_->merge_candidates_.size() > config::kL0_CompactionTrigger;
 }
 
 Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {

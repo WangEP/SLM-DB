@@ -33,7 +33,6 @@ Status BuildTable(const std::string& dbname,
     if (!s.ok()) {
       return s;
     }
-    edit->Ref();
     TableBuilder* builder = new TableBuilder(options, file, meta->number);
     meta->smallest.DecodeFrom(iter->key());
     Slice prev_key;
