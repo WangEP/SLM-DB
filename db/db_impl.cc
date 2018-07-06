@@ -246,13 +246,13 @@ void DBImpl::DeleteObsoleteFiles() {
           break;
         case kTableFile:
           // keep = (live.find(number) != live.end());
-          keep = versions_->current()->IsAlive(number);
+          keep = versions_->current()->IsAlive(number) || pending_outputs_.count(number) > 0;
           break;
         case kTempFile:
           // Any temp files that are currently being written to must
           // be recorded in pending_outputs_, which is inserted into "live"
           // keep = (live.find(number) != live.end());
-          keep = versions_->current()->IsAlive(number);
+          keep = versions_->current()->IsAlive(number) || pending_outputs_.count(number) > 0;
           break;
         case kCurrentFile:
         case kDBLockFile:

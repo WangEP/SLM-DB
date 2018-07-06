@@ -481,7 +481,7 @@ Status VersionControl::WriteSnapshot(log::Writer* log) {
 }
 
 const char* VersionControl::Summary(SummaryStorage* scratch) const {
-  snprintf(scratch->buffer, sizeof(scratch->buffer), "total files %d", int(current_->NumFiles()));
+  snprintf(scratch->buffer, sizeof(scratch->buffer), " Regular files number %lu, Merge files number %lu", current_->NumFiles(), current_->MergeNumFiles());
   return scratch->buffer;
 }
 

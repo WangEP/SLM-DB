@@ -44,7 +44,8 @@ class ZeroLevelVersion {
   void AddFile(std::shared_ptr<FileMetaData> f);
   void AddCompactionFile(std::shared_ptr<FileMetaData> f);
 
-  uint64_t NumFiles() { return files_.size() + merge_candidates_.size(); }
+  uint64_t NumFiles() { return files_.size(); }
+  uint64_t MergeNumFiles() { return merge_candidates_.size(); }
   uint64_t NumBytes() {
     uint64_t bytes = 0;
     for (auto f : files_) bytes += f.second->file_size;

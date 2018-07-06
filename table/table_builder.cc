@@ -153,13 +153,6 @@ void TableBuilder::Flush() {
   if (r->filter_block != nullptr) {
     r->filter_block->StartBlock(r->offset);
   }
-//  if (ok()) {
-//    r->index->AddQueue(r->index_queue);
-//    assert(r->index_queue.size() == 0);
-//    if (!r->index_queue.empty())
-//      Log(r->options.info_log, "queue not empty, size %d", r->index_queue.size());
-//    r->index_queue.clear();
-//  }
 }
 
 void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block) {
