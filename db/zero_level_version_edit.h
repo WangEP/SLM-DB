@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include <util/persist.h>
-#include <numa.h>
 #include "dbformat.h"
 #include "zero_level_version.h"
 #include "index/nvm_btree.h"

@@ -102,6 +102,12 @@ static bool FLAGS_use_existing_db = false;
 // If true, reuse existing log/MANIFEST files when re-opening a database.
 static bool FLAGS_reuse_logs = false;
 
+// live/total percentage to add into compaction
+static int FLAGS_merge_threshold = 50;
+
+// Range query size
+static int FLAGS_range_size = 1000;
+
 // Use the db with the following name.
 static const char* FLAGS_db = NULL;
 
@@ -485,7 +491,7 @@ public:
         method = &Benchmark::ReadRandom;
       } else if (name == Slice("rangequery")) {
         ranges_ = 10;
-        range_size_ = 1000;
+        range_size_ = FLAGS_range_size;
         method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;
@@ -703,6 +709,7 @@ private:
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
     options.index = new leveldb::Index();
+    options.merge_threshold = FLAGS_merge_threshold;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -1014,6 +1021,10 @@ int main(int argc, char** argv) {
       FLAGS_bloom_bits = n;
     } else if (sscanf(argv[i], "--open_files=%d%c", &n, &junk) == 1) {
       FLAGS_open_files = n;
+    } else if (sscanf(argv[i], "--merge_ratio=%d%c", &n, &junk) == 1) {
+      FLAGS_merge_threshold = n;
+    } else if (sscanf(argv[i], "--range_size=%d%c", &n, &junk) == 1) {
+      FLAGS_range_size = n;
     } else if (strncmp(argv[i], "--db=", 5) == 0) {
       FLAGS_db = argv[i] + 5;
     } else {
