@@ -65,6 +65,8 @@ class ZeroLevelVersion {
 
   bool IsAlive(uint64_t fnumber) { return files_.count(fnumber) > 0 || merge_candidates_.count(fnumber) > 0; }
 
+  void SortMergeCandidates();
+
   std::string DebugString() const;
 
   friend class VersionControl;

@@ -1,6 +1,9 @@
 #include "zero_level_version.h"
 #include "version_control.h"
 #include "leveldb/index.h"
+#ifdef PERF_LOG
+#include "util/perf_log.h"
+#endif
 
 namespace leveldb {
 
@@ -40,7 +43,16 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
   const Comparator* ucmp = vcontrol_->user_comparator();
 
   Index* index = vcontrol_->options()->index;
+
+#ifdef PERF_LOG
+  uint64_t start_micros = NowMicros();
+#endif
   IndexMeta index_meta = index->Get(user_key);
+#ifdef PERF_LOG
+  uint64_t micros = NowMicros() - start_micros;
+  logMicro(QUERY, micros);
+#endif
+
   if (convert(index_meta) != 0) {
 
     Saver saver;
@@ -129,6 +141,10 @@ void ZeroLevelVersion::AddFile(std::shared_ptr<FileMetaData> f) {
 
 void ZeroLevelVersion::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
   merge_candidates_.insert({f->number, f});
+}
+
+void ZeroLevelVersion::SortMergeCandidates() {
+
 }
 
 } // namespace leveldb

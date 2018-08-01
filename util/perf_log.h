@@ -7,7 +7,18 @@
 
 namespace leveldb {
 
-extern void logMicro(uint64_t);
+enum Type {
+  QUERY = 0,
+  VERSION = 1,
+  BLOCK = 2,
+  COMPACTION = 3,
+  COMPACTION_F = 4,
+  RANGE = 5
+};
+
+extern void logMicro(Type, uint64_t);
+
+extern void logMicro(Type, uint64_t, uint64_t);
 
 extern uint64_t NowMicros();
 

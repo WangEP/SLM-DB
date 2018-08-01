@@ -239,7 +239,7 @@ Iterator* Table::BlockReader2(void* arg,
       s = ReadBlock(table->rep_->file, options, handle, &contents);
 #ifdef PERF_LOG
       uint64_t micros = NowMicros() - start_micros;
-      logMicro(micros);
+      logMicro(BLOCK, micros);
 #endif
       if (s.ok()) {
         block = new Block(contents);
@@ -256,7 +256,7 @@ Iterator* Table::BlockReader2(void* arg,
     s = ReadBlock(table->rep_->file, options, handle, &contents);
 #ifdef PERF_LOG
     uint64_t micros = NowMicros() - start_micros;
-        logMicro(micros);
+    logMicro(BLOCK, micros);
 #endif
     if (s.ok()) {
       block = new Block(contents);
@@ -299,7 +299,7 @@ Iterator* Table::BlockIterator(const ReadOptions& options,
       s = ReadBlock(rep_->file, options, handle, &contents);
 #ifdef PERF_LOG
       uint64_t micros = NowMicros() - start_micros;
-      logMicro(micros);
+      logMicro(BLOCK, micros);
 #endif
       if (s.ok()) {
         block = new Block(contents);
@@ -316,7 +316,7 @@ Iterator* Table::BlockIterator(const ReadOptions& options,
     s = ReadBlock(rep_->file, options, handle, &contents);
 #ifdef PERF_LOG
     uint64_t micros = NowMicros() - start_micros;
-    logMicro(micros);
+    logMicro(BLOCK, micros);
 #endif
     if (s.ok()) {
       block = new Block(contents);

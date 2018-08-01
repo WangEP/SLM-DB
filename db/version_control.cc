@@ -3,6 +3,10 @@
 #include "filename.h"
 #include "log_reader.h"
 #include "table/merger.h"
+#ifdef PERF_LOG
+#include "util/perf_log.h"
+#endif
+
 
 namespace leveldb {
 
@@ -79,7 +83,6 @@ class VersionControl::Builder {
         if (f->alive > dead) {
           f->alive -= dead;
           v->AddCompactionFile(f);
-          vcontrol_->new_merge_candidates_ = true;
         }
       }
     }
@@ -398,21 +401,25 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   }
   if (c->num_input_files() <= 1) {
     delete c;
-    c = nullptr;
     new_merge_candidates_ = false;
     Log(options_->info_log, "No compaction candidates");
-    if (current_->merge_candidates_.size() >= config::kL0_SlowdownWritesTrigger) {
-      return ForcedCompaction();
+    if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {
+      c = ForcedCompaction();
     }
-  } else {
-    Log(options_->info_log, "Picked %zu candidates for merge", c->num_input_files());
-    std::string msg;
-    for (int i = 0; i < c->num_input_files(); i++) {
-      msg.append(std::to_string(c->input(i)->number));
-      msg.append(" ");
-    }
-    Log(options_->info_log, "Merge %s", msg.c_str());
   }
+
+  Log(options_->info_log, "Compact %zu candidates for merge", c->num_input_files());
+  std::string msg;
+  for (int i = 0; i < c->num_input_files(); i++) {
+    msg.append(std::to_string(c->input(i)->number));
+    msg.append(" ");
+  }
+  Log(options_->info_log, "Merge %s", msg.c_str());
+#ifdef PERF_LOG
+  uint64_t numfiles = c->num_input_files();
+  logMicro(COMPACTION_F, numfiles);
+#endif
+
   return c;
 }
 
@@ -430,7 +437,7 @@ ZeroLevelCompaction* VersionControl::ForcedCompaction() {
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-  return current_->merge_candidates_.size() > config::kL0_CompactionTrigger;
+  return current_->merge_candidates_.size() > config::CompactionTrigger && new_merge_candidates_;
 }
 
 Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {

@@ -34,6 +34,10 @@
 #include "util/mutexlock.h"
 #include "zero_level_version.h"
 #include "version_control.h"
+#ifdef PERF_LOG
+#include "util/perf_log.h"
+#endif
+
 
 namespace leveldb {
 
@@ -612,6 +616,9 @@ void DBImpl::BackgroundCall() {
 }
 
 void DBImpl::BackgroundCompaction() {
+#ifdef PERF_LOG
+  uint64_t start_micros = NowMicros();
+#endif
   mutex_.AssertHeld();
   Log(options_.info_log, "Background compaction");
   if (imm_ != nullptr) {
@@ -642,6 +649,11 @@ void DBImpl::BackgroundCompaction() {
     Log(options_.info_log,
         "Compaction error: %s", status.ToString().c_str());
   }
+#ifdef PERF_LOG
+  uint64_t micros = NowMicros() - start_micros;
+  logMicro(COMPACTION, start_micros, micros);
+#endif
+
 }
 
 void DBImpl::CleanupCompaction(CompactionState* compact) {
@@ -936,7 +948,15 @@ Status DBImpl::Get(const ReadOptions& options,
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
       // Done
     } else {
+#ifdef PERF_LOG
+      uint64_t start_micros = NowMicros();
+#endif
       s = current->Get(options, lkey, value);
+#ifdef PERF_LOG
+      uint64_t micros = NowMicros() - start_micros;
+      logMicro(VERSION, micros);
+#endif
+
     }
     mutex_.Lock();
   }
@@ -1143,7 +1163,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
-    } else if (allow_delay && versions_->CompactionSize() >= config::kL0_SlowdownWritesTrigger) {
+    } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger) {
       MaybeScheduleCompaction();
       mutex_.Unlock();
       env_->SleepForMicroseconds(1000);
@@ -1159,7 +1179,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       Log(options_.info_log, "Current memtable full; waiting...\n");
       MaybeScheduleCompaction();
       bg_cv_.Wait();
-    } else if (versions_->CompactionSize() >= config::kL0_StopWritesTrigger) {
+    } else if (versions_->CompactionSize() >= config::StopWritesTrigger) {
       Log(options_.info_log, "Too many file for compaction, waiting..." );
       MaybeScheduleCompaction();
       bg_cv_.Wait();

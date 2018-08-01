@@ -24,7 +24,7 @@ Options::Options()
       block_restart_interval(16),
       max_file_size(2<<20),
       merge_threshold(50),
-      compaction_max_size(8),
+      compaction_max_size(5),
       forced_compaction_size(5),
       compression(kSnappyCompression),
       reuse_logs(false),
