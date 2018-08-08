@@ -101,8 +101,6 @@ class ZeroLevelCompaction {
 
   bool IsInput(uint64_t num);
 
-  size_t size() { return inputs_.size(); }
-
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
 
   void AddInputDeletions(ZeroLevelVersionEdit* edit);

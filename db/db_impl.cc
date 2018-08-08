@@ -868,6 +868,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
   if (status.ok() && shutting_down_.Acquire_Load()) {
     status = Status::IOError("Deleting DB during compaction");
+    compact->compaction->edit()->Wait();
   }
   if (status.ok() && compact->builder != nullptr) {
     status = FinishCompactionOutputFile(compact, input);
@@ -1164,7 +1165,6 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       s = bg_error_;
       break;
     } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger) {
-      MaybeScheduleCompaction();
       mutex_.Unlock();
       env_->SleepForMicroseconds(1000);
       allow_delay = false;
@@ -1177,15 +1177,10 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
-      MaybeScheduleCompaction();
       bg_cv_.Wait();
     } else if (versions_->CompactionSize() >= config::StopWritesTrigger) {
       Log(options_.info_log, "Too many file for compaction, waiting..." );
-      MaybeScheduleCompaction();
       bg_cv_.Wait();
-    } else if (versions_->NeedsCompaction()
-        && mem_->ApproximateMemoryUsage() <= options_.write_buffer_size) {
-      MaybeScheduleCompaction();
     } else {
       // Attempt to switch to a new memtable and trigger compaction of old
       if (!options_.disable_recovery_log) {
@@ -1248,7 +1243,8 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     if (stats_.micros > 0 || files > 0) {
       snprintf(
           buf, sizeof(buf),
-          "%8d %8.0f %9.0f %8.0f %9.0f\n",
+          "%3d %8d %8.0f %9.0f %8.0f %9.0f\n",
+          0,
           files,
           versions_->NumBytes() / 1048576.0,
           stats_.micros / 1e6,

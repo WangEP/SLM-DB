@@ -308,9 +308,9 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   edit->SetLastSequence(last_sequence_);
 
   ZeroLevelVersion* v = new ZeroLevelVersion(this);
-  edit->Wait();
   {
     Builder builder(this, current_);
+    edit->Wait();
     builder.Apply(edit);
     builder.SaveTo(v, options_->merge_threshold);
   }
@@ -382,7 +382,7 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   Slice end = candidate1->largest.user_key();
   c->AddInput(candidate1);
   for (auto iter : current_->merge_candidates_) {
-    if (c->size() > options_->compaction_max_size) {
+    if (c->num_input_files() > options_->compaction_max_size) {
       break;
     }
     if (iter.first != rand_it->first) {
@@ -401,13 +401,18 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   }
   if (c->num_input_files() <= 1) {
     delete c;
+    c = nullptr;
     new_merge_candidates_ = false;
     Log(options_->info_log, "No compaction candidates");
     if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {
+      new_merge_candidates_ = true;
       c = ForcedCompaction();
+    } else {
+      return nullptr;
     }
   }
-
+  assert(c != nullptr);
+  assert(c->num_input_files() > 1);
   Log(options_->info_log, "Compact %zu candidates for merge", c->num_input_files());
   std::string msg;
   for (int i = 0; i < c->num_input_files(); i++) {
@@ -424,13 +429,13 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
 }
 
 ZeroLevelCompaction* VersionControl::ForcedCompaction() {
-  Log(options_->info_log, "Forced compaction");
   ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
-  for (auto iter: current_->merge_candidates_) {
-    if (c->size() > options_->forced_compaction_size) {
-      break;
-    }
-    c->AddInput(iter.second);
+  Log(options_->info_log, "Forced compaction");
+  for (auto iter = current_->merge_candidates_.begin();
+    iter != current_->merge_candidates_.end() &&
+    c->num_input_files() <= options_->forced_compaction_size;
+    iter++) {
+      c->AddInput(iter->second);
   }
   return c;
 }
@@ -445,11 +450,11 @@ Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {
   options.verify_checksums = options_->paranoid_checks;
   options.fill_cache = false;
 
-  Iterator** list = new Iterator*[c->size()];
-  for (size_t i = 0; i < c->size(); i++) {
+  Iterator** list = new Iterator*[c->num_input_files()];
+  for (size_t i = 0; i < c->num_input_files(); i++) {
     list[i] = table_cache_->NewIterator(options, c->input(i)->number, c->input(i)->file_size);
   }
-  Iterator* result = NewMergingIterator(&icmp_, list, c->size());
+  Iterator* result = NewMergingIterator(&icmp_, list, c->num_input_files());
   delete[] list;
   return result;
 }

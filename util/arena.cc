@@ -4,6 +4,7 @@
 
 #include "util/arena.h"
 #include <cassert>
+#include "persistant_pool.h"
 
 namespace leveldb {
 
@@ -16,7 +17,7 @@ Arena::Arena() : memory_usage_(nullptr) {
 
 Arena::~Arena() {
   for (auto& block : blocks_) {
-    delete[] block;
+    nvram::pfree(block);
   }
 }
 
@@ -58,7 +59,7 @@ char* Arena::AllocateAligned(size_t bytes) {
 }
 
 char* Arena::AllocateNewBlock(size_t block_bytes) {
-  char *result = new char[block_bytes];
+  char *result = (char*) nvram::pmalloc(block_bytes);
   blocks_.push_back(result);
   memory_usage_.NoBarrier_Store(
       reinterpret_cast<void*>(MemoryUsage() + block_bytes + sizeof(char*)));

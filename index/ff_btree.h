@@ -15,6 +15,7 @@
 #include <climits>
 #include <future>
 #include <mutex>
+#include "util/persistant_pool.h"
 #include "util/persist.h"
 #include "leveldb/iterator.h"
 
@@ -125,12 +126,11 @@ public:
   }
 
   void* operator new(size_t size) {
-    void* ret;
-    return posix_memalign(&ret, 64, size) == 0 ? ret : nullptr;
+    return nvram::pmalloc(size);
   }
 
   void operator delete(void* buffer) {
-    free(buffer);
+    nvram::pfree(buffer);
   }
 
   inline int count() {
