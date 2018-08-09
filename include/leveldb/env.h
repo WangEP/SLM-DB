@@ -143,6 +143,8 @@ class LEVELDB_EXPORT Env {
       void (*function)(void* arg),
       void* arg) = 0;
 
+  virtual bool IsSchedulerEmpty() = 0;
+
   // Start a new thread, invoking "function(arg)" within the new thread.
   // When "function(arg)" returns, the thread will be destroyed.
   virtual void StartThread(void (*function)(void* arg), void* arg) = 0;

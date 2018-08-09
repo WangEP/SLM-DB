@@ -42,6 +42,7 @@ class DBImpl : public DB {
   virtual void CompactRange(const Slice* begin, const Slice* end) { }
   virtual void GetApproximateSizes(const Range* range, int n, uint64_t* sizes) { }
   virtual Iterator* NewIterator(const ReadOptions&);
+  virtual void WaitComp();
 
  private:
   friend class DB;

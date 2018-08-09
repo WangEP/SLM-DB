@@ -521,6 +521,8 @@ public:
         method = &Benchmark::SnappyUncompress;
       } else if (name == Slice("heapprofile")) {
         HeapProfile();
+      } else if (name == Slice("waitcompaction")) {
+        method = &Benchmark::WaitCompaction;
       } else if (name == Slice("stats")) {
         PrintStats("leveldb.stats");
       } else if (name == Slice("sstables")) {
@@ -936,6 +938,10 @@ private:
       // Do not count any of the preceding work/delay in stats.
       thread->stats.Start();
     }
+  }
+
+  void WaitCompaction(ThreadState* thread) {
+    db_->WaitComp();
   }
 
   void Compact(ThreadState* thread) {

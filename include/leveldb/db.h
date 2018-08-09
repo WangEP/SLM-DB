@@ -143,6 +143,8 @@ class LEVELDB_EXPORT DB {
   //    db->CompactRange(NULL, NULL);
   virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
 
+  virtual void WaitComp() = 0;
+
  private:
   // No copying allowed
   DB(const DB&);

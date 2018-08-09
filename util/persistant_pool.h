@@ -48,9 +48,9 @@ static inline void* pmalloc(size_t size) {
 }
 
 static void stats() {
-  char *msg;
-  pmemcto_stats_print(vmem, msg);
-  printf("%s\n", msg);
+//  char *msg;
+//  pmemcto_stats_print(vmem, msg);
+//  printf("%s\n", msg);
 }
 
 } // namespace nvram
