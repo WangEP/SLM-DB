@@ -56,6 +56,8 @@ class LEVELDB_EXPORT DB {
   DB() = default;
   virtual ~DB();
 
+  virtual Logger* GetLogger() const = 0;
+
   // Set the database entry for "key" to "value".  Returns OK on success,
   // and a non-OK status on error.
   // Note: consider setting options.sync = true.

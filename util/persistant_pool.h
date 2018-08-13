@@ -23,7 +23,9 @@ static void create_pool(const std::string& dir, const size_t& s) {
 }
 
 static void close_pool() {
-  pmemcto_close(vmem);
+  if (vmem != nullptr) {
+    pmemcto_close(vmem);
+  }
 }
 
 static inline void pfree(void* ptr) {

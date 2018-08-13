@@ -215,6 +215,10 @@ Status DBImpl::NewDB() {
   return s;
 }
 
+Logger* DBImpl::GetLogger() const{
+  return options_.info_log;
+}
+
 void DBImpl::MaybeIgnoreError(Status* s) const {
   if (s->ok() || options_.paranoid_checks) {
     // No change needed
