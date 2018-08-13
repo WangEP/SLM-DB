@@ -447,7 +447,7 @@ void VersionControl::RandomBasedPick(Compaction** c) {
       uint64_t c2 = fast_atoi(c_end);
       uint64_t f1 = fast_atoi(f_start);
       uint64_t f2 = fast_atoi(f_end);
-      ratio = (max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
+      ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
     }
     ratio_array.push_back({ratio, f});
   }
