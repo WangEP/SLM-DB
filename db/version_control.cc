@@ -96,27 +96,27 @@ class VersionControl::Builder {
 
 // Compaction class
 
-ZeroLevelCompaction::~ZeroLevelCompaction() {
+Compaction::~Compaction() {
   if (input_version_ != nullptr) {
     input_version_->Unref();
   }
 }
 
-void ZeroLevelCompaction::AddInputDeletions(VersionEdit* edit) {
+void Compaction::AddInputDeletions(VersionEdit* edit) {
   for (auto f : inputs_) {
     edit->DeleteFile(f->number);
   }
 }
 
 
-void ZeroLevelCompaction::ReleaseInputs() {
+void Compaction::ReleaseInputs() {
   if (input_version_ != nullptr) {
     input_version_->Unref();
     input_version_ = nullptr;
   }
 }
 
-bool ZeroLevelCompaction::IsInput(uint64_t num) {
+bool Compaction::IsInput(uint64_t num) {
   for (auto f : inputs_) {
     if (f->number == num) {
       return true;
@@ -365,12 +365,12 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
-ZeroLevelCompaction* VersionControl::PickCompaction() {
+Compaction* VersionControl::PickCompaction() {
   // get compaction and return
   if (current_->merge_candidates_.size() <= 1) return nullptr;
   Log(options_->info_log, "Picking compaction");
   srand(time(nullptr));
-  ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
+  Compaction* c = new Compaction(options_);
   auto rand_it = current_->merge_candidates_.begin();
   int rand_index = std::rand() % current_->merge_candidates_.size();
   while (--rand_index > 0) rand_it++;
@@ -382,7 +382,7 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   Slice end = candidate1->largest.user_key();
   c->AddInput(candidate1);
   for (auto iter : current_->merge_candidates_) {
-    if (c->num_input_files() > options_->compaction_max_size) {
+    if (c->num_input_files() > config::CompactionMaxSize) {
       break;
     }
     if (iter.first != rand_it->first) {
@@ -428,8 +428,8 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   return c;
 }
 
-ZeroLevelCompaction* VersionControl::ForcedCompaction() {
-  ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
+Compaction* VersionControl::ForcedCompaction() {
+  Compaction* c = new Compaction(options_);
   Log(options_->info_log, "Forced compaction");
   for (auto iter = current_->merge_candidates_.begin();
     iter != current_->merge_candidates_.end() &&
@@ -445,7 +445,7 @@ bool VersionControl::NeedsCompaction() const {
   return current_->merge_candidates_.size() > config::CompactionTrigger && new_merge_candidates_;
 }
 
-Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {
+Iterator* VersionControl::MakeInputIterator(Compaction* c) {
   ReadOptions options;
   options.verify_checksums = options_->paranoid_checks;
   options.fill_cache = false;

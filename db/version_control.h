@@ -8,7 +8,7 @@
 
 namespace leveldb {
 
-class ZeroLevelCompaction;
+class Compaction;
 
 class VersionControl {
  public:
@@ -29,9 +29,9 @@ class VersionControl {
   const Comparator* internal_comparator() const { return &icmp_;}
 
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu);
-  ZeroLevelCompaction* PickCompaction();
+  Compaction* PickCompaction();
   Status Recover(bool* save_manifest);
-  Iterator* MakeInputIterator(ZeroLevelCompaction* c);
+  Iterator* MakeInputIterator(Compaction* c);
   const char* Summary(SummaryStorage* scratch) const;
 
   bool NeedsCompaction() const;
@@ -56,7 +56,7 @@ class VersionControl {
   void AppendVersion(Version* v);
   Status WriteSnapshot(log::Writer* log);
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
-  ZeroLevelCompaction* ForcedCompaction();
+  Compaction* ForcedCompaction();
 
   Env* const env_;
   const std::string dbname_;
@@ -81,14 +81,14 @@ class VersionControl {
   void operator=(const VersionControl&);
 };
 
-class ZeroLevelCompaction {
+class Compaction {
  public:
-  ZeroLevelCompaction(const Options* options)
+  Compaction(const Options* options)
       : max_output_file_size_(options->max_file_size),
         edit_(nullptr),
         input_version_(nullptr) { }
 
-  ~ZeroLevelCompaction();
+  ~Compaction();
 
   VersionEdit* edit() { return edit_; }
   size_t num_input_files() const { return inputs_.size(); }
