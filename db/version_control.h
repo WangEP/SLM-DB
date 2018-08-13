@@ -56,7 +56,8 @@ class VersionControl {
   void AppendVersion(Version* v);
   Status WriteSnapshot(log::Writer* log);
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
-  ZeroLevelCompaction* ForcedCompaction();
+  void ForcedPick(ZeroLevelCompaction**);
+  void RandomBasedPick(ZeroLevelCompaction**);
 
   Env* const env_;
   const std::string dbname_;
@@ -73,7 +74,7 @@ class VersionControl {
   log::Writer* descriptor_log_;
   Version* current_;
   TableCache* table_cache_;
-  bool new_merge_candidates_;
+  bool state_change_;
   int compaction_pointer_;
 
   // no copy
@@ -106,6 +107,8 @@ class ZeroLevelCompaction {
   void AddInputDeletions(VersionEdit* edit);
 
   void ReleaseInputs();
+
+  void ReleaseFiles();
 
  private:
   uint64_t max_output_file_size_;

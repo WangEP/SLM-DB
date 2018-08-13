@@ -65,7 +65,7 @@ class VersionControl::Builder {
           f->alive -= dead;
           if (100 * f->alive / f->total <= threshold) { // move to compaction list
             v->AddCompactionFile(f);
-            vcontrol_->new_merge_candidates_ = true;
+            vcontrol_->state_change_ = true;
           } else {
             v->AddFile(f);
           }
@@ -116,6 +116,10 @@ void ZeroLevelCompaction::ReleaseInputs() {
   }
 }
 
+void ZeroLevelCompaction::ReleaseFiles() {
+  inputs_.clear();
+}
+
 bool ZeroLevelCompaction::IsInput(uint64_t num) {
   for (auto f : inputs_) {
     if (f->number == num) {
@@ -142,7 +146,7 @@ VersionControl::VersionControl(const std::string& dbname,
       log_number_(0),
       prev_log_number_(0),
       compaction_pointer_(0),
-      new_merge_candidates_(false),
+      state_change_(false),
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
       current_(nullptr) {
@@ -369,80 +373,98 @@ ZeroLevelCompaction* VersionControl::PickCompaction() {
   // get compaction and return
   if (current_->merge_candidates_.size() <= 1) return nullptr;
   Log(options_->info_log, "Picking compaction");
-  srand(time(nullptr));
+  state_change_ = true;
   ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
-  auto rand_it = current_->merge_candidates_.begin();
-  int rand_index = std::rand() % current_->merge_candidates_.size();
-  while (--rand_index > 0) rand_it++;
-  auto candidate1 = rand_it->second;
-  assert(candidate1 != nullptr);
-  assert(candidate1->number >= 2);
-  assert(candidate1->number < next_file_number_);
-  Slice begin = candidate1->smallest.user_key();
-  Slice end = candidate1->largest.user_key();
-  c->AddInput(candidate1);
-  for (auto iter : current_->merge_candidates_) {
-    if (c->num_input_files() > options_->compaction_max_size) {
-      break;
-    }
-    if (iter.first != rand_it->first) {
-      auto f = iter.second;
-      const Slice file_start = f->smallest.user_key();
-      const Slice file_end = f->largest.user_key();
-      if (user_comparator()->Compare(file_end, begin) < 0) {
-        // skip it
-      } else if (user_comparator()->Compare(file_start, end) > 0) {
-        // skip it
-      } else {
-        c->AddInput(f);
-      }
+  RandomBasedPick(&c);
+  if (c->num_input_files() <= 1) {
+    c->ReleaseFiles();
 
+  }
+  if (c->num_input_files() <= 1) {
+    c->ReleaseFiles();
+    if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {
+      ForcedPick(&c);
     }
   }
   if (c->num_input_files() <= 1) {
+    state_change_ = false;
     delete c;
-    c = nullptr;
-    new_merge_candidates_ = false;
-    Log(options_->info_log, "No compaction candidates");
-    if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {
-      new_merge_candidates_ = true;
-      c = ForcedCompaction();
-    } else {
-      return nullptr;
-    }
+    return nullptr;
   }
-  assert(c != nullptr);
-  assert(c->num_input_files() > 1);
   Log(options_->info_log, "Compact %zu candidates for merge", c->num_input_files());
   std::string msg;
   for (int i = 0; i < c->num_input_files(); i++) {
     msg.append(std::to_string(c->input(i)->number));
     msg.append(" ");
   }
-  Log(options_->info_log, "Merge %s", msg.c_str());
+  Log(options_->info_log, "Merge files %s", msg.c_str());
 #ifdef PERF_LOG
   uint64_t numfiles = c->num_input_files();
   logMicro(COMPACTION_F, numfiles);
 #endif
-
   return c;
 }
 
-ZeroLevelCompaction* VersionControl::ForcedCompaction() {
-  ZeroLevelCompaction* c = new ZeroLevelCompaction(options_);
+void VersionControl::ForcedPick(ZeroLevelCompaction** c) {
   Log(options_->info_log, "Forced compaction");
-  for (auto iter = current_->merge_candidates_.begin();
-    iter != current_->merge_candidates_.end() &&
-    c->num_input_files() <= options_->forced_compaction_size;
+  for (auto iter = current_->merge_candidates_.begin(); iter != current_->merge_candidates_.end() &&
+      (*c)->num_input_files() <= options_->forced_compaction_size;
     iter++) {
-      c->AddInput(iter->second);
+      (*c)->AddInput(iter->second);
   }
-  return c;
+}
+
+void VersionControl::RandomBasedPick(ZeroLevelCompaction** c) {
+  Log(options_->info_log, "Random based compaction");
+  srand(time(0));
+  auto rand_it = current_->merge_candidates_.begin();
+  int rand_index = std::rand() % current_->merge_candidates_.size();
+  while (--rand_index > 0) rand_it++;
+  auto candidate = rand_it->second;
+  assert(candidate != nullptr);
+  assert(candidate->number >= 2);
+  assert(candidate->number < next_file_number_);
+  Slice c_start = candidate->smallest.user_key();
+  Slice c_end = candidate->largest.user_key();
+  (*c)->AddInput(candidate);
+
+  std::vector<std::pair<float, std::shared_ptr<FileMetaData>>> ratio_array;
+  for (auto iter : current_->merge_candidates_) {
+    float ratio = 0.0;
+    auto f = iter.second;
+    const Slice f_start = f->smallest.user_key();
+    const Slice f_end = f->largest.user_key();
+    if (f == candidate) {
+      continue; // skip
+    } else if (user_comparator()->Compare(f_end, c_start) < 0 || user_comparator()->Compare(f_start, c_end) > 0) {
+      continue; // skip
+    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
+      ratio = 1.0;
+    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
+      ratio = 1.0;
+    } else {
+      uint64_t c1 = fast_atoi(c_start);
+      uint64_t c2 = fast_atoi(c_end);
+      uint64_t f1 = fast_atoi(f_start);
+      uint64_t f2 = fast_atoi(f_end);
+      ratio = (max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
+    }
+    ratio_array.push_back({ratio, f});
+  }
+  std::sort(ratio_array.begin(), ratio_array.end(), [](const auto& a, const auto& b) {
+    return a.first > b.first;
+  });
+  for (auto iter : ratio_array) {
+    (*c)->AddInput(iter.second);
+    if ((*c)->num_input_files() >= options_->compaction_max_size) {
+      break;
+    }
+  }
 }
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-  return current_->merge_candidates_.size() > config::CompactionTrigger && new_merge_candidates_;
+  return current_->merge_candidates_.size() > config::CompactionTrigger && state_change_;
 }
 
 Iterator* VersionControl::MakeInputIterator(ZeroLevelCompaction* c) {
