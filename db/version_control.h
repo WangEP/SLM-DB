@@ -2,8 +2,8 @@
 #define STORAGE_LEVELDB_DB_VERSION_CONTROL_H_
 
 #include <memory>
-#include "zero_level_version.h"
-#include "zero_level_version_edit.h"
+#include "version.h"
+#include "version_edit.h"
 #include "port/port_posix.h"
 
 namespace leveldb {
@@ -22,13 +22,13 @@ class VersionControl {
     char buffer[100];
   };
 
-  ZeroLevelVersion* current() { return current_; }
+  Version* current() { return current_; }
   TableCache* cache() { return table_cache_; }
   const Options* const options() { return options_; }
   const Comparator* user_comparator() const { return icmp_.user_comparator(); }
   const Comparator* internal_comparator() const { return &icmp_;}
 
-  Status LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu);
+  Status LogAndApply(VersionEdit* edit, port::Mutex* mu);
   ZeroLevelCompaction* PickCompaction();
   Status Recover(bool* save_manifest);
   Iterator* MakeInputIterator(ZeroLevelCompaction* c);
@@ -53,7 +53,7 @@ class VersionControl {
  private:
   class Builder;
 
-  void AppendVersion(ZeroLevelVersion* v);
+  void AppendVersion(Version* v);
   Status WriteSnapshot(log::Writer* log);
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
   ZeroLevelCompaction* ForcedCompaction();
@@ -71,7 +71,7 @@ class VersionControl {
   const Options* const options_;
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
-  ZeroLevelVersion* current_;
+  Version* current_;
   TableCache* table_cache_;
   bool new_merge_candidates_;
   int compaction_pointer_;
@@ -90,12 +90,12 @@ class ZeroLevelCompaction {
 
   ~ZeroLevelCompaction();
 
-  ZeroLevelVersionEdit* edit() { return edit_; }
+  VersionEdit* edit() { return edit_; }
   size_t num_input_files() const { return inputs_.size(); }
 
   std::shared_ptr<FileMetaData> input(int i) { return inputs_[i]; }
 
-  void SetEdit(ZeroLevelVersionEdit* edit) { edit_ = edit; }
+  void SetEdit(VersionEdit* edit) { edit_ = edit; }
 
   void AddInput(std::shared_ptr<FileMetaData> f) { inputs_.push_back(f); }
 
@@ -103,14 +103,14 @@ class ZeroLevelCompaction {
 
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
 
-  void AddInputDeletions(ZeroLevelVersionEdit* edit);
+  void AddInputDeletions(VersionEdit* edit);
 
   void ReleaseInputs();
 
  private:
   uint64_t max_output_file_size_;
-  ZeroLevelVersion* input_version_;
-  ZeroLevelVersionEdit* edit_;
+  Version* input_version_;
+  VersionEdit* edit_;
 
   std::vector<std::shared_ptr<FileMetaData>> inputs_;
 };

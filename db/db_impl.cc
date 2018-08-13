@@ -32,7 +32,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-#include "zero_level_version.h"
+#include "version.h"
 #include "version_control.h"
 #ifdef PERF_LOG
 #include "util/perf_log.h"
@@ -184,7 +184,7 @@ DBImpl::~DBImpl() {
 }
 
 Status DBImpl::NewDB() {
-  ZeroLevelVersionEdit new_db;
+  VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
   new_db.SetLogNumber(0);
   new_db.SetNextFile(2);
@@ -279,7 +279,7 @@ void DBImpl::DeleteObsoleteFiles() {
   }
 }
 
-Status DBImpl::Recover(ZeroLevelVersionEdit* edit, bool *save_manifest) {
+Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   mutex_.AssertHeld();
 
   // Ignore error from CreateDir since the creation of the DB is
@@ -372,7 +372,7 @@ Status DBImpl::Recover(ZeroLevelVersionEdit* edit, bool *save_manifest) {
 }
 
 Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
-                              bool* save_manifest, ZeroLevelVersionEdit* edit,
+                              bool* save_manifest, VersionEdit* edit,
                               SequenceNumber* max_sequence) {
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
@@ -495,7 +495,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   return status;
 }
 
-Status DBImpl::WriteLevel0Table(MemTable* mem, ZeroLevelVersionEdit* edit) {
+Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit) {
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
@@ -539,8 +539,8 @@ void DBImpl::CompactMemTable() {
   assert(imm_ != nullptr);
 
   // Save the contents of the memtable as a new Table
-  ZeroLevelVersionEdit edit;
-  ZeroLevelVersion* base = versions_->current();
+  VersionEdit edit;
+  Version* base = versions_->current();
   base->Ref();
   Status s = WriteLevel0Table(imm_, &edit);
   base->Unref();
@@ -778,7 +778,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
-  ZeroLevelVersionEdit edit;
+  VersionEdit edit;
   compact->compaction->SetEdit(&edit);
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
   input->SeekToFirst();
@@ -934,7 +934,7 @@ Status DBImpl::Get(const ReadOptions& options,
 
   MemTable* mem = mem_;
   MemTable* imm = imm_;
-  ZeroLevelVersion* current = versions_->current();
+  Version* current = versions_->current();
   mem->Ref();
   if (imm != nullptr) imm->Ref();
   current->Ref();
@@ -1296,7 +1296,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
 
   DBImpl* impl = new DBImpl(options, dbname);
   impl->mutex_.Lock();
-  ZeroLevelVersionEdit edit;
+  VersionEdit edit;
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
   Status s;

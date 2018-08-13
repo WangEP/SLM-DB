@@ -10,8 +10,8 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
-#include "zero_level_version.h"
-#include "zero_level_version_edit.h"
+#include "version.h"
+#include "version_edit.h"
 
 namespace leveldb {
 
@@ -21,7 +21,7 @@ Status BuildTable(const std::string& dbname,
                   TableCache* table_cache,
                   Iterator* iter,
                   FileMetaData* meta,
-                  ZeroLevelVersionEdit* edit) {
+                  VersionEdit* edit) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();

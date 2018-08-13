@@ -75,12 +75,12 @@ set(LEVEL_DB_FILES
         db/table_cache.h
         db/write_batch.cc
         db/write_batch_internal.h
-        db/zero_level_version.cc
-        db/zero_level_version.h
+        db/version.cc
+        db/version.h
         db/version_control.cc
         db/version_control.h
-        db/zero_level_version_edit.cc
-        db/zero_level_version_edit.h
+        db/version_edit.cc
+        db/version_edit.h
         db/logger.cc
         db/logger.h
         table/block.cc
@@ -194,20 +194,8 @@ target_link_libraries(leveldb
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)
 
-add_executable(insert_bench bench/insert_bench.cc)
-target_link_libraries(insert_bench PUBLIC leveldb)
-
-add_executable(read_bench bench/read_bench.cc)
-target_link_libraries(read_bench PUBLIC leveldb)
-
-add_executable(simple_bench bench/simple_bench.cc)
-target_link_libraries(simple_bench PUBLIC leveldb)
-
-add_executable(sanity_check bench/sanity_check.cc)
+add_executable(sanity_check db/sanity_check.cc)
 target_link_libraries(sanity_check PUBLIC leveldb)
 
 add_executable(db_bench db/db_bench.cc)
 target_link_libraries(db_bench PUBLIC leveldb)
-
-add_executable(nvm_btree_test index/nvm_btree_test.cc)
-target_link_libraries(nvm_btree_test PUBLIC leveldb)

@@ -4,7 +4,7 @@
 #include "leveldb/index.h"
 #include "index_iterator.h"
 #include "db/table_cache.h"
-#include "db/zero_level_version_edit.h"
+#include "db/version_edit.h"
 
 namespace leveldb {
 
@@ -87,7 +87,7 @@ void* Index::ThreadWrapper(void* index) {
   reinterpret_cast<Index*>(index)->Runner();
   return NULL;
 }
-void Index::AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit) {
+void Index::AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) {
   mutex_.Lock();
   assert(queue_.size() == 0);
   queue_.swap(queue);

@@ -46,7 +46,7 @@ public:
 
   void AsyncInsert(const KeyAndMeta& key_and_meta);
 
-  void AddQueue(std::deque<KeyAndMeta>& queue, ZeroLevelVersionEdit* edit);
+  void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
 
   Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
 
@@ -78,7 +78,7 @@ private:
   bool free_;
 
   std::deque<KeyAndMeta> queue_;
-  ZeroLevelVersionEdit* edit_;
+  VersionEdit* edit_;
 
   Index(const Index&);
   void operator=(const Index&);

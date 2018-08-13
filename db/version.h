@@ -31,9 +31,9 @@ struct FileMetaData {
         smallest(std::move(smallest_)), largest(std::move(largest_)) { }
 };
 
-class ZeroLevelVersion {
+class Version {
  public:
-  explicit ZeroLevelVersion(VersionControl* vcontrol)
+  explicit Version(VersionControl* vcontrol)
       : vcontrol_(vcontrol), refs_(0) { }
 
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val);
@@ -76,10 +76,10 @@ class ZeroLevelVersion {
   VersionControl* vcontrol_;
   int refs_;
 
-  ~ZeroLevelVersion() = default;
+  ~Version() = default;
   // no copy
-  ZeroLevelVersion(const ZeroLevelVersion&);
-  void operator=(const ZeroLevelVersion&);
+  Version(const Version&);
+  void operator=(const Version&);
 };
 
 

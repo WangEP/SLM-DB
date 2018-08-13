@@ -20,10 +20,10 @@ class VersionControl::Builder {
   std::set<uint64_t> deleted_files_;
   std::unordered_map<uint64_t, uint64_t> dead_key_counter_;
   VersionControl* vcontrol_;
-  ZeroLevelVersion* base_;
+  Version* base_;
  public:
 
-  Builder(VersionControl* vcontrol, ZeroLevelVersion* base)
+  Builder(VersionControl* vcontrol, Version* base)
       : vcontrol_(vcontrol), base_(base) {
     base_->Ref();
   }
@@ -32,7 +32,7 @@ class VersionControl::Builder {
     base_->Unref();
   }
 
-  void Apply(ZeroLevelVersionEdit* edit) {
+  void Apply(VersionEdit* edit) {
     for (auto iter : edit->deleted_files_) {
       deleted_files_.insert(iter);
     }
@@ -52,7 +52,7 @@ class VersionControl::Builder {
     }
   }
 
-  void SaveTo(ZeroLevelVersion* v, int threshold) {
+  void SaveTo(Version* v, int threshold) {
     for (auto iter : base_->files_) {
       assert(iter.first == iter.second->number);
       auto f = iter.second;
@@ -102,7 +102,7 @@ ZeroLevelCompaction::~ZeroLevelCompaction() {
   }
 }
 
-void ZeroLevelCompaction::AddInputDeletions(ZeroLevelVersionEdit* edit) {
+void ZeroLevelCompaction::AddInputDeletions(VersionEdit* edit) {
   for (auto f : inputs_) {
     edit->DeleteFile(f->number);
   }
@@ -146,7 +146,7 @@ VersionControl::VersionControl(const std::string& dbname,
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
       current_(nullptr) {
-  AppendVersion(new ZeroLevelVersion(this));
+  AppendVersion(new Version(this));
 }
 
 VersionControl::~VersionControl() {
@@ -155,7 +155,7 @@ VersionControl::~VersionControl() {
   current_->Unref();
 }
 
-void VersionControl::AppendVersion(ZeroLevelVersion* v) {
+void VersionControl::AppendVersion(Version* v) {
   assert(v->refs_ == 0);
   assert(v != current_);
   if (current_ != nullptr) {
@@ -211,7 +211,7 @@ Status VersionControl::Recover(bool* save_manifest) {
     Slice record;
     std::string scratch;
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
-      ZeroLevelVersionEdit edit;
+      VersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
         if (edit.HasComparatorName() &&
@@ -269,7 +269,7 @@ Status VersionControl::Recover(bool* save_manifest) {
   }
 
   if (s.ok()) {
-    ZeroLevelVersion* v = new ZeroLevelVersion(this);
+    Version* v = new Version(this);
     builder.SaveTo(v, options_->merge_threshold);
     AppendVersion(v);
     manifest_file_number_ = next_file;
@@ -294,7 +294,7 @@ bool VersionControl::ReuseManifest(const std::string& dscname,
   // Skip it, don't need to reuse manifest
 }
 
-Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) {
+Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->HasLogNumber()) {
     assert(edit->GetLogNumber() >= log_number_);
     assert(edit->GetLogNumber() < next_file_number_);
@@ -307,7 +307,7 @@ Status VersionControl::LogAndApply(ZeroLevelVersionEdit* edit, port::Mutex* mu) 
   edit->SetNextFile(next_file_number_);
   edit->SetLastSequence(last_sequence_);
 
-  ZeroLevelVersion* v = new ZeroLevelVersion(this);
+  Version* v = new Version(this);
   {
     Builder builder(this, current_);
     edit->Wait();
@@ -477,7 +477,7 @@ void VersionControl::SetLastSequence(uint64_t s) {
 }
 
 Status VersionControl::WriteSnapshot(log::Writer* log) {
-  ZeroLevelVersionEdit edit;
+  VersionEdit edit;
   edit.SetComparatorName(icmp_.user_comparator()->Name());
   for (auto iter : current_->files_) {
     auto f = iter.second;

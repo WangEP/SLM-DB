@@ -23,7 +23,7 @@ namespace leveldb {
 class BlockBuilder;
 class BlockHandle;
 class WritableFile;
-class ZeroLevelVersionEdit;
+class VersionEdit;
 
 class LEVELDB_EXPORT TableBuilder {
  public:
@@ -60,7 +60,7 @@ class LEVELDB_EXPORT TableBuilder {
   // Finish building the table.  Stops using the file passed to the
   // constructor after this function returns.
   // REQUIRES: Finish(), Abandon() have not been called
-  Status Finish(ZeroLevelVersionEdit* edit);
+  Status Finish(VersionEdit* edit);
 
   // Indicate that the contents of this builder should be abandoned.  Stops
   // using the file passed to the constructor after this function returns.

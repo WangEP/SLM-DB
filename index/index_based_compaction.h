@@ -1,7 +1,7 @@
 #ifndef STORAGE_LEVELDB_INDEX_INDEX_BASED_COMPACTION_H_
 #define STORAGE_LEVELDB_INDEX_INDEX_BASED_COMPACTION_H_
 
-#include "db/zero_level_version.h"
+#include "db/version.h"
 
 namespace leveldb {
 

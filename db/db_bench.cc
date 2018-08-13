@@ -6,7 +6,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include "db/db_impl.h"
-#include "db/version_set.h"
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"

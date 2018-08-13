@@ -16,7 +16,7 @@ class Env;
 class Iterator;
 class TableCache;
 class VersionEdit;
-class ZeroLevelVersionEdit;
+class VersionEdit;
 
 // Build a Table file from the contents of *iter.  The generated file
 // will be named according to meta->number.  On success, the rest of
@@ -29,7 +29,7 @@ extern Status BuildTable(const std::string& dbname,
                          TableCache* table_cache,
                          Iterator* iter,
                          FileMetaData* meta,
-                         ZeroLevelVersionEdit* edit);
+                         VersionEdit* edit);
 
 }  // namespace leveldb
 

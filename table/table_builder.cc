@@ -14,7 +14,7 @@
 #include "util/coding.h"
 #include "util/crc32c.h"
 #include "leveldb/index.h"
-#include "db/zero_level_version_edit.h"
+#include "db/version_edit.h"
 
 namespace leveldb {
 
@@ -220,7 +220,7 @@ Status TableBuilder::status() const {
   return rep_->status;
 }
 
-Status TableBuilder::Finish(ZeroLevelVersionEdit* edit) {
+Status TableBuilder::Finish(VersionEdit* edit) {
   Rep* r = rep_;
   Flush();
   assert(!r->closed);

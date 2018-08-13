@@ -1,4 +1,4 @@
-#include "zero_level_version.h"
+#include "version.h"
 #include "version_control.h"
 #include "leveldb/index.h"
 #ifdef PERF_LOG
@@ -36,7 +36,7 @@ static void SaveValue(void* arg, const Slice& ikey, const Slice& v) {
   }
 }
 
-Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, std::string* val) {
+Status Version::Get(const ReadOptions& options, const LookupKey& key, std::string* val) {
   Status s;
   Slice ikey = key.internal_key();
   Slice user_key = key.user_key();
@@ -83,11 +83,11 @@ Status ZeroLevelVersion::Get(const ReadOptions& options, const LookupKey& key, s
   return Status::NotFound(Slice());
 }
 
-void ZeroLevelVersion::Ref() {
+void Version::Ref() {
   ++refs_;
 }
 
-void ZeroLevelVersion::Unref() {
+void Version::Unref() {
 //  assert(this != vcontrol_->next_version());
   assert(refs_ >= 1);
   --refs_;
@@ -96,7 +96,7 @@ void ZeroLevelVersion::Unref() {
   }
 }
 
-std::string ZeroLevelVersion::DebugString() const {
+std::string Version::DebugString() const {
   std::string r;
   r.append("Files:\n");
   for (const auto& file : files_) {
@@ -135,15 +135,15 @@ std::string ZeroLevelVersion::DebugString() const {
   return r;
 }
 
-void ZeroLevelVersion::AddFile(std::shared_ptr<FileMetaData> f) {
+void Version::AddFile(std::shared_ptr<FileMetaData> f) {
   files_.insert({f->number, f});
 }
 
-void ZeroLevelVersion::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
+void Version::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
   merge_candidates_.insert({f->number, f});
 }
 
-void ZeroLevelVersion::SortMergeCandidates() {
+void Version::SortMergeCandidates() {
 
 }
 
