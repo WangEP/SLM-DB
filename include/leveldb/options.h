@@ -86,7 +86,6 @@ struct LEVELDB_EXPORT Options {
 
   size_t max_buffer_size;
   int merge_threshold;
-  int compaction_max_size;
   int forced_compaction_size;
 
   // Number of open files that can be used by the DB.  You may need to

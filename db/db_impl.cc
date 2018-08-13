@@ -55,7 +55,7 @@ struct DBImpl::Writer {
 };
 
 struct DBImpl::CompactionState {
-  ZeroLevelCompaction* const compaction;
+  Compaction* const compaction;
 
   // Sequence numbers < smallest_snapshot are not significant since we
   // will never have to service a snapshot below smallest_snapshot.
@@ -81,7 +81,7 @@ struct DBImpl::CompactionState {
 
   Output* current_output() { return &outputs[outputs.size()-1]; }
 
-  explicit CompactionState(ZeroLevelCompaction* c)
+  explicit CompactionState(Compaction* c)
       : compaction(c),
         outfile(nullptr),
         builder(nullptr),
@@ -626,7 +626,7 @@ void DBImpl::BackgroundCompaction() {
     return;
   }
 
-  ZeroLevelCompaction* c = versions_->PickCompaction();
+  Compaction* c = versions_->PickCompaction();
 
   Status status;
   if (c != nullptr) {

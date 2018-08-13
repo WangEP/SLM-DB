@@ -314,6 +314,7 @@ class Benchmark {
 private:
   Cache* cache_;
   const FilterPolicy* filter_policy_;
+  Options options_;
   DB* db_;
   int num_;
   int value_size_;
@@ -699,19 +700,18 @@ private:
 
   void Open() {
     assert(db_ == NULL);
-    Options options;
-    options.env = g_env;
-    options.create_if_missing = !FLAGS_use_existing_db;
-    options.block_cache = cache_;
-    options.write_buffer_size = FLAGS_write_buffer_size;
-    options.max_file_size = FLAGS_max_file_size;
-    options.block_size = FLAGS_block_size;
-    options.max_open_files = FLAGS_open_files;
-    options.filter_policy = filter_policy_;
-    options.reuse_logs = FLAGS_reuse_logs;
-    options.index = new leveldb::Index();
-    options.merge_threshold = FLAGS_merge_threshold;
-    Status s = DB::Open(options, FLAGS_db, &db_);
+    options_.env = g_env;
+    options_.create_if_missing = !FLAGS_use_existing_db;
+    options_.block_cache = cache_;
+    options_.write_buffer_size = FLAGS_write_buffer_size;
+    options_.max_file_size = FLAGS_max_file_size;
+    options_.block_size = FLAGS_block_size;
+    options_.max_open_files = FLAGS_open_files;
+    options_.filter_policy = filter_policy_;
+    options_.reuse_logs = FLAGS_reuse_logs;
+    options_.index = new leveldb::Index();
+    options_.merge_threshold = FLAGS_merge_threshold;
+    Status s = DB::Open(options_, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
       exit(1);
@@ -727,10 +727,12 @@ private:
   }
 
   void WriteSeq(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting sequential write");
     DoWrite(thread, true);
   }
 
   void WriteRandom(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting random write");
     DoWrite(thread, false);
   }
 
@@ -765,6 +767,7 @@ private:
   }
 
   void ReadSequential(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting sequential read");
     Iterator* iter = db_->NewIterator(ReadOptions());
     int i = 0;
     int64_t bytes = 0;
@@ -783,6 +786,7 @@ private:
   }
 
   void ReadReverse(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting reverse read");
     Iterator* iter = db_->NewIterator(ReadOptions());
     int i = 0;
     int64_t bytes = 0;
@@ -796,6 +800,7 @@ private:
   }
 
   void ReadRandom(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting random read");
     ReadOptions options;
     std::string value;
     int found = 0;
@@ -814,6 +819,7 @@ private:
   }
 
   void RangeQuery(ThreadState* thread) {
+    Log(options_.info_log, "[db_bench] Starting range query");
     ReadOptions options;
     std::string value;
     int64_t bytes = 0;

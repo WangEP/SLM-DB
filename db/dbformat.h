@@ -26,6 +26,8 @@ static constexpr int CompactionTrigger = 2;
 
 static constexpr int CompactionForceTrigger = 4;
 
+static constexpr int CompactionMaxSize = 5;
+
 // Soft limit on number of level-0 files.  We slow down writes at this point.
 static constexpr int SlowdownWritesTrigger = 8;
 
