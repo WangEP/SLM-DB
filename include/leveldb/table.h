@@ -48,14 +48,6 @@ class LEVELDB_EXPORT Table {
   // call one of the Seek methods on the iterator before using it).
   Iterator* NewIterator(const ReadOptions&) const;
 
-  // Given a key, return an approximate byte offset in the file where
-  // the data for that key begins (or would begin if the key were
-  // present in the file).  The returned value is in terms of file
-  // bytes, and so includes effects like compression of the underlying data.
-  // E.g., the approximate offset of the last key in the table will
-  // be close to the file length.
-  uint64_t ApproximateOffsetOf(const Slice& key) const;
-  static Iterator* BlockReader2(void*, const ReadOptions&, const BlockHandle&);
   Iterator* BlockIterator(const ReadOptions&, const BlockHandle&);
 
  private:
@@ -73,13 +65,6 @@ class LEVELDB_EXPORT Table {
       const ReadOptions&, const Slice& key,
       void* arg,
       void (*handle_result)(void* arg, const Slice& k, const Slice& v));
-
-  Status InternalGet2(
-      const ReadOptions&, const Slice& key,
-      const BlockHandle& block_handle,
-      void* arg,
-      void(*handle_result)(void* arg, const Slice& k, const Slice& v));
-
 
   void ReadMeta(const Footer& footer);
   void ReadFilter(const Slice& filter_handle_value);
