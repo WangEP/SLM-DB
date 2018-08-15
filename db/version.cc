@@ -45,16 +45,14 @@ Status Version::Get(const ReadOptions& options, const LookupKey& key, std::strin
   Index* index = vcontrol_->options()->index;
 
 #ifdef PERF_LOG
-  uint64_t start_micros = NowMicros();
-#endif
+  uint64_t start_micros = benchmark::NowMicros();
   IndexMeta index_meta = index->Get(user_key);
-#ifdef PERF_LOG
-  uint64_t micros = NowMicros() - start_micros;
-  logMicro(QUERY, micros);
+  benchmark::LogMicros(benchmark::QUERY, benchmark::NowMicros() - start_micros);
+#else
+  IndexMeta index_meta = index->Get(user_key);
 #endif
 
   if (convert(index_meta) != 0) {
-
     Saver saver;
     saver.state = kNotFound;
     saver.ucmp = ucmp;

@@ -88,15 +88,8 @@ void IndexIterator::CacheLookup() {
   Slice cache_key(buf, sizeof(buf));
   handle_ = cache_->Lookup(cache_key);
   if (handle_ == nullptr) {
-#ifdef PERF_LOG
-    uint64_t start_micros = NowMicros();
-#endif
     status_ = table_cache_->GetBlockIterator(options_, index_meta_.file_number,
                                              index_meta_.offset, index_meta_.size, &block_iterator_);
-#ifdef PERF_LOG
-    uint64_t micros = NowMicros() - start_micros;
-    logMicro(RANGE, micros);
-#endif
     if (!status_.ok()) return; // something went wrong
     char key[100];
     snprintf(key, sizeof(key), "%016lu", btree_iterator_->key());

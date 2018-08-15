@@ -532,6 +532,8 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit) {
   }
 
   CompactionStats stats;
+  stats.count = 1;
+  stats.files_created = 1;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
   stats_.Add(stats);
@@ -620,9 +622,6 @@ void DBImpl::BackgroundCall() {
 }
 
 void DBImpl::BackgroundCompaction() {
-#ifdef PERF_LOG
-  uint64_t start_micros = NowMicros();
-#endif
   mutex_.AssertHeld();
   Log(options_.info_log, "Background compaction");
   if (imm_ != nullptr) {
@@ -653,11 +652,6 @@ void DBImpl::BackgroundCompaction() {
     Log(options_.info_log,
         "Compaction error: %s", status.ToString().c_str());
   }
-#ifdef PERF_LOG
-  uint64_t micros = NowMicros() - start_micros;
-  logMicro(COMPACTION, start_micros, micros);
-#endif
-
 }
 
 void DBImpl::CleanupCompaction(CompactionState* compact) {
@@ -884,7 +878,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   input = nullptr;
 
   CompactionStats stats;
+  stats.count = 1;
   stats.micros = env_->NowMicros() - start_micros - imm_micros;
+  stats.files_deleted += compact->compaction->num_input_files();
+  stats.files_created += compact->outputs.size();
   for (int i = 0; i < compact->compaction->num_input_files(); i++) {
     stats.bytes_read += compact->compaction->input(i)->file_size;
   }
@@ -948,21 +945,26 @@ Status DBImpl::Get(const ReadOptions& options,
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
+#ifdef PERF_LOG
+    bool found;
+    uint64_t start_micros = benchmark::NowMicros();
+    found = mem->Get(lkey, value, &s);
+    if (!found) found = imm != NULL && imm->Get(lkey, value, &s);
+    benchmark::LogMicros(benchmark::MEMTABLE, benchmark::NowMicros() - start_micros);
+    if (!found) {
+      start_micros = benchmark::NowMicros();
+      s = current->Get(options, lkey, value);
+      benchmark::LogMicros(benchmark::VERSION, benchmark::NowMicros() - start_micros);
+    }
+#else
     if (mem->Get(lkey, value, &s)) {
       // Done
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
       // Done
     } else {
-#ifdef PERF_LOG
-      uint64_t start_micros = NowMicros();
-#endif
       s = current->Get(options, lkey, value);
-#ifdef PERF_LOG
-      uint64_t micros = NowMicros() - start_micros;
-      logMicro(VERSION, micros);
-#endif
-
     }
+#endif
     mutex_.Lock();
   }
 
@@ -1256,6 +1258,23 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
           stats_.bytes_written / 1048576.0);
       value->append(buf);
     }
+    return true;
+  } else if (in == "csv") {
+    char buf[200];
+    snprintf(buf, sizeof(buf),
+             "Level, Files, Size(MB), C Time(sec), C Read(MB), C Write(MB), C File Deleted, C File Created, C Count,\n");
+    value->append(buf);
+    snprintf(buf, sizeof(buf), "%d, %li, %f, %f, %f, %f, %li, %li, %li,\n",
+             0,
+             versions_->NumFiles(),
+             versions_->NumBytes() / 1048576.0,
+             stats_.micros / 1e6,
+             stats_.bytes_read / 1048576.0,
+             stats_.bytes_written / 1048576.0,
+             stats_.files_deleted,
+             stats_.files_created,
+             stats_.count);
+    value->append(buf);
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();

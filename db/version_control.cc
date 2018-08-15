@@ -397,11 +397,7 @@ Compaction* VersionControl::PickCompaction() {
     msg.append(std::to_string(c->input(i)->number));
     msg.append(" ");
   }
-  Log(options_->info_log, "Merge files %s", msg.c_str());
-#ifdef PERF_LOG
-  uint64_t numfiles = c->num_input_files();
-  logMicro(COMPACTION_F, numfiles);
-#endif
+  Log(options_->info_log, "Merge %s", msg.c_str());
   return c;
 }
 
