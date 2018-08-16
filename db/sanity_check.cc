@@ -80,11 +80,11 @@ TEST(SanityCheck, RandomRead) {
 
 int main(int argc, char** argv) {
 #ifdef PERF_LOG
-  leveldb::createPerfLog();
+  leveldb::benchmark::ClosePerfLog();
 #endif
   leveldb::test::RunAllTests();
 #ifdef PERF_LOG
-  leveldb::closePerfLog();
+  leveldb::benchmark::ClosePerfLog();
 #endif
 
 }
