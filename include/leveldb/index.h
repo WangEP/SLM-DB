@@ -2,19 +2,16 @@
 #define STORAGE_LEVELDB_INCLUDE_INDEX_H_
 
 #include <cstdint>
-#include <map>
+#include <memory>
 #include <deque>
-#include <shared_mutex>
-#include "port/port.h"
-#include "table/format.h"
-#include "index/nvm_btree.h"
-#include "index/ff_btree.h"
-#include "leveldb/env.h"
+#include "leveldb/slice.h"
 #include "leveldb/iterator.h"
+#include "leveldb/options.h"
 
 namespace leveldb {
 
 class TableCache;
+class VersionEdit;
 
 struct IndexMeta {
 public:
@@ -38,52 +35,16 @@ struct KeyAndMeta{
 
 class Index {
 public:
-  Index();
-
-  IndexMeta Get(const Slice& key);
-
-  void Insert(const uint32_t& key, IndexMeta meta);
-
-  void AsyncInsert(const KeyAndMeta& key_and_meta);
-
-  void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
-
-  Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
-
-  bool Acceptable() {
-    return queue_.empty() && free_;
-  }
-
-  bool IsQueueEmpty() { return queue_.empty(); }
-
-  void CompactionFinished() {
-    free_ = true;
-  }
-
-  void CompactionStarted() {
-    free_ = false;
-  }
-
-  void Runner();
-
-  static void* ThreadWrapper(void* index);
-
-private:
-
-  FFBtree tree_; // Temporary
-  bool bgstarted_;
-  pthread_t thread_;
-  port::Mutex mutex_;
-  port::CondVar condvar_;
-  bool free_;
-
-  std::deque<KeyAndMeta> queue_;
-  VersionEdit* edit_;
-
-  Index(const Index&);
-  void operator=(const Index&);
+  Index() = default;
+  virtual ~Index() = default;
+  //virtual void Insert(const uint32_t& key, IndexMeta meta) = 0;
+  virtual IndexMeta Get(const Slice& key) = 0;
+  virtual void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) = 0;
+  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache) = 0;
 };
+
+Index* CreateBtreeIndex();
 
 } // namespace leveldb
 
-#endif // STORAGE_LEVELDB_INCLUDE_INDEX_H_
+#endif //STORAGE_LEVELDB_INCLUDE_INDEX_H_

@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "leveldb/iterator.h"
-#include "leveldb/index.h"
+#include "btree_index.h"
 #include "index/ff_btree_iterator.h"
 #include "table/format.h"
 #include "db/table_cache.h"
