@@ -4,7 +4,7 @@
 
 #include "util/arena.h"
 #include <cassert>
-#include "persistant_pool.h"
+#include "include/leveldb/persistant_pool.h"
 
 namespace leveldb {
 

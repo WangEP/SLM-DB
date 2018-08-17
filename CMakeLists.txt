@@ -50,6 +50,7 @@ set(LEVEL_DB_FILES
         include/leveldb/write_batch.h
         include/leveldb/export.h
         include/leveldb/index.h
+        include/leveldb/persistant_pool.h
         db/builder.cc
         db/builder.h
         db/db_impl.cc
@@ -129,7 +130,6 @@ set(LEVEL_DB_FILES
         util/testutil.cc
         util/perf_log.h
         util/perf_log.cc
-        util/persistant_pool.h
         port/port.h
         port/atomic_pointer.h
         index/btree_index.cc
@@ -181,7 +181,8 @@ set_target_properties(leveldb PROPERTIES PUBLIC_HEADER
         include/leveldb/table_builder.h;
         include/leveldb/write_batch.h;
         include/leveldb/export.h;
-        include/leveldb/index.h")
+        include/leveldb/index.h
+        include/leveldb/persistant_pool.h")
 
 target_link_libraries(leveldb
         PRIVATE

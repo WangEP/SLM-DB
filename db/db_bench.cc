@@ -10,6 +10,7 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/write_batch.h"
+#include "leveldb/persistant_pool.h"
 #include "port/port.h"
 #include "util/crc32c.h"
 #include "util/histogram.h"
@@ -17,7 +18,6 @@
 #include "util/random.h"
 #include "util/testutil.h"
 #include "util/perf_log.h"
-#include "util/persistant_pool.h"
 
 
 // Comma-separated list of operations to run in the specified order

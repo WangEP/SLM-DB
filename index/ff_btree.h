@@ -15,7 +15,7 @@
 #include <climits>
 #include <future>
 #include <mutex>
-#include "util/persistant_pool.h"
+#include "include/leveldb/persistant_pool.h"
 #include "util/persist.h"
 #include "leveldb/iterator.h"
 
