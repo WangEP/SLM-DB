@@ -5,16 +5,15 @@
 #include <map>
 #include <deque>
 #include <shared_mutex>
-#include "port/port.h"
-#include "table/format.h"
-#include "index/nvm_btree.h"
-#include "index/ff_btree.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
+#include "leveldb/options.h"
 
 namespace leveldb {
 
 class TableCache;
+class VersionEdit;
+class FFBtree;
 
 struct IndexMeta {
 public:
@@ -70,11 +69,9 @@ public:
 
 private:
 
-  FFBtree tree_; // Temporary
+  FFBtree* tree_; // Temporary
   bool bgstarted_;
   pthread_t thread_;
-  port::Mutex mutex_;
-  port::CondVar condvar_;
   bool free_;
 
   std::deque<KeyAndMeta> queue_;

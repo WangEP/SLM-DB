@@ -18,6 +18,7 @@
 #include "util/testutil.h"
 #include "leveldb/index.h"
 #include "util/perf_log.h"
+#include "util/persistant_pool.h"
 
 
 // Comma-separated list of operations to run in the specified order
@@ -802,7 +803,7 @@ private:
     Iterator* iter = db_->NewIterator(ReadOptions());
     int i = 0;
     int64_t bytes = 0;
-    string value;
+    std::string value;
     for (iter->SeekToFirst(); i < reads_ && iter->Valid(); iter->Next()) {
       bytes += iter->key().size() + iter->value().size();
       value = iter->value().ToString();
@@ -994,7 +995,6 @@ private:
     } else {
       fprintf(stdout, "\n%s\n", stats.c_str());
     }
-    fprintf(stdout, "\n%s\n", stats.c_str());
   }
 
   static void WriteToFile(void* arg, const char* buf, int n) {

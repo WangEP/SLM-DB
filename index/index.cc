@@ -5,8 +5,15 @@
 #include "index_iterator.h"
 #include "db/table_cache.h"
 #include "db/version_edit.h"
+#include "port/port.h"
+#include "table/format.h"
+#include "index/nvm_btree.h"
+#include "index/ff_btree.h"
 
 namespace leveldb {
+
+port::Mutex* mutex_;
+port::CondVar* condvar_;
 
 void* convert(IndexMeta meta) {
   uint64_t t = 0;
@@ -27,46 +34,48 @@ IndexMeta convert(void* ptr) {
   return meta;
 }
 
-Index::Index()
-  : condvar_(port::CondVar(&mutex_))  {
+Index::Index() {
   free_ = true;
   bgstarted_ = false;
+  tree_ = new FFBtree;
+  mutex_ = new port::Mutex;
+  condvar_ = new port::CondVar(mutex_);
 }
 
 IndexMeta Index::Get(const Slice& key) {
-  void* result = tree_.Search(fast_atoi(key.data(), key.size()));
+  void* result = tree_->Search(fast_atoi(key.data(), key.size()));
   return convert(result);
 }
 
 void Index::Insert(const uint32_t& key, IndexMeta meta) {
   edit_->AddToRecoveryList(meta.file_number);
   // TODO: check btree if updated
-  void* old_meta = tree_.Insert(key, convert(meta));
+  void* old_meta = tree_->Insert(key, convert(meta));
   if (old_meta != nullptr) {
     edit_->DecreaseCount(convert(old_meta).file_number);
   }
 }
 
 void Index::AsyncInsert(const KeyAndMeta& key_and_meta) {
-  mutex_.Lock();
+  mutex_->Lock();
   if (!bgstarted_) {
     bgstarted_ = true;
     port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));
   }
   if (queue_.empty()) {
-    condvar_.Signal();
+    condvar_->Signal();
   }
   queue_.push_back(key_and_meta);
-  mutex_.Unlock();
+  mutex_->Unlock();
 }
 
 void Index::Runner() {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
   for (;;) {
-    mutex_.Lock();
+    mutex_->Lock();
     for (;queue_.empty();) {
-      condvar_.Wait();
+      condvar_->Wait();
     }
     edit_->AllocateRecoveryList(queue_.size());
     assert(queue_.size() > 0);
@@ -78,7 +87,7 @@ void Index::Runner() {
     }
     edit_->Unref();
     assert(queue_.empty());
-    mutex_.Unlock();
+    mutex_->Unlock();
   }
 #pragma clang diagnostic pop
 }
@@ -88,7 +97,7 @@ void* Index::ThreadWrapper(void* index) {
   return NULL;
 }
 void Index::AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) {
-  mutex_.Lock();
+  mutex_->Lock();
   assert(queue_.size() == 0);
   queue_.swap(queue);
   edit_ = edit;
@@ -97,12 +106,12 @@ void Index::AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) {
     bgstarted_ = true;
     port::PthreadCall("create thread", pthread_create(&thread_, NULL, &Index::ThreadWrapper, this));
   }
-  condvar_.Signal();
-  mutex_.Unlock();
+  condvar_->Signal();
+  mutex_->Unlock();
 }
 
 Iterator* Index::NewIterator(const ReadOptions& options, TableCache* table_cache) {
-  return new IndexIterator(options, tree_.GetIterator(), table_cache);
+  return new IndexIterator(options, tree_->GetIterator(), table_cache);
 }
 
 } // namespace leveldb
