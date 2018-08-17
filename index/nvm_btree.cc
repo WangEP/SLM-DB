@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
-#include "leveldb/index.h"
+#include "btree_index.h"
 #include "nvm_btree.h"
 
 using namespace std;

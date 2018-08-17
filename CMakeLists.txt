@@ -132,15 +132,15 @@ set(LEVEL_DB_FILES
         util/persistant_pool.h
         port/port.h
         port/atomic_pointer.h
-        index/index.cc
-        index/nvm_btree.cc
-        index/nvm_btree.h
+        index/btree_index.cc
+        index/btree_index.h
         index/index_iterator.cc
         index/index_iterator.h
         index/ff_btree.cc
         index/ff_btree.h
         index/ff_btree_iterator.cc
-        index/ff_btree_iterator.h)
+        index/ff_btree_iterator.h
+        index/index.cc)
 
 if(WIN32)
     list(APPEND LEVEL_DB_FILES

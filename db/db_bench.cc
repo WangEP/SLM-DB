@@ -16,7 +16,6 @@
 #include "util/mutexlock.h"
 #include "util/random.h"
 #include "util/testutil.h"
-#include "leveldb/index.h"
 #include "util/perf_log.h"
 #include "util/persistant_pool.h"
 
@@ -741,7 +740,6 @@ private:
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
-    options.index = new leveldb::Index();
     options.merge_threshold = FLAGS_merge_threshold;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
