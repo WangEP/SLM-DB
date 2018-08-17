@@ -30,6 +30,8 @@ public:
 
   Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
 
+  FFBtreeIterator* BtreeIterator();
+
 private:
   void Runner();
   static void* ThreadWrapper(void* ptr);

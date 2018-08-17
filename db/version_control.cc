@@ -3,7 +3,7 @@
 #include "filename.h"
 #include "log_reader.h"
 #include "table/merger.h"
-#include "leveldb/index.h"
+#include "index/btree_index.h"
 #include "index/ff_btree_iterator.h"
 #include "index/ff_btree.h"
 #ifdef PERF_LOG
@@ -374,7 +374,7 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 }
 
 void VersionControl::CheckLocality() {
-  auto iter = options_->index->BtreeIterator();
+  auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
   iter->Seek(locality_check_key);
   std::set<uint16_t> uniq_files;
   for (int64_t r = 0; r < config::LocalityCheckRange; r++) {

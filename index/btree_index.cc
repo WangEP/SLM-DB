@@ -70,4 +70,9 @@ Iterator* BtreeIndex::NewIterator(const ReadOptions& options, TableCache* table_
   return new IndexIterator(options, tree_.GetIterator(), table_cache);
 }
 
+FFBtreeIterator* BtreeIndex::BtreeIterator() {
+  return tree_.GetIterator();
+}
+
+
 } // namespace leveldb

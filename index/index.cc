@@ -27,8 +27,4 @@ Index* CreateBtreeIndex() {
   return new BtreeIndex();
 }
 
-FFBtreeIterator* Index::BtreeIterator() {
-  return tree_.GetIterator();
-}
-
 } // namespace leveldb
