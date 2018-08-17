@@ -50,6 +50,8 @@ public:
 
   Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
 
+  FFBtreeIterator* BtreeIterator();
+
   bool Acceptable() {
     return queue_.empty() && free_;
   }

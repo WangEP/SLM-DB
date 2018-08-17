@@ -3,6 +3,9 @@
 #include "filename.h"
 #include "log_reader.h"
 #include "table/merger.h"
+#include "leveldb/index.h"
+#include "index/ff_btree_iterator.h"
+#include "index/ff_btree.h"
 #ifdef PERF_LOG
 #include "util/perf_log.h"
 #endif
@@ -146,6 +149,7 @@ VersionControl::VersionControl(const std::string& dbname,
       log_number_(0),
       prev_log_number_(0),
       compaction_pointer_(0),
+      locality_check_key(0),
       state_change_(false),
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
@@ -369,6 +373,37 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
+void VersionControl::CheckLocality() {
+  auto iter = options_->index->BtreeIterator();
+  iter->Seek(locality_check_key);
+  std::set<uint16_t> uniq_files;
+  for (int64_t r = 0; r < config::LocalityCheckRange; r++) {
+    std::set<uint16_t> uniq_files_;
+    if (!iter->Valid()) iter->SeekToFirst();
+    for (int i = 0; i < cardinality && iter->Valid(); i++, r++) {
+      uniq_files_.insert(convert(iter->value()).file_number);
+      iter->Next();
+    }
+    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > 1) {
+      uniq_files.swap(uniq_files_);
+    }
+  }
+  locality_check_key = iter->key();
+  if (uniq_files.empty()) {
+    Log(options_->info_log, "No locality merge candidates");
+    return;
+  }
+  delete iter;
+  std::string msg;
+  char buf[100];
+  for (auto f : uniq_files) {
+    snprintf(buf, sizeof(buf), "%d, ", f);
+    msg.append(buf);
+  }
+  current_->MoveToMerge(uniq_files);
+  Log(options_->info_log, "Added for locality merge [%s] files ", msg.c_str());
+}
+
 Compaction* VersionControl::PickCompaction() {
   // get compaction and return
   if (current_->merge_candidates_.size() <= 1) return nullptr;
@@ -376,10 +411,6 @@ Compaction* VersionControl::PickCompaction() {
   state_change_ = true;
   Compaction* c = new Compaction(options_);
   RandomBasedPick(&c);
-  if (c->num_input_files() <= 1) {
-    c->ReleaseFiles();
-
-  }
   if (c->num_input_files() <= 1) {
     c->ReleaseFiles();
     if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {

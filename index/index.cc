@@ -105,4 +105,8 @@ Iterator* Index::NewIterator(const ReadOptions& options, TableCache* table_cache
   return new IndexIterator(options, tree_.GetIterator(), table_cache);
 }
 
+FFBtreeIterator* Index::BtreeIterator() {
+  return tree_.GetIterator();
+}
+
 } // namespace leveldb

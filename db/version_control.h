@@ -30,6 +30,7 @@ class VersionControl {
 
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu);
   Compaction* PickCompaction();
+  void CheckLocality();
   Status Recover(bool* save_manifest);
   Iterator* MakeInputIterator(Compaction* c);
   const char* Summary(SummaryStorage* scratch) const;
@@ -74,6 +75,7 @@ class VersionControl {
   log::Writer* descriptor_log_;
   Version* current_;
   TableCache* table_cache_;
+  int64_t locality_check_key;
   bool state_change_;
   int compaction_pointer_;
 

@@ -145,4 +145,14 @@ void Version::SortMergeCandidates() {
 
 }
 
+void Version::MoveToMerge(std::set<uint16_t> array) {
+  for (auto f : array) {
+    if (files_.count(f) > 0) {
+      auto file = files_.at(f);
+      files_.erase(f);
+      merge_candidates_.insert({f, file});
+    }
+  }
+}
+
 } // namespace leveldb

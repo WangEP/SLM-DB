@@ -628,7 +628,7 @@ void DBImpl::BackgroundCompaction() {
     CompactMemTable();
     return;
   }
-
+  versions_->CheckLocality();
   Compaction* c = versions_->PickCompaction();
 
   Status status;
