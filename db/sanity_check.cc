@@ -3,15 +3,15 @@
 #include <thread>
 #include <util/perf_log.h>
 #include "leveldb/db.h"
-#include "leveldb/index.h"
+#include "index/btree_index.h"
 #include "util/testharness.h"
 
 
 class SanityCheck {};
 
 leveldb::DB* db;
-int seq_inserts = 1000000;
-int rand_inserts = 300000;
+int seq_inserts = 10000000;
+int rand_inserts = 3000000;
 int rand_reads = 300000;
 
 TEST(SanityCheck, Create) {
@@ -19,7 +19,6 @@ TEST(SanityCheck, Create) {
   options.filter_policy = NULL;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
-  options.index = new leveldb::Index();
   const char *c = "/tmp/testdb";
   std::string dbpath(c);
   leveldb::DestroyDB(dbpath, leveldb::Options());
@@ -65,7 +64,7 @@ TEST(SanityCheck, SequentialRead) {
 TEST(SanityCheck, RandomRead) {
   leveldb::Status status;
   leveldb::Random rand(time(0));
-  for (auto i = 0; i < rand_inserts; i++) {
+  for (auto i = 0; i < rand_reads; i++) {
     int k = rand.Next() % seq_inserts;
     char key[100];
     snprintf(key, sizeof(key), "%016d", k);

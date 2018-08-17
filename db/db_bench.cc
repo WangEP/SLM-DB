@@ -16,8 +16,8 @@
 #include "util/mutexlock.h"
 #include "util/random.h"
 #include "util/testutil.h"
-#include "leveldb/index.h"
 #include "util/perf_log.h"
+#include "util/persistant_pool.h"
 
 
 // Comma-separated list of operations to run in the specified order
@@ -740,7 +740,6 @@ private:
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
-    options.index = new leveldb::Index();
     options.merge_threshold = FLAGS_merge_threshold;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
@@ -802,7 +801,7 @@ private:
     Iterator* iter = db_->NewIterator(ReadOptions());
     int i = 0;
     int64_t bytes = 0;
-    string value;
+    std::string value;
     for (iter->SeekToFirst(); i < reads_ && iter->Valid(); iter->Next()) {
       bytes += iter->key().size() + iter->value().size();
       value = iter->value().ToString();
@@ -994,7 +993,6 @@ private:
     } else {
       fprintf(stdout, "\n%s\n", stats.c_str());
     }
-    fprintf(stdout, "\n%s\n", stats.c_str());
   }
 
   static void WriteToFile(void* arg, const char* buf, int n) {
