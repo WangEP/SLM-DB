@@ -29,7 +29,7 @@ void* convert(IndexMeta meta);
 IndexMeta convert(void* ptr);
 
 struct KeyAndMeta{
-  uint32_t key;
+  uint64_t key;
   std::shared_ptr<IndexMeta> meta;
 };
 

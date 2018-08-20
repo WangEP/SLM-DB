@@ -54,7 +54,7 @@ void IndexIterator::Next() {
   btree_iterator_->Next();
   Advance();
   assert(status_.ok());
-  uint32_t key;
+  uint64_t key;
   while ((key = fast_atoi(block_iterator_->key())) < btree_iterator_->key()) {
     block_iterator_->Next();
   }

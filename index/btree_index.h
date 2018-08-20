@@ -24,7 +24,7 @@ public:
 
   IndexMeta Get(const Slice& key);
 
-  void Insert(const uint32_t& key, IndexMeta meta);
+  void Insert(const uint64_t& key, IndexMeta meta);
 
   void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
 

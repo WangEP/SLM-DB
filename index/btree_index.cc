@@ -16,7 +16,7 @@ IndexMeta BtreeIndex::Get(const Slice& key) {
   return convert(result);
 }
 
-void BtreeIndex::Insert(const uint32_t& key, IndexMeta meta) {
+void BtreeIndex::Insert(const uint64_t& key, IndexMeta meta) {
   edit_->AddToRecoveryList(meta.file_number);
   // TODO: check btree if updated
   void* old_meta = tree_.Insert(key, convert(meta));
@@ -36,7 +36,7 @@ void BtreeIndex::Runner() {
     edit_->AllocateRecoveryList(queue_.size());
     assert(queue_.size() > 0);
     for (;!queue_.empty();) {
-      uint32_t key = queue_.front().key;
+      uint64_t key = queue_.front().key;
       std::shared_ptr<IndexMeta> value = queue_.front().meta;
       queue_.pop_front();
       Insert(key, *value);

@@ -99,7 +99,7 @@ inline const char* GetVarint32Ptr(const char* p,
   return GetVarint32PtrFallback(p, limit, value);
 }
 
-inline uint32_t fast_atoi(const char* str, size_t size) {
+inline uint64_t fast_atoi(const char* str, size_t size) {
   uint32_t val = 0;
   while(size-- > 0 && *str && *str >= '0' && *str <= '9') {
     val = val*10 + (*str++ - '0');
@@ -107,7 +107,7 @@ inline uint32_t fast_atoi(const char* str, size_t size) {
   return val;
 }
 
-inline uint32_t fast_atoi(Slice slice) {
+inline uint64_t fast_atoi(Slice slice) {
   return fast_atoi(slice.data(), slice.size());
 }
 
