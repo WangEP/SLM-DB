@@ -9,6 +9,9 @@
 #include "leveldb/table.h"
 #include "util/coding.h"
 #include "table/format.h"
+#ifdef PERF_LOG
+#include "util/perf_log.h"
+#endif
 
 namespace leveldb {
 
@@ -116,9 +119,17 @@ Status TableCache::Get(const ReadOptions& options,
   Status s = GetBlockIterator(options, file_number, offset, size, &block_iter);
   if (block_iter != nullptr) {
     block_iter->Seek(k);
+#ifdef PERF_LOG
+    uint64_t start_micros = benchmark::NowMicros();
     if (block_iter->Valid()) {
       (*saver)(arg, block_iter->key(), block_iter->value());
     }
+    benchmark::LogMicros(benchmark::VALUE_COPY, benchmark::NowMicros() - start_micros);
+#else
+    if (block_iter->Valid()) {
+      (*saver)(arg, block_iter->key(), block_iter->value());
+    }
+#endif
     s = block_iter->status();
     delete block_iter;
   }

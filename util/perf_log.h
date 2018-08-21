@@ -15,6 +15,7 @@ enum Type {
   VERSION = 1,
   BLOCK = 2,
   MEMTABLE = 3,
+  VALUE_COPY = 4,
 };
 
 class PerfLog {
@@ -24,6 +25,7 @@ public:
     version_.Clear();
     block_.Clear();
     memtable_.Clear();
+    value_copy_.Clear();
   }
 
   ~PerfLog() = default;
@@ -42,6 +44,9 @@ public:
       case MEMTABLE:
         memtable_.Add(micros);
         break;
+      case VALUE_COPY:
+        value_copy_.Add(micros);
+        break;
     }
   }
 
@@ -55,6 +60,8 @@ public:
     r.append(query_.GetInfo());
     r.append("Block info,\n");
     r.append(block_.GetInfo());
+    r.append("Value Copy info,\n");
+    r.append(value_copy_.GetInfo());
     return r;
   }
 
@@ -68,6 +75,8 @@ public:
     r.append(query_.GetHistogram());
     r.append("Block info,\n");
     r.append(block_.GetHistogram());
+    r.append("Value Copy info,\n");
+    r.append(value_copy_.GetHistogram());
     return r;
   }
 
@@ -76,6 +85,7 @@ private:
   Histogram version_;
   Histogram block_;
   Histogram memtable_;
+  Histogram value_copy_;
 };
 
 extern void CreatePerfLog();
