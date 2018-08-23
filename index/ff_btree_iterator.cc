@@ -37,7 +37,7 @@ void FFBtreeIterator::SeekToLast() {
   valid = cur != NULL;
 }
 
-void FFBtreeIterator::Seek(const uint64_t& key) {
+void FFBtreeIterator::Seek(const entry_key_t& key) {
   Page* page = (Page*)btree->root;
   // search until leaf node
   while(page->hdr.leftmost_ptr!=NULL) {
@@ -58,7 +58,7 @@ void FFBtreeIterator::Seek(const uint64_t& key) {
           continue;
         }
         for (i = 1; page->records[i].ptr != nullptr && i < record_count; ++i) {
-          if (page->records[i].key >= key && page->records[i].ptr != nullptr) {
+          if (page->records[i].key.compare(key) >= 0 && page->records[i].ptr != nullptr) {
             ret = &page->records[i];
             index = i;
             break;
@@ -66,7 +66,7 @@ void FFBtreeIterator::Seek(const uint64_t& key) {
         }
       } else {
         for (i = record_count - 1; i > 0; --i) {
-          if (page->records[i].key <= key && page->records[i].ptr != nullptr) {
+          if (page->records[i].key.compare(key) <= 0 && page->records[i].ptr != nullptr) {
             ret = &page->records[i];
             index = i;
             break;
@@ -88,7 +88,7 @@ void FFBtreeIterator::Seek(const uint64_t& key) {
     }
   } while (page != page->hdr.sibling_ptr
            && (page = page->hdr.sibling_ptr)
-           && key >= page->records[0].key);
+           && key.compare(page->records[0].key) >= 0);
 
   valid = ret != nullptr;
 }
@@ -105,7 +105,7 @@ void FFBtreeIterator::Next() {
     cur = &(cur_page->records[index]);
   }
   // if this is a last key, make invalid
-  if ((cur_page->records[index+1].ptr == nullptr || cur_page->records[index+1].key == -1) && cur_page->hdr.sibling_ptr == nullptr) {
+  if ((cur_page->records[index+1].ptr == nullptr || cur_page->records[index+1].key == "") && cur_page->hdr.sibling_ptr == nullptr) {
     valid = false;
   }
 }
@@ -118,7 +118,7 @@ void FFBtreeIterator::Prev() {
   }
 }
 
-int64_t FFBtreeIterator::key() const {
+entry_key_t FFBtreeIterator::key() const {
   return cur->key;
 }
 

@@ -11,17 +11,23 @@ BtreeIndex::BtreeIndex() : condvar_(&mutex_) {
   bgstarted_ = false;
 }
 
-IndexMeta BtreeIndex::Get(const Slice& key) {
-  void* result = tree_.Search(fast_atoi(key.data(), key.size()));
-  return convert(result);
+IndexMeta* BtreeIndex::Get(const Slice& key) {
+  IndexMeta* result = (IndexMeta*)tree_.Search(key.ToString());
+  return result;
 }
 
-void BtreeIndex::Insert(const uint64_t& key, IndexMeta meta) {
+void BtreeIndex::Insert(const entry_key_t& key, const IndexMeta& meta) {
   edit_->AddToRecoveryList(meta.file_number);
-  // TODO: check btree if updated
-  void* old_meta = tree_.Insert(key, convert(meta));
-  if (old_meta != nullptr) {
-    edit_->DecreaseCount(convert(old_meta).file_number);
+  // check btree if updated
+  IndexMeta* ptr = (IndexMeta*) nvram::pmalloc(sizeof(IndexMeta));
+  ptr->size = meta.size;
+  ptr->file_number = meta.file_number;
+  ptr->offset = meta.offset;
+  clflush((char*)ptr, sizeof(IndexMeta));
+  IndexMeta* old_ptr = (IndexMeta*) tree_.Insert(key, ptr);
+  if (old_ptr != nullptr) {
+    edit_->DecreaseCount(old_ptr->file_number);
+    delete old_ptr;
   }
 }
 
@@ -34,9 +40,9 @@ void BtreeIndex::Runner() {
       condvar_.Wait();
     }
     edit_->AllocateRecoveryList(queue_.size());
-    assert(queue_.size() > 0);
+    assert(!queue_.empty());
     for (;!queue_.empty();) {
-      uint64_t key = queue_.front().key;
+      std::string key = queue_.front().key;
       std::shared_ptr<IndexMeta> value = queue_.front().meta;
       queue_.pop_front();
       Insert(key, *value);

@@ -75,7 +75,7 @@ class VersionControl {
   log::Writer* descriptor_log_;
   Version* current_;
   TableCache* table_cache_;
-  int64_t locality_check_key;
+  entry_key_t locality_check_key;
   bool state_change_;
   int compaction_pointer_;
 

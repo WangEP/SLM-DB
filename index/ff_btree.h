@@ -15,13 +15,13 @@
 #include <climits>
 #include <future>
 #include <mutex>
-#include "include/leveldb/persistant_pool.h"
+#include "leveldb/persistant_pool.h"
+#include "leveldb/index.h"
 #include "util/persist.h"
 #include "leveldb/iterator.h"
 
 #define IS_FORWARD(c) (c % 2 == 0)
 
-using entry_key_t = uint64_t;
 
 using namespace std;
 
@@ -86,7 +86,7 @@ private:
   void* ptr; // 8 bytes
 public :
   Entry() {
-    key = LONG_MAX;
+    key = "";
     ptr = NULL;
   }
 
@@ -372,7 +372,7 @@ public:
   }
 
   inline void*
-  insert_key(entry_key_t key, void* ptr, int* num_entries, bool flush = true,
+  insert_key(const entry_key_t& key, void* ptr, int* num_entries, bool flush = true,
              bool update_last_index = true) {
     // update switch_counter
     if (!IS_FORWARD(hdr.switch_counter))
@@ -528,23 +528,18 @@ public:
 
       // Set a new root or insert the split key to the parent
       if (bt->root == this) { // only one node can update the root ptr
-        Page* new_root = new Page(this, split_key, sibling,
-                                  hdr.level + 1);
-        bt->setNewRoot(new_root);
-      } else {
-        void* tmp = bt->InsertInternal(NULL, split_key, sibling,
-                           hdr.level + 1);
-        if (tmp) {
-          printf("debug\n");
-        }
+        Page* new_root = new Page(this, split_key, sibling, hdr.level + 1);
+        bt->setNewRoot((char *)new_root);
       }
-
+      else {
+        bt->InsertInternal(NULL, split_key, (char *)sibling, hdr.level + 1);
+      }
       return ret;
     }
   }
 
   // Search keys with linear Search
-  void linear_search_range (entry_key_t min, entry_key_t max, unsigned long* buf) {
+  void linear_search_range (const entry_key_t& min, entry_key_t max, unsigned long* buf) {
     int i, off = 0;
     uint8_t previous_switch_counter;
     Page* current = this;
@@ -619,8 +614,8 @@ public:
     }
   }
 
-  void* linear_search(entry_key_t key) {
-    int i;
+  void* linear_search(const entry_key_t& key) {
+    int i = 1;
     uint8_t previous_switch_counter;
     void* ret = NULL;
     void* t;
@@ -644,9 +639,9 @@ public:
 
           for (i = 1; records[i].ptr != NULL; ++i) {
             if ((k = records[i].key) == key) {
-              if (records[i - 1].key != records[i].key && records[i].ptr) {
+              if (records[i-1].ptr != (t = records[i].ptr)) {
                 if (k == records[i].key) {
-                  ret = records[i].ptr;
+                  ret = t;
                   break;
                 }
               }
@@ -655,9 +650,9 @@ public:
         } else { // Search from right to left
           for (i = count() - 1; i > 0; --i) {
             if ((k = records[i].key) == key) {
-              if (records[i - 1].key != records[i].key && records[i].ptr) {
+              if (records[i - 1].ptr != (t = records[i].ptr) && t) {
                 if (k == records[i].key) {
-                  ret = records[i].ptr;
+                  ret = t;
                   break;
                 }
               }

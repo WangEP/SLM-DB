@@ -36,19 +36,14 @@ Status BuildTable(const std::string& dbname,
     TableBuilder* builder = new TableBuilder(options, file, meta->number);
     meta->smallest.DecodeFrom(iter->key());
     Slice prev_key;
-    Slice prev_value;
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
       Slice value = iter->value();
-      if (prev_key.empty()) {
-        prev_key = key;
-      } else if (options.comparator->Compare(ExtractUserKey(prev_key), ExtractUserKey(key)) != 0) {
-        builder->Add(prev_key, prev_value);
+      if (prev_key.empty() || options.comparator->Compare(ExtractUserKey(prev_key), ExtractUserKey(key)) != 0) {
+        builder->Add(key, value);
         prev_key = key;
       }
-      prev_value = value;
     }
-    builder->Add(prev_key, prev_value);
     meta->largest.DecodeFrom(prev_key);
     meta->total = builder->NumEntries();
     meta->alive = builder->NumEntries();

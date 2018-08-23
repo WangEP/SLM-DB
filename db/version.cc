@@ -46,21 +46,20 @@ Status Version::Get(const ReadOptions& options, const LookupKey& key, std::strin
 
 #ifdef PERF_LOG
   uint64_t start_micros = benchmark::NowMicros();
-  IndexMeta index_meta = index->Get(user_key);
+  const IndexMeta* index_meta = index->Get(user_key);
   benchmark::LogMicros(benchmark::QUERY, benchmark::NowMicros() - start_micros);
 #else
   IndexMeta index_meta = index->Get(user_key);
 #endif
 
-  if (convert(index_meta) != 0) {
+  if (index_meta != nullptr) {
     Saver saver;
     saver.state = kNotFound;
     saver.ucmp = ucmp;
     saver.user_key = user_key;
     saver.value = val;
 //    uint64_t fsize = GetFileSize(index_meta.file_number);
-    s = vcontrol_->cache()->Get(options, index_meta.file_number, index_meta.offset, index_meta.size,
-                                ikey, &saver, SaveValue);
+    s = vcontrol_->cache()->Get(options, index_meta, ikey, &saver, SaveValue);
     if (!s.ok()) {
       return s;
     }

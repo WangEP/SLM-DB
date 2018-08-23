@@ -90,7 +90,7 @@ class VersionControl::Builder {
       }
     }
     for (const auto& f : added_files_) {
-      assert(dead_key_counter_.count(f->number) <= 0);
+      assert(dead_key_counter_.count(f->number) >= 0);
       v->AddFile(f);
     }
   }
@@ -149,7 +149,6 @@ VersionControl::VersionControl(const std::string& dbname,
       log_number_(0),
       prev_log_number_(0),
       compaction_pointer_(0),
-      locality_check_key(0),
       state_change_(false),
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
@@ -381,7 +380,7 @@ void VersionControl::CheckLocality() {
     std::set<uint16_t> uniq_files_;
     if (!iter->Valid()) iter->SeekToFirst();
     for (int i = 0; i < cardinality && iter->Valid(); i++, r++) {
-      uniq_files_.insert(convert(iter->value()).file_number);
+      uniq_files_.insert(((IndexMeta*)iter->value())->file_number);
       iter->Next();
     }
     if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > 1) {

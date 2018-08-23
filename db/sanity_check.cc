@@ -1,15 +1,16 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <util/perf_log.h>
+#include <map>
 #include "leveldb/db.h"
-#include "index/btree_index.h"
 #include "util/testharness.h"
+#include "util/perf_log.h"
 
 
 class SanityCheck {};
 
 leveldb::DB* db;
+std::map<std::string, std::string> checker;
 int seq_inserts = 10000000;
 int rand_inserts = 3000000;
 int rand_reads = 300000;
@@ -35,19 +36,7 @@ TEST(SanityCheck, SequentialWrite) {
     std::string value = std::string("valuevalue").append(key);
     status = db->Put(leveldb::WriteOptions(), key, value);
     ASSERT_OK(status);
-  }
-}
-
-TEST(SanityCheck, RandomWrite) {
-  leveldb::Status status;
-  leveldb::Random rand(time(0));
-  for (auto i = 0; i < rand_inserts; i++) {
-    int k = rand.Next() % seq_inserts;
-    char key[100];
-    snprintf(key, sizeof(key), "%016d", k);
-    std::string value = std::string("valuevalue").append(key);
-    status = db->Put(leveldb::WriteOptions(), key, value);
-    ASSERT_OK(status);
+    checker.insert_or_assign(key, value);
   }
 }
 
@@ -61,18 +50,49 @@ TEST(SanityCheck, SequentialRead) {
   }
 }
 
-TEST(SanityCheck, RandomRead) {
+TEST(SanityCheck, RandomRead1) {
   leveldb::Status status;
   leveldb::Random rand(time(0));
   for (auto i = 0; i < rand_reads; i++) {
     int k = rand.Next() % seq_inserts;
     char key[100];
     snprintf(key, sizeof(key), "%016d", k);
-    std::string v = std::string("valuevalue").append(key);
     std::string value;
     status = db->Get(leveldb::ReadOptions(), key, &value);
     ASSERT_OK(status);
-    ASSERT_EQ(v, value);
+    std::string check = checker.at(key);
+    assert(value == check);
+    ASSERT_EQ(value, check);
+  }
+}
+
+TEST(SanityCheck, RandomWrite) {
+  leveldb::Status status;
+  leveldb::Random rand(time(0));
+  for (auto i = 0; i < rand_inserts; i++) {
+    int k = rand.Next() % seq_inserts;
+    char key[100];
+    snprintf(key, sizeof(key), "%016d", k);
+    std::string value = std::string("update").append(std::to_string(rand.Next() % seq_inserts));
+    status = db->Put(leveldb::WriteOptions(), key, value);
+    ASSERT_OK(status);
+    checker.insert_or_assign(key, value);
+  }
+}
+
+TEST(SanityCheck, RandomRead2) {
+  leveldb::Status status;
+  leveldb::Random rand(time(0));
+  for (auto i = 0; i < rand_reads; i++) {
+    int k = rand.Next() % seq_inserts;
+    char key[100];
+    snprintf(key, sizeof(key), "%016d", k);
+    std::string value;
+    status = db->Get(leveldb::ReadOptions(), key, &value);
+    ASSERT_OK(status);
+    std::string check = checker.at(key);
+    assert(value == check);
+    ASSERT_EQ(value, check);
   }
 }
 

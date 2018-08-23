@@ -22,9 +22,9 @@ public:
 
   ~BtreeIndex() = default;
 
-  IndexMeta Get(const Slice& key);
+  IndexMeta* Get(const Slice& key);
 
-  void Insert(const uint64_t& key, IndexMeta meta);
+  void Insert(const entry_key_t& key, const IndexMeta& meta);
 
   void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
 
@@ -36,7 +36,7 @@ private:
   void Runner();
   static void* ThreadWrapper(void* ptr);
 
-  FFBtree tree_; // Temporary
+  FFBtree tree_;
   bool bgstarted_;
   pthread_t thread_;
   port::Mutex mutex_;
