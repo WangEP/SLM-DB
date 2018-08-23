@@ -159,7 +159,7 @@ public:
     return count;
   }
 
-  inline bool remove_key(entry_key_t key) {
+  inline bool remove_key(const entry_key_t& key) {
     // Set the switch_counter
     if (IS_FORWARD(hdr.switch_counter))
       ++hdr.switch_counter;
@@ -195,7 +195,7 @@ public:
     return shift;
   }
 
-  bool remove(FFBtree* bt, entry_key_t key, bool only_rebalance = false, bool with_lock = true) {
+  bool remove(FFBtree* bt, const entry_key_t& key, bool only_rebalance = false, bool with_lock = true) {
     if (!only_rebalance) {
       int num_entries_before = count();
 
@@ -539,7 +539,7 @@ public:
   }
 
   // Search keys with linear Search
-  void linear_search_range (const entry_key_t& min, entry_key_t max, unsigned long* buf) {
+  void linear_search_range (const entry_key_t& min, const entry_key_t& max, unsigned long* buf) {
     int i, off = 0;
     uint8_t previous_switch_counter;
     Page* current = this;
@@ -738,7 +738,7 @@ public:
     return nullptr;
   }
 
-  void* linear_search_entry(entry_key_t key) {
+  void* linear_search_entry(const entry_key_t& key) {
     int i = 1;
     uint8_t previous_switch_counter;
     void* ret = nullptr;

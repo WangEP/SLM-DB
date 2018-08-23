@@ -105,7 +105,7 @@ void FFBtreeIterator::Next() {
     cur = &(cur_page->records[index]);
   }
   // if this is a last key, make invalid
-  if ((cur_page->records[index+1].ptr == nullptr || cur_page->records[index+1].key == "") && cur_page->hdr.sibling_ptr == nullptr) {
+  if ((cur_page->records[index+1].ptr == nullptr || cur_page->records[index + 1].key.empty()) && cur_page->hdr.sibling_ptr == nullptr) {
     valid = false;
   }
 }

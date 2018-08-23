@@ -833,7 +833,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         compact->compaction->IsBaseLevelForKey(ikey.user_key),
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
-    if (!compact->compaction->IsInput(index_->Get(key)->file_number)) {
+    if (!compact->compaction->IsInput(index_->Get(ExtractUserKey(key))->file_number)) {
       drop = true;
     }
 

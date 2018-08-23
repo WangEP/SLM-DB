@@ -104,6 +104,22 @@ inline int Slice::compare(const Slice& b) const {
   return r;
 }
 
+inline bool operator<(const Slice& x, const Slice& y) {
+  return x.compare(y) < 0;
+}
+
+inline bool operator<=(const Slice& x, const Slice& y) {
+  return x.compare(y) <= 0;
+}
+
+inline bool operator>(const Slice& x, const Slice& y) {
+  return x.compare(y) > 0;
+}
+
+inline bool operator>=(const Slice& x, const Slice& y) {
+  return x.compare(y) >= 0;
+}
+
 }  // namespace leveldb
 
 
