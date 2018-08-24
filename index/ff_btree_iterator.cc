@@ -66,7 +66,7 @@ void FFBtreeIterator::Seek(const entry_key_t& key) {
         }
       } else {
         for (i = record_count - 1; i > 0; --i) {
-          if (page->records[i].key <= key <= 0 && page->records[i].ptr != nullptr) {
+          if (page->records[i].key <= key && page->records[i].ptr != nullptr) {
             ret = &page->records[i];
             index = i;
             break;

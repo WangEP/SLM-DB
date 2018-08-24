@@ -52,10 +52,12 @@ void IndexIterator::Seek(const Slice& target) {
 void IndexIterator::Next() {
   assert(btree_iterator_->Valid());
   btree_iterator_->Next();
+  assert(btree_iterator_->value() != index_meta_);
   Advance();
   assert(status_.ok());
   entry_key_t key;
-  while ((key = fast_atoi(block_iterator_->key())) < btree_iterator_->key()) {
+  while ((key = fast_atoi(ExtractUserKey(block_iterator_->key()))) < btree_iterator_->key()) {
+    assert(block_iterator_->Valid());
     block_iterator_->Next();
   }
   if (key != btree_iterator_->key()) {
