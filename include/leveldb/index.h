@@ -7,8 +7,9 @@
 #include "leveldb/slice.h"
 #include "leveldb/iterator.h"
 #include "leveldb/options.h"
+#include "leveldb/string.h"
 
-using entry_key_t = std::string;
+using entry_key_t = uint64_t;
 
 namespace leveldb {
 
@@ -32,7 +33,7 @@ public:
 extern bool IsEqual(const IndexMeta* lhs, const IndexMeta* rhs);
 
 struct KeyAndMeta{
-  std::string key;
+  entry_key_t key;
   std::shared_ptr<IndexMeta> meta;
 };
 

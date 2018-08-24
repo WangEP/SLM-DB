@@ -43,7 +43,7 @@ void IndexIterator::SeekToLast() {
 }
 
 void IndexIterator::Seek(const Slice& target) {
-  btree_iterator_->Seek(target.ToString());
+  btree_iterator_->Seek(fast_atoi(target));
   Advance();
   block_iterator_->Seek(target);
   status_ = block_iterator_->status();
@@ -55,11 +55,11 @@ void IndexIterator::Next() {
   Advance();
   assert(status_.ok());
   entry_key_t key;
-  while ((key = ExtractUserKey(this->key()).ToString()).compare(btree_iterator_->key()) < 0) {
+  while ((key = fast_atoi(block_iterator_->key())) < btree_iterator_->key()) {
     block_iterator_->Next();
   }
   if (key != btree_iterator_->key()) {
-    status_ = Status::NotFound(btree_iterator_->key());
+    status_ = Status::NotFound(std::to_string(btree_iterator_->key()));
   }
 }
 
@@ -92,9 +92,9 @@ void IndexIterator::CacheLookup() {
   if (handle_ == nullptr) {
     status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
     if (!status_.ok()) return; // something went wrong
-//    char key[100];
-//    snprintf(key, sizeof(key), "%016lu", btree_iterator_->key());
-    block_iterator_->Seek(btree_iterator_->key());
+    char key[100];
+    snprintf(key, sizeof(key), "%016lu", btree_iterator_->key());
+    block_iterator_->Seek(key);
     handle_ = cache_->Insert(cache_key, block_iterator_, 1,&DeleteIterator);
   } else {
     block_iterator_ = reinterpret_cast<Iterator*>(cache_->Value(handle_));

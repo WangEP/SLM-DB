@@ -17,7 +17,7 @@ void FFBtree::setNewRoot(void* new_root) {
   ++height;
 }
 
-void* FFBtree::Search(entry_key_t key){
+void* FFBtree::Search(const entry_key_t& key){
   Page* p = (Page*)root;
 
   while(p->hdr.leftmost_ptr != NULL) {
@@ -31,16 +31,10 @@ void* FFBtree::Search(entry_key_t key){
       break;
     }
   }
-
-//  if(!t || (char *)t != (char *)key) {
-//    // printf("NOT FOUND %lu, t = %x\n", key, t);
-//    return NULL;
-//  }
-
   return (char *)t;
 }
 
-void* FFBtree::Insert(entry_key_t key, void* right){ //need to be string
+void* FFBtree::Insert(const entry_key_t& key, void* right){ //need to be string
   Page* p = (Page*)root;
 
   while(p->hdr.leftmost_ptr != NULL) {
@@ -54,7 +48,7 @@ void* FFBtree::Insert(entry_key_t key, void* right){ //need to be string
   return ret;
 }
 
-void* FFBtree::InsertInternal(void* left, entry_key_t key,
+void* FFBtree::InsertInternal(void* left, const entry_key_t& key,
                              void* right, uint32_t level) {
   if(level > ((Page *)root)->hdr.level)
     return nullptr;
@@ -71,7 +65,7 @@ void* FFBtree::InsertInternal(void* left, entry_key_t key,
   return ret;
 }
 
-void FFBtree::Remove(entry_key_t key) {
+void FFBtree::Remove(const entry_key_t& key) {
   Page* p = (Page*)root;
 
   while(p->hdr.leftmost_ptr != NULL){
@@ -95,7 +89,7 @@ void FFBtree::Remove(entry_key_t key) {
   }
 }
 
-void FFBtree::RemoveInternal(entry_key_t key, void* ptr, uint32_t level,
+void FFBtree::RemoveInternal(const entry_key_t& key, void* ptr, uint32_t level,
                              entry_key_t* deleted_key, bool* is_leftmost_node,
                              Page** left_sibling) {
   if(level > ((Page *)this->root)->hdr.level)
@@ -132,23 +126,6 @@ void FFBtree::RemoveInternal(entry_key_t key, void* ptr, uint32_t level,
           break;
         }
       }
-    }
-  }
-}
-
-void FFBtree::Range(entry_key_t min, entry_key_t max, unsigned long* buf) {
-  Page *p = (Page *)root;
-
-  while(p) {
-    if(p->hdr.leftmost_ptr != NULL) {
-      // The current page is internal
-      p = (Page *)p->linear_search(min);
-    }
-    else {
-      // Found a leaf
-      p->linear_search_range(min, max, buf);
-
-      break;
     }
   }
 }

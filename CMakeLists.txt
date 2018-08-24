@@ -22,8 +22,8 @@ include_directories(
 add_compile_options(
         -Wno-sign-compare
         -std=c++17
-        -O2
-        -DNDEBUG
+        #-O2
+        #-DNDEBUG
 )
 
 add_definitions(-DLEVELDB_ATOMIC_PRESENT)
@@ -51,6 +51,7 @@ set(LEVEL_DB_FILES
         include/leveldb/export.h
         include/leveldb/index.h
         include/leveldb/persistant_pool.h
+        include/leveldb/string.h
         db/builder.cc
         db/builder.h
         db/db_impl.cc
@@ -100,6 +101,7 @@ set(LEVEL_DB_FILES
         table/table_builder.cc
         table/two_level_iterator.cc
         table/two_level_iterator.h
+        util/string.cc
         util/arena.cc
         util/arena.h
         util/bloom.cc
@@ -200,3 +202,6 @@ target_link_libraries(sanity_check PUBLIC leveldb)
 
 add_executable(db_bench db/db_bench.cc)
 target_link_libraries(db_bench PUBLIC leveldb)
+
+add_executable(ff_btree_test index/ff_btree_test.cc)
+target_link_libraries(ff_btree_test PUBLIC leveldb)

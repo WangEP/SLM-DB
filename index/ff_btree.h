@@ -1,3 +1,5 @@
+#include <utility>
+
 #ifndef STORAGE_LEVELDB_INDEX_FF_BTREE_H_
 #define STORAGE_LEVELDB_INDEX_FF_BTREE_H_
 
@@ -37,19 +39,17 @@ private:
 
   void setNewRoot(void* new_root);
   // store the key into the node at the given level
-  void* InsertInternal(void* left, entry_key_t key, void* right, uint32_t level);
-  void RemoveInternal(entry_key_t left, void* ptr, uint32_t level,
+  void* InsertInternal(void* left, const entry_key_t& key, void* right, uint32_t level);
+  void RemoveInternal(const entry_key_t& left, void* ptr, uint32_t level,
                       entry_key_t* deleted_key, bool* is_leftmost_node, Page** left_sibling);
 
 public:
   FFBtree();
 // insert the key in the leaf node
-  void* Insert(entry_key_t key, void* right);
-  void Remove(entry_key_t key);
-  void* Search(entry_key_t key);
+  void* Insert(const entry_key_t& key, void* right);
+  void Remove(const entry_key_t& key);
+  void* Search(const entry_key_t& key);
   FFBtreeIterator* GetIterator();
-// Function to Search keys from "min" to "max"
-  void Range(entry_key_t min, entry_key_t max, unsigned long* buf);
 
   friend class Page;
   friend class FFBtreeIterator;
@@ -86,7 +86,7 @@ private:
   void* ptr; // 8 bytes
 public :
   Entry() {
-    key = "";
+    key = UINT64_MAX;
     ptr = NULL;
   }
 
@@ -113,7 +113,7 @@ public:
   }
 
   // this is called when tree grows
-  Page(Page* left, entry_key_t key, Page* right, uint32_t level = 0) {
+  Page(Page* left, const entry_key_t& key, Page* right, uint32_t level = 0) {
     hdr.leftmost_ptr = left;
     hdr.level = level;
     records[0].key = key;
@@ -174,7 +174,7 @@ public:
       }
 
       if (shift) {
-        records[i].key = records[i + 1].key;
+        records[i].key = std::move(records[i + 1].key);
         records[i].ptr = records[i + 1].ptr;
 
         // flush
@@ -380,18 +380,19 @@ public:
 
     // FAST
     if (*num_entries == 0) {  // this page is empty
-      Entry* new_entry = &records[0];
-      Entry* array_end = &records[1];
-      new_entry->key = (entry_key_t) key;
-      new_entry->ptr = ptr;
+//      Entry* new_entry = &records[0];
+//      Entry* array_end = &records[1];
+      records[0].key = key;
+      records[0].ptr = ptr;
 
-      array_end->ptr = NULL;
+      records[1].ptr = NULL;
 
       if (flush) {
         clflush((char*) this, CACHE_LINE_SIZE);
       }
     } else {
-      int i, inserted = 0, to_flush_cnt = 0;
+      int i, to_flush_cnt = 0;
+      bool inserted = false;
       records[*num_entries + 1].ptr = records[*num_entries].ptr;
       if (flush) {
         if ((uint64_t) &(records[*num_entries + 1].ptr) % CACHE_LINE_SIZE == 0)
@@ -416,7 +417,7 @@ public:
       for (i = *num_entries - 1; i >= 0; i--) {
         if (key < records[i].key) {
           records[i + 1].ptr = records[i].ptr;
-          records[i + 1].key = records[i].key;
+          records[i + 1].key = std::move(records[i].key);
 
           if (flush) {
             uint64_t records_ptr = (uint64_t) (&records[i + 1]);
@@ -432,18 +433,18 @@ public:
               ++to_flush_cnt;
           }
         } else {
-          records[i + 1].ptr = records[i].ptr;
+//          records[i + 1].ptr = records[i].ptr;
           records[i + 1].key = key;
           records[i + 1].ptr = ptr;
 
           if (flush)
             clflush((char*) &records[i + 1], sizeof(Entry));
-          inserted = 1;
+          inserted = true;
           break;
         }
       }
-      if (inserted == 0) {
-        records[0].ptr = hdr.leftmost_ptr;
+      if (!inserted) {
+//        records[0].ptr = hdr.leftmost_ptr;
         records[0].key = key;
         records[0].ptr = ptr;
         if (flush)
@@ -459,7 +460,7 @@ public:
   }
 
   // Insert a new key - FAST and FAIR
-  Page* store(FFBtree* bt, void* left, entry_key_t key, void* right,
+  Page* store(FFBtree* bt, void* left, const entry_key_t& key, void* right,
               bool flush, Page* invalid_sibling = NULL, void** upd_ptr = NULL) {
     // If this node has a sibling node,
     if (hdr.sibling_ptr && (hdr.sibling_ptr != invalid_sibling)) {

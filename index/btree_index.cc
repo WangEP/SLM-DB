@@ -12,7 +12,7 @@ BtreeIndex::BtreeIndex() : condvar_(&mutex_) {
 }
 
 IndexMeta* BtreeIndex::Get(const Slice& key) {
-  IndexMeta* result = (IndexMeta*)tree_.Search(key.ToString());
+  IndexMeta* result = (IndexMeta*)tree_.Search(fast_atoi(key));
   return result;
 }
 
@@ -42,7 +42,7 @@ void BtreeIndex::Runner() {
     edit_->AllocateRecoveryList(queue_.size());
     assert(!queue_.empty());
     for (;!queue_.empty();) {
-      std::string key = queue_.front().key;
+      uint64_t key = queue_.front().key;
       std::shared_ptr<IndexMeta> value = queue_.front().meta;
       queue_.pop_front();
       Insert(key, *value);

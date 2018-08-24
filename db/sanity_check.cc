@@ -13,13 +13,15 @@ leveldb::DB* db;
 std::map<std::string, std::string> checker;
 int seq_inserts = 10000000;
 int rand_inserts = 3000000;
-int rand_reads = 300000;
+int rand_reads = 3000000;
 
 TEST(SanityCheck, Create) {
   leveldb::Options options;
   options.filter_policy = NULL;
   options.create_if_missing = true;
   options.compression = leveldb::kNoCompression;
+  options.write_buffer_size = 64 << 20;
+  options.max_file_size = 64 << 20;
   const char *c = "/tmp/testdb";
   std::string dbpath(c);
   leveldb::DestroyDB(dbpath, leveldb::Options());
@@ -73,7 +75,7 @@ TEST(SanityCheck, RandomWrite) {
     int k = rand.Next() % seq_inserts;
     char key[100];
     snprintf(key, sizeof(key), "%016d", k);
-    std::string value = std::string("update").append(std::to_string(rand.Next() % seq_inserts));
+    std::string value = std::string("update").append(key);
     status = db->Put(leveldb::WriteOptions(), key, value);
     ASSERT_OK(status);
     checker.insert_or_assign(key, value);
