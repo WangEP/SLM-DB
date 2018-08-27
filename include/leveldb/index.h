@@ -45,6 +45,7 @@ public:
   virtual IndexMeta* Get(const Slice& key) = 0;
   virtual void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) = 0;
   virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache) = 0;
+  virtual void Break() = 0;
 };
 
 Index* CreateBtreeIndex();

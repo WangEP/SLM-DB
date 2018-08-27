@@ -280,10 +280,11 @@ public:
               name.ToString().c_str(), seconds_ * 1e6 / done_, extra.c_str());
     }
     if (FLAGS_histogram) {
-      fprintf(stdout, "Microseconds per op:\n%s\n", hist_.ToString().c_str());
       if (FLAGS_csv) {
         fprintf(csv_file, "%s", hist_.GetInfo().c_str());
         fprintf(csv_file, "%s", hist_.GetHistogram().c_str());
+      } else {
+        fprintf(stdout, "Microseconds per op:\n%s\n", hist_.ToString().c_str());
       }
     }
     fflush(stdout);

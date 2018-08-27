@@ -22,13 +22,15 @@ public:
 
   ~BtreeIndex() = default;
 
-  IndexMeta* Get(const Slice& key);
+  virtual IndexMeta* Get(const Slice& key);
 
   void Insert(const entry_key_t& key, const IndexMeta& meta);
 
-  void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
+  virtual void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
 
-  Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
+  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
+
+  virtual void Break();
 
   FFBtreeIterator* BtreeIterator();
 
@@ -36,6 +38,7 @@ private:
   void Runner();
   static void* ThreadWrapper(void* ptr);
 
+  bool break_;
   FFBtree tree_;
   bool bgstarted_;
   pthread_t thread_;

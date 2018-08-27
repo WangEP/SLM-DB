@@ -43,7 +43,7 @@ void IndexIterator::SeekToLast() {
 }
 
 void IndexIterator::Seek(const Slice& target) {
-  btree_iterator_->Seek(fast_atoi(target));
+  btree_iterator_->Seek(fast_atoi(ExtractUserKey(target)));
   Advance();
   block_iterator_->Seek(target);
   status_ = block_iterator_->status();
@@ -52,13 +52,15 @@ void IndexIterator::Seek(const Slice& target) {
 void IndexIterator::Next() {
   assert(btree_iterator_->Valid());
   btree_iterator_->Next();
-  assert(btree_iterator_->value() != index_meta_);
-  Advance();
-  assert(status_.ok());
   entry_key_t key;
-  while ((key = fast_atoi(ExtractUserKey(block_iterator_->key()))) < btree_iterator_->key()) {
-    assert(block_iterator_->Valid());
-    block_iterator_->Next();
+  while (btree_iterator_->value() != index_meta_) {
+    Advance();
+    assert(status_.ok());
+    while (block_iterator_->Valid() &&
+           (key = fast_atoi(ExtractUserKey(block_iterator_->key()))) < btree_iterator_->key()) {
+      assert(block_iterator_->Valid());
+      block_iterator_->Next();
+    }
   }
   if (key != btree_iterator_->key()) {
     status_ = Status::NotFound(std::to_string(btree_iterator_->key()));
@@ -86,9 +88,9 @@ Status IndexIterator::status() const {
 
 void IndexIterator::CacheLookup() {
   if (handle_ != nullptr) cache_->Release(handle_);
-  assert(btree_iterator_->value() != nullptr);
-  char buf[sizeof(void*)];
-  EncodeFixed64(buf, (uint64_t) btree_iterator_->value());
+  assert(index_meta_ != nullptr);
+  char buf[27];
+  snprintf(buf, sizeof(buf), "%06d%010d%010d", index_meta_->file_number, index_meta_->size, index_meta_->offset);
   Slice cache_key(buf, sizeof(buf));
   handle_ = cache_->Lookup(cache_key);
   if (handle_ == nullptr) {
@@ -104,10 +106,8 @@ void IndexIterator::CacheLookup() {
 }
 
 void IndexIterator::Advance() {
-  if (!IsEqual((IndexMeta*) btree_iterator_->value(), index_meta_)) {
-    index_meta_ = (IndexMeta*)btree_iterator_->value();
-    CacheLookup();
-  }
+  index_meta_ = (IndexMeta*)btree_iterator_->value();
+  CacheLookup();
 }
 
 }

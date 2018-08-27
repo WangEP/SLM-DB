@@ -161,6 +161,7 @@ DBImpl::~DBImpl() {
   while (bg_compaction_scheduled_) {
     bg_cv_.Wait();
   }
+  index_->Break();
   mutex_.Unlock();
 
   if (db_lock_ != nullptr) {

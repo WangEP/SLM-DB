@@ -31,6 +31,7 @@ private:
   Page* cur_page;
   int index;
   bool valid; // validity of current entry
+  bool last;
 };
 
 } // namespace leveldb
