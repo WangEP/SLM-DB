@@ -234,7 +234,7 @@ Iterator* Table::BlockIterator(const ReadOptions& options,
     } else {
       uint64_t start_micros = benchmark::NowMicros();
       s = ReadBlock(rep_->file, options, handle, &contents);
-      benchmark::LogMicros(benchmark::BLOCK, benchmark::NowMicros() - start_micros);
+      benchmark::LogMicros(benchmark::BLOCK_READ, benchmark::NowMicros() - start_micros);
       if (s.ok()) {
         block = new Block(contents);
         if (contents.cachable && options.fill_cache) {
@@ -246,7 +246,7 @@ Iterator* Table::BlockIterator(const ReadOptions& options,
   } else {
     uint64_t start_micros = benchmark::NowMicros();
     s = ReadBlock(rep_->file, options, handle, &contents);
-    benchmark::LogMicros(benchmark::BLOCK, benchmark::NowMicros() - start_micros);
+    benchmark::LogMicros(benchmark::BLOCK_READ, benchmark::NowMicros() - start_micros);
     if (s.ok()) {
       block = new Block(contents);
     }

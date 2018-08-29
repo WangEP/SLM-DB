@@ -49,7 +49,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& key, std::strin
   const IndexMeta* index_meta = index->Get(user_key);
   benchmark::LogMicros(benchmark::QUERY, benchmark::NowMicros() - start_micros);
 #else
-  IndexMeta index_meta = index->Get(user_key);
+  const IndexMeta* index_meta = index->Get(user_key);
 #endif
 
   if (index_meta != nullptr) {

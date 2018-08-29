@@ -47,7 +47,7 @@ class VersionControl {
   void ReuseFileNumber(uint64_t file_number);
   void SetLastSequence(uint64_t s);
 
-  uint64_t NumFiles() { return current_->NumFiles(); }
+  uint64_t NumFiles() { return current_->NumFiles() + current_->MergeNumFiles(); }
   uint64_t NumBytes() { return current_->NumBytes(); }
   uint64_t CompactionSize() { return current_->merge_candidates_.size(); }
 

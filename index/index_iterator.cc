@@ -98,7 +98,13 @@ void IndexIterator::CacheLookup() {
     if (!status_.ok()) return; // something went wrong
     char key[100];
     snprintf(key, sizeof(key), "%016lu", btree_iterator_->key());
+#ifdef PERF_LOG
+    uint64_t start_micros = benchmark::NowMicros();
     block_iterator_->Seek(key);
+    benchmark::LogMicros(benchmark::QUERY_VALUE, benchmark::NowMicros() - start_micros);
+#else
+    block_iterator_->Seek(key);
+#endif
     handle_ = cache_->Insert(cache_key, block_iterator_, 1,&DeleteIterator);
   } else {
     block_iterator_ = reinterpret_cast<Iterator*>(cache_->Value(handle_));

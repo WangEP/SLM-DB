@@ -117,15 +117,18 @@ Status TableCache::Get(const ReadOptions& options,
   Status s = GetBlockIterator(options, index, &block_iter);
   assert(s.ok());
   if (block_iter != nullptr) {
-    block_iter->Seek(k);
 #ifdef PERF_LOG
     uint64_t start_micros = benchmark::NowMicros();
+    block_iter->Seek(k);
+    benchmark::LogMicros(benchmark::QUERY_VALUE, benchmark::NowMicros() - start_micros);
+    start_micros = benchmark::NowMicros();
     assert(block_iter->Valid());
     if (block_iter->Valid()) {
       (*saver)(arg, block_iter->key(), block_iter->value());
     }
     benchmark::LogMicros(benchmark::VALUE_COPY, benchmark::NowMicros() - start_micros);
 #else
+    block_iter->Seek(k);
     if (block_iter->Valid()) {
       (*saver)(arg, block_iter->key(), block_iter->value());
     }

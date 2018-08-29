@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <sys/time.h>
+#include <map>
 #include "histogram.h"
 
 namespace leveldb {
@@ -11,84 +12,70 @@ namespace leveldb {
 namespace  benchmark {
 
 enum Type {
-  QUERY = 0,
-  VERSION = 1,
-  BLOCK = 2,
-  MEMTABLE = 3,
-  VALUE_COPY = 4,
+  MEMTABLE,
+  VERSION,
+  QUERY,
+  BLOCK_READ,
+  QUERY_VALUE,
+  VALUE_COPY,
 };
+
+static const Type AllTypes[] = { MEMTABLE, VERSION, QUERY, BLOCK_READ, QUERY_VALUE,VALUE_COPY };
 
 class PerfLog {
 public:
   PerfLog() {
-    query_.Clear();
-    version_.Clear();
-    block_.Clear();
-    memtable_.Clear();
-    value_copy_.Clear();
+    names_.insert({Type::MEMTABLE, "Memtable"});
+    names_.insert({Type::VERSION, "Version"});
+    names_.insert({Type::QUERY, "Query for file"});
+    names_.insert({Type::BLOCK_READ, "Read for data block"});
+    names_.insert({Type::QUERY_VALUE, "Query for value"});
+    names_.insert({Type::VALUE_COPY, "Copy for value"});
+    for (const auto type : AllTypes) {
+      histograms_.insert({type, Histogram()});
+    }
+    Clear();
   }
 
   ~PerfLog() = default;
 
-  void LogMicro(Type type, uint64_t micros) {
-    switch (type) {
-      case QUERY:
-        query_.Add(micros);
-        break;
-      case VERSION:
-        version_.Add(micros);
-        break;
-      case BLOCK:
-        block_.Add(micros);
-        break;
-      case MEMTABLE:
-        memtable_.Add(micros);
-        break;
-      case VALUE_COPY:
-        value_copy_.Add(micros);
-        break;
+  void Clear() {
+    for (const auto type : AllTypes) {
+      histograms_.at(type).Clear();
     }
+  }
+
+  void LogMicro(Type type, uint64_t micros) {
+    histograms_.at(type).Add(micros);
   }
 
   std::string GetInfo() {
     std::string r;
-    r.append("Memtable info,\n");
-    r.append(memtable_.GetInfo());
-    r.append("Version info,\n");
-    r.append(version_.GetInfo());
-    r.append("Query info,\n");
-    r.append(query_.GetInfo());
-    r.append("Block info,\n");
-    r.append(block_.GetInfo());
-    r.append("Value Copy info,\n");
-    r.append(value_copy_.GetInfo());
+    for (const auto type : AllTypes) {
+      r.append(names_.at(type));
+      r.append("\n");
+      r.append(histograms_.at(type).GetInfo());
+    }
     return r;
   }
 
   std::string GetHistogram() {
     std::string r;
-    r.append("Memtable info,\n");
-    r.append(memtable_.GetHistogram());
-    r.append("Version info,\n");
-    r.append(version_.GetHistogram());
-    r.append("Query info,\n");
-    r.append(query_.GetHistogram());
-    r.append("Block info,\n");
-    r.append(block_.GetHistogram());
-    r.append("Value Copy info,\n");
-    r.append(value_copy_.GetHistogram());
+    for (const auto type : AllTypes) {
+      r.append(names_.at(type));
+      r.append("\n");
+      r.append(histograms_.at(type).GetHistogram());
+    }
     return r;
   }
 
 private:
-  Histogram query_;
-  Histogram version_;
-  Histogram block_;
-  Histogram memtable_;
-  Histogram value_copy_;
+  std::map<Type, Histogram> histograms_;
+  std::map<Type, std::string> names_;
 };
 
 extern void CreatePerfLog();
+extern void ClearPerfLog();
 extern uint64_t NowMicros();
 extern void LogMicros(Type, uint64_t);
 extern std::string GetInfo();

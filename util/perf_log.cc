@@ -14,6 +14,11 @@ void CreatePerfLog() {
   log = new PerfLog;
 }
 
+void ClearPerfLog() {
+  if (log == nullptr) return;
+  log->Clear();
+};
+
 uint64_t NowMicros() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -21,19 +26,23 @@ uint64_t NowMicros() {
 }
 
 void LogMicros(Type type, uint64_t micros) {
+  if (log == nullptr) return;
   log->LogMicro(type, micros);
 }
 
 std::string GetInfo() {
+  if (log == nullptr) return std::string();
   return log->GetInfo();
 }
 
 std::string GetHistogram() {
+  if (log == nullptr) return std::string();
   return log->GetHistogram();
 }
 
 void ClosePerfLog() {
   delete log;
+  log = nullptr;
 }
 
 }
