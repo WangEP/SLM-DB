@@ -107,8 +107,27 @@ inline uint64_t fast_atoi(const char* str, size_t size) {
   return val;
 }
 
+static constexpr int64_t FNV_OFFSET_BASIS_64 = 0xCBF29CE484222325L;
+static constexpr int64_t FNV_PRIME_64 = 1099511628211L;
+
 inline uint64_t fast_atoi(Slice slice) {
   return fast_atoi(slice.data(), slice.size());
+}
+
+//from http://en.wikipedia.org/wiki/Fowler_Noll_Vo_hash
+inline int64_t fnvhash64(int64_t val) {
+  int64_t hashval = FNV_OFFSET_BASIS_64;
+  for (int i = 0; i < 8; i++) {
+    int64_t octet = val & 0x00ff;
+    val = val >> 8;
+    hashval = hashval ^ octet;
+    hashval = hashval * FNV_PRIME_64;
+  }
+  return std::abs(hashval);
+}
+
+inline int64_t hash(int64_t val) {
+  return fnvhash64(val);
 }
 
 }  // namespace leveldb
