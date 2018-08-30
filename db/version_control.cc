@@ -400,6 +400,7 @@ void VersionControl::CheckLocality() {
     msg.append(buf);
   }
   current_->MoveToMerge(uniq_files);
+  state_change_ = true;
   Log(options_->info_log, "Added for locality merge [%s] files ", msg.c_str());
 }
 

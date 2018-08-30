@@ -627,6 +627,7 @@ void DBImpl::BackgroundCompaction() {
   Log(options_.info_log, "Background compaction");
   if (imm_ != nullptr) {
     CompactMemTable();
+    versions_->CheckLocality();
     return;
   }
   versions_->CheckLocality();
