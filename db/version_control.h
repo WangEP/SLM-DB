@@ -2,6 +2,7 @@
 #define STORAGE_LEVELDB_DB_VERSION_CONTROL_H_
 
 #include <memory>
+#include <random>
 #include "version.h"
 #include "version_edit.h"
 #include "port/port_posix.h"
@@ -76,8 +77,10 @@ class VersionControl {
   Version* current_;
   TableCache* table_cache_;
   entry_key_t locality_check_key;
+  std::random_device rd;
+  std::mt19937 gen;
+  std::uniform_int_distribution<> distribution;
   bool state_change_;
-  int compaction_pointer_;
 
   // no copy
   VersionControl(const VersionControl&);

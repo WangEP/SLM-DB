@@ -13,9 +13,6 @@
 
 namespace leveldb {
 
-
-static Random generator(0);
-
 // Builder class
 
 class VersionControl::Builder {
@@ -148,7 +145,8 @@ VersionControl::VersionControl(const std::string& dbname,
       last_sequence_(0),
       log_number_(0),
       prev_log_number_(0),
-      compaction_pointer_(0),
+      gen(rd()),
+      distribution(0, INT_MAX),
       state_change_(false),
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
@@ -373,6 +371,7 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 }
 
 void VersionControl::CheckLocality() {
+  if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) return;
   auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
   iter->Seek(locality_check_key);
   std::set<uint16_t> uniq_files;
@@ -380,7 +379,10 @@ void VersionControl::CheckLocality() {
     std::set<uint16_t> uniq_files_;
     if (!iter->Valid()) iter->SeekToFirst();
     for (int i = 0; i < cardinality && iter->Valid(); i++, r++) {
-      uniq_files_.insert(((IndexMeta*)iter->value())->file_number);
+      uint16_t fnumber = ((IndexMeta*)iter->value())->file_number;
+      if (current_->merge_candidates_.count(fnumber) == 0) {
+        uniq_files_.insert(fnumber);
+      }
       iter->Next();
     }
     if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > 1) {
@@ -388,7 +390,7 @@ void VersionControl::CheckLocality() {
     }
   }
   locality_check_key = iter->key();
-  if (uniq_files.empty()) {
+  if (uniq_files.empty() || uniq_files.size() < config::CompactionForceTrigger) {
     Log(options_->info_log, "No locality merge candidates");
     return;
   }
@@ -443,9 +445,8 @@ void VersionControl::ForcedPick(Compaction** c) {
 
 void VersionControl::RandomBasedPick(Compaction** c) {
   Log(options_->info_log, "Random based compaction");
-  srand(time(0));
   auto rand_it = current_->merge_candidates_.begin();
-  int rand_index = std::rand() % current_->merge_candidates_.size();
+  int rand_index = distribution(gen) % current_->merge_candidates_.size();
   while (--rand_index > 0) rand_it++;
   auto candidate = rand_it->second;
   assert(candidate != nullptr);
@@ -465,10 +466,10 @@ void VersionControl::RandomBasedPick(Compaction** c) {
       continue; // skip
     } else if (user_comparator()->Compare(f_end, c_start) < 0 || user_comparator()->Compare(f_start, c_end) > 0) {
       continue; // skip
-    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
-      ratio = 1.0;
-    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
-      ratio = 1.0;
+//    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
+//      ratio = 1.0;
+//    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
+//      ratio = 1.0;
     } else {
       uint64_t c1 = fast_atoi(c_start);
       uint64_t c2 = fast_atoi(c_end);
@@ -476,7 +477,7 @@ void VersionControl::RandomBasedPick(Compaction** c) {
       uint64_t f2 = fast_atoi(f_end);
       ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
     }
-    ratio_array.push_back({ratio, f});
+    ratio_array.emplace_back(ratio, f);
   }
   std::sort(ratio_array.begin(), ratio_array.end(), [](const auto& a, const auto& b) {
     return a.first > b.first;

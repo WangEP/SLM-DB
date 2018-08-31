@@ -319,7 +319,7 @@ struct ThreadState {
 
   ThreadState(int index)
     : tid(index),
-      rand(1000 + index) {
+      rand(1000 + index, FLAGS_num) {
   }
 };
 
@@ -974,6 +974,52 @@ private:
       // Do not count any of the preceding work/delay in stats.
       thread->stats.Start();
     }
+  }
+
+  void LoadWorkload(ThreadState* thread) {
+    RandomGenerator gen;
+    WriteOptions options;
+    Status s;
+    long bytes = 0;
+    long operationcount = 1000;
+    long recordcoint = FLAGS_num;
+    for (int i = 0; i < operationcount; i++) {
+      long k = hash(thread->rand.Uniform(recordcoint));
+      char key[100];
+      snprintf(key, sizeof(key), "%016li", k);
+      s = db_->Put(options, key, gen.Generate(value_size_));
+      bytes += value_size_ + strlen(key);
+      thread->stats.FinishedSingleOp();
+      if (!s.ok()) {
+        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
+        exit(1);
+      }
+    }
+    thread->stats.AddBytes(bytes);
+  }
+
+  void WorkloadA(ThreadState* thread) {
+
+  }
+
+  void WorkloadB(ThreadState* thread) {
+
+  }
+
+  void WorkloadC(ThreadState* thread) {
+
+  }
+
+  void WorkloadD(ThreadState* thread) {
+
+  }
+
+  void WorkloadE(ThreadState* thread) {
+
+  }
+
+  void WorkloadF(ThreadState* thread) {
+
   }
 
   void WaitCompaction(ThreadState* thread) {
