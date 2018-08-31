@@ -32,6 +32,7 @@ class VersionControl {
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu);
   Compaction* PickCompaction();
   void CheckLocality();
+  void UpdateLocalityCheckKey(const Slice& target);
   Status Recover(bool* save_manifest);
   Iterator* MakeInputIterator(Compaction* c);
   const char* Summary(SummaryStorage* scratch) const;

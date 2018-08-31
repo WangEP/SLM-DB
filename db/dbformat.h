@@ -21,7 +21,7 @@ namespace leveldb {
 namespace config {
 static constexpr int kNumLevels = 7;
 
-static constexpr int LocalityCheckRange = 100;
+static constexpr int LocalityCheckRange = 10000;
 
 // Level-0 compaction is started when we hit this many files.
 static constexpr int CompactionTrigger = 2;

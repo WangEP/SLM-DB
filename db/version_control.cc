@@ -370,6 +370,10 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
+void VersionControl::UpdateLocalityCheckKey(const leveldb::Slice& target) {
+  locality_check_key = fast_atoi(target);
+}
+
 void VersionControl::CheckLocality() {
   if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) return;
   auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();

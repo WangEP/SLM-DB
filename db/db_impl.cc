@@ -786,6 +786,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   ParsedInternalKey ikey;
   std::string current_user_key;
   bool has_current_user_key = false;
+  Slice key;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
   for (; input->Valid() && !shutting_down_.Acquire_Load(); ) {
     // Prioritize immutable compaction work
@@ -800,7 +801,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       imm_micros += (env_->NowMicros() - imm_start);
     }
 
-    Slice key = input->key();
+    key = input->key();
 
     // Handle key/value, add to state, etc.
     bool drop = false;
@@ -878,6 +879,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   if (status.ok()) {
     status = input->status();
   }
+  versions_->UpdateLocalityCheckKey(ExtractUserKey(key));
   delete input;
   input = nullptr;
 
