@@ -19,6 +19,9 @@ namespace leveldb {
 // Grouping of constants.  We may want to make some of these
 // parameters set via options.
 namespace config {
+
+static constexpr char key_format[] = "%020lu";
+
 static constexpr int kNumLevels = 7;
 
 static constexpr int LocalityCheckRange = 10000;

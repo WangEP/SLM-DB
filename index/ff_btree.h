@@ -40,7 +40,7 @@ private:
   void setNewRoot(void* new_root);
   // store the key into the node at the given level
   void* InsertInternal(void* left, const entry_key_t& key, void* right, uint32_t level);
-  void RemoveInternal(const entry_key_t& left, void* ptr, uint32_t level,
+  void RemoveInternal(const entry_key_t& key, void* ptr, uint32_t level,
                       entry_key_t* deleted_key, bool* is_leftmost_node, Page** left_sibling);
 
 public:
@@ -61,7 +61,7 @@ private:
   Page* sibling_ptr;          // 8 bytes
   uint32_t level;             // 4 bytes
   uint8_t switch_counter;     // 1 bytes
-  uint8_t is_deleted;         // 1 bytes
+  bool is_deleted;         // 1 bytes
   int16_t last_index;         // 2 bytes
 
   friend class Page;
@@ -86,7 +86,7 @@ private:
   void* ptr; // 8 bytes
 public :
   Entry() {
-    key = UINT64_MAX;
+    key = 0;
     ptr = NULL;
   }
 
@@ -174,12 +174,12 @@ public:
       }
 
       if (shift) {
-        records[i].key = std::move(records[i + 1].key);
+        records[i].key = records[i + 1].key;
         records[i].ptr = records[i + 1].ptr;
 
         // flush
         uint64_t records_ptr = (uint64_t) (&records[i]);
-        int remainder = records_ptr % CACHE_LINE_SIZE;
+        uint64_t remainder = records_ptr % CACHE_LINE_SIZE;
         bool do_flush = (remainder == 0) ||
                         ((((int) (remainder + sizeof(Entry)) / CACHE_LINE_SIZE) == 1) &&
                          ((remainder + sizeof(Entry)) % CACHE_LINE_SIZE) != 0);
@@ -417,12 +417,12 @@ public:
       for (i = *num_entries - 1; i >= 0; i--) {
         if (key < records[i].key) {
           records[i + 1].ptr = records[i].ptr;
-          records[i + 1].key = std::move(records[i].key);
+          records[i + 1].key = records[i].key;
 
           if (flush) {
             uint64_t records_ptr = (uint64_t) (&records[i + 1]);
 
-            int remainder = records_ptr % CACHE_LINE_SIZE;
+            uint64_t remainder = records_ptr % CACHE_LINE_SIZE;
             bool do_flush = (remainder == 0) ||
                             ((((int) (remainder + sizeof(Entry)) / CACHE_LINE_SIZE) == 1)
                              && ((remainder + sizeof(Entry)) % CACHE_LINE_SIZE) != 0);

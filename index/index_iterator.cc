@@ -52,15 +52,21 @@ void IndexIterator::Seek(const Slice& target) {
 void IndexIterator::Next() {
   assert(btree_iterator_->Valid());
   btree_iterator_->Next();
-  entry_key_t key;
+  entry_key_t key = 0;
   while (btree_iterator_->value() != index_meta_) {
     Advance();
-    assert(status_.ok());
+    if (!status_.ok()) {
+      fprintf(stderr, "%s\n", status_.ToString().c_str());
+      assert(status_.ok());
+    }
     while (block_iterator_->Valid() &&
            (key = fast_atoi(ExtractUserKey(block_iterator_->key()))) < btree_iterator_->key()) {
       assert(block_iterator_->Valid());
       block_iterator_->Next();
     }
+  }
+  if (!btree_iterator_->Valid()) {
+    return; // last index
   }
   if (key != btree_iterator_->key()) {
     status_ = Status::NotFound(std::to_string(btree_iterator_->key()));
@@ -89,6 +95,13 @@ Status IndexIterator::status() const {
 void IndexIterator::CacheLookup() {
   if (handle_ != nullptr) cache_->Release(handle_);
   assert(index_meta_ != nullptr);
+//  delete block_iterator_;
+//  status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
+//  if (!status_.ok()) return; // something went wrong
+//  char key[100];
+//  snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
+//  block_iterator_->Seek(key);
+//  return;
   char buf[27];
   snprintf(buf, sizeof(buf), "%06d%010d%010d", index_meta_->file_number, index_meta_->size, index_meta_->offset);
   Slice cache_key(buf, sizeof(buf));
@@ -97,7 +110,7 @@ void IndexIterator::CacheLookup() {
     status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
     if (!status_.ok()) return; // something went wrong
     char key[100];
-    snprintf(key, sizeof(key), "%016lu", btree_iterator_->key());
+    snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
 #ifdef PERF_LOG
     uint64_t start_micros = benchmark::NowMicros();
     block_iterator_->Seek(key);

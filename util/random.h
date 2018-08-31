@@ -31,6 +31,7 @@ class Random {
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen; //Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis;
+  std::uniform_int_distribution<uint64_t> int_distribution;
 
 public:
 
@@ -39,7 +40,8 @@ public:
   items_(items),
   zipfianconstant_(zipfianconstant),
   gen(rd()),
-  dis(0.0, DBL_MAX) {
+  dis(0.0, DBL_MAX),
+  int_distribution(0, UINT64_MAX) {
     // Avoid bad seeds.
     if (seed_ == 0 || seed_ == 2147483647L) {
       seed_ = 1;
@@ -56,7 +58,11 @@ public:
     zeta2theta_ = zeta(2, theta_);
   }
 
-  long Next() {
+  uint64_t Next() {
+    uint64_t ret = 0;
+    // do not generate zero
+    while (ret == 0) ret = int_distribution(gen) % 100000000000000000;
+    return ret;
     static const uint32_t M = 2147483647L;   // 2^31-1
     static const uint64_t A = 16807;  // bits 14, 8, 7, 5, 2, 1, 0
     // We are computing

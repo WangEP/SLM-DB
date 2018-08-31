@@ -781,9 +781,9 @@ private:
     for (int i = 0; i < num_; i += entries_per_batch_) {
       batch.Clear();
       for (int j = 0; j < entries_per_batch_; j++) {
-        const int k = seq ? i+j : (thread->rand.Next() % FLAGS_num);
+        const uint64_t k = seq ? i+j : (thread->rand.Next());
         char key[100];
-        snprintf(key, sizeof(key), "%016d", k);
+        snprintf(key, sizeof(key), config::key_format, k);
         batch.Put(key, gen.Generate(value_size_));
         bytes += value_size_ + strlen(key);
         thread->stats.FinishedSingleOp();
@@ -837,8 +837,8 @@ private:
     int found = 0;
     for (int i = 0; i < reads_; i++) {
       char key[100];
-      const int k = thread->rand.Next() % FLAGS_num;
-      snprintf(key, sizeof(key), "%016d", k);
+      const uint64_t k = thread->rand.Next();
+      snprintf(key, sizeof(key), config::key_format, k);
       if (db_->Get(options, key, &value).ok()) {
         found++;
       }
@@ -855,12 +855,12 @@ private:
     std::string value;
     int64_t bytes = 0;
     for (int i = 0; i < ranges_; i++) {
-      const int k = abs((int)(thread->rand.Next() % FLAGS_num) - range_size_);
-      const int l = k + range_size_;
+      const uint64_t k = (thread->rand.Next() % FLAGS_num) - range_size_;
+      const uint64_t l = k + range_size_;
       char begin[100];
-      snprintf(begin, sizeof(begin), "%016d", k);
+      snprintf(begin, sizeof(begin), config::key_format, k);
       char end[100];
-      snprintf(end, sizeof(end), "%016d", l);
+      snprintf(end, sizeof(end), config::key_format, l);
       Iterator* iter = db_->NewIterator(options);
       int r = 0;
       for (iter->Seek(begin); r < range_size_ && iter->Valid(); iter->Next()) {
@@ -892,8 +892,8 @@ private:
     const int range = (FLAGS_num + 99) / 100;
     for (int i = 0; i < reads_; i++) {
       char key[100];
-      const int k = thread->rand.Next() % range;
-      snprintf(key, sizeof(key), "%016d", k);
+      const uint64_t k = thread->rand.Next() % range;
+      snprintf(key, sizeof(key), config::key_format, k);
       db_->Get(options, key, &value);
       thread->stats.FinishedSingleOp();
     }
@@ -905,8 +905,8 @@ private:
     for (int i = 0; i < reads_; i++) {
       Iterator* iter = db_->NewIterator(options);
       char key[100];
-      const int k = thread->rand.Next() % FLAGS_num;
-      snprintf(key, sizeof(key), "%016d", k);
+      const uint64_t k = thread->rand.Next() % FLAGS_num;
+      snprintf(key, sizeof(key), config::key_format, k);
       iter->Seek(key);
       if (iter->Valid() && iter->key() == key) found++;
       delete iter;
@@ -924,9 +924,9 @@ private:
     for (int i = 0; i < num_; i += entries_per_batch_) {
       batch.Clear();
       for (int j = 0; j < entries_per_batch_; j++) {
-        const int k = seq ? i+j : (thread->rand.Next() % FLAGS_num);
+        const uint64_t k = seq ? i+j : (thread->rand.Next() % FLAGS_num);
         char key[100];
-        snprintf(key, sizeof(key), "%016d", k);
+        snprintf(key, sizeof(key), config::key_format, k);
         batch.Delete(key);
         thread->stats.FinishedSingleOp();
       }
@@ -961,9 +961,9 @@ private:
           }
         }
 
-        const int k = thread->rand.Next() % FLAGS_num;
+        const uint64_t k = thread->rand.Next() % FLAGS_num;
         char key[100];
-        snprintf(key, sizeof(key), "%016d", k);
+        snprintf(key, sizeof(key), config::key_format, k);
         Status s = db_->Put(write_options_, key, gen.Generate(value_size_));
         if (!s.ok()) {
           fprintf(stderr, "put error: %s\n", s.ToString().c_str());
@@ -986,7 +986,7 @@ private:
     for (int i = 0; i < operationcount; i++) {
       long k = hash(thread->rand.Uniform(recordcoint));
       char key[100];
-      snprintf(key, sizeof(key), "%016li", k);
+      snprintf(key, sizeof(key), config::key_format, k);
       s = db_->Put(options, key, gen.Generate(value_size_));
       bytes += value_size_ + strlen(key);
       thread->stats.FinishedSingleOp();

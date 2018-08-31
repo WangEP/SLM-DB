@@ -389,7 +389,7 @@ void VersionControl::CheckLocality() {
       }
       iter->Next();
     }
-    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > 1) {
+    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > config::CompactionTrigger) {
       uniq_files.swap(uniq_files_);
     }
   }

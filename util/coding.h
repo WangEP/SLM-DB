@@ -100,19 +100,19 @@ inline const char* GetVarint32Ptr(const char* p,
 }
 
 inline uint64_t fast_atoi(const char* str, size_t size) {
-  uint32_t val = 0;
+  uint64_t val = 0;
   while(size-- > 0 && *str && *str >= '0' && *str <= '9') {
     val = val*10 + (*str++ - '0');
   }
   return val;
 }
 
-static constexpr int64_t FNV_OFFSET_BASIS_64 = 0xCBF29CE484222325L;
-static constexpr int64_t FNV_PRIME_64 = 1099511628211L;
-
 inline uint64_t fast_atoi(Slice slice) {
   return fast_atoi(slice.data(), slice.size());
 }
+
+static constexpr int64_t FNV_OFFSET_BASIS_64 = 0xCBF29CE484222325L;
+static constexpr int64_t FNV_PRIME_64 = 1099511628211L;
 
 //from http://en.wikipedia.org/wiki/Fowler_Noll_Vo_hash
 inline int64_t fnvhash64(int64_t val) {
