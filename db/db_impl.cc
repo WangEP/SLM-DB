@@ -927,6 +927,35 @@ static void CleanupIteratorState(void* arg1, void* arg2) {
 }
 }  // namespace
 
+Status DBImpl::Update(const leveldb::WriteOptions& options,
+                      const leveldb::Slice& key,
+                      const leveldb::Slice& value) {
+  Status s;
+  SequenceNumber snapshot = versions_->LastSequence();
+  MemTable* mem = mem_;
+  MemTable* imm = imm_;
+  mem->Ref();
+  if (imm != nullptr) imm->Ref();
+  Index* index = index_;
+  bool exists = false;
+  std::string v;
+  LookupKey lkey(key, snapshot);
+  if (mem->Get(lkey, &v, &s)) {
+    exists = true;
+  } else if (imm != nullptr && imm->Get(lkey, &v, &s)) {
+    exists = true;
+  } else if (index->Get(key) != nullptr){
+    exists = true;
+  }
+  mem->Unref();
+  if (imm != nullptr) imm->Unref();
+  if (exists) {
+    s = Put(options, key, value);
+    return Status::OK();
+  }
+  return Status::OK();
+}
+
 Status DBImpl::Get(const ReadOptions& options,
                    const Slice& key,
                    std::string* value) {

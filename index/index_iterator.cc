@@ -16,16 +16,16 @@ IndexIterator::IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, T
   : options_(options),
     btree_iterator_(btree_iter),
     table_cache_(table_cache),
-    cache_(NewLRUCache(20)),
+//    cache_(NewLRUCache(20)),
     block_iterator_(nullptr),
-    handle_(nullptr),
+//    handle_(nullptr),
     index_meta_(nullptr) {
   SeekToFirst();
 }
 
 IndexIterator::~IndexIterator() {
-  if (handle_ != nullptr) cache_->Release(handle_);
-  delete cache_;
+//  if (handle_ != nullptr) cache_->Release(handle_);
+//  delete cache_;
   delete btree_iterator_;
 }
 
@@ -93,35 +93,35 @@ Status IndexIterator::status() const {
 }
 
 void IndexIterator::CacheLookup() {
-  if (handle_ != nullptr) cache_->Release(handle_);
+//  if (handle_ != nullptr) cache_->Release(handle_);
   assert(index_meta_ != nullptr);
-//  delete block_iterator_;
-//  status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
-//  if (!status_.ok()) return; // something went wrong
-//  char key[100];
-//  snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
-//  block_iterator_->Seek(key);
-//  return;
-  char buf[27];
-  snprintf(buf, sizeof(buf), "%06d%010d%010d", index_meta_->file_number, index_meta_->size, index_meta_->offset);
-  Slice cache_key(buf, sizeof(buf));
-  handle_ = cache_->Lookup(cache_key);
-  if (handle_ == nullptr) {
-    status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
-    if (!status_.ok()) return; // something went wrong
-    char key[100];
-    snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
-#ifdef PERF_LOG
-    uint64_t start_micros = benchmark::NowMicros();
-    block_iterator_->Seek(key);
-    benchmark::LogMicros(benchmark::QUERY_VALUE, benchmark::NowMicros() - start_micros);
-#else
-    block_iterator_->Seek(key);
-#endif
-    handle_ = cache_->Insert(cache_key, block_iterator_, 1,&DeleteIterator);
-  } else {
-    block_iterator_ = reinterpret_cast<Iterator*>(cache_->Value(handle_));
-  }
+  delete block_iterator_;
+  status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
+  if (!status_.ok()) return; // something went wrong
+  char key[100];
+  snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
+  block_iterator_->Seek(key);
+  return;
+//  char buf[27];
+//  snprintf(buf, sizeof(buf), "%06d%010d%010d", index_meta_->file_number, index_meta_->size, index_meta_->offset);
+//  Slice cache_key(buf, sizeof(buf));
+//  handle_ = cache_->Lookup(cache_key);
+//  if (handle_ == nullptr) {
+//    status_ = table_cache_->GetBlockIterator(options_, index_meta_, &block_iterator_);
+//    if (!status_.ok()) return; // something went wrong
+//    char key[100];
+//    snprintf(key, sizeof(key), config::key_format, btree_iterator_->key());
+//#ifdef PERF_LOG
+//    uint64_t start_micros = benchmark::NowMicros();
+//    block_iterator_->Seek(key);
+//    benchmark::LogMicros(benchmark::QUERY_VALUE, benchmark::NowMicros() - start_micros);
+//#else
+//    block_iterator_->Seek(key);
+//#endif
+//    handle_ = cache_->Insert(cache_key, block_iterator_, 1,&DeleteIterator);
+//  } else {
+//    block_iterator_ = reinterpret_cast<Iterator*>(cache_->Value(handle_));
+//  }
 }
 
 void IndexIterator::Advance() {

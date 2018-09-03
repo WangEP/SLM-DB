@@ -27,8 +27,8 @@ public:
 
 private:
   FFBtreeIterator* btree_iterator_;
-  Cache* cache_;
-  Cache::Handle* handle_;
+//  Cache* cache_;
+//  Cache::Handle* handle_;
   IndexMeta* index_meta_;
   ReadOptions options_;
   TableCache* table_cache_;

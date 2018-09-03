@@ -76,6 +76,10 @@ class LEVELDB_EXPORT DB {
   // Note: consider setting options.sync = true.
   virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
 
+  // Updates value for a given "key" to "value". Returns OK on success,
+  // and a non-OK status on error. Non-existing key does not insert.
+  virtual Status Update(const WriteOptions& options, const Slice& key, const Slice& value) = 0;
+
   // If the database contains an entry for "key" store the
   // corresponding value in *value and return OK.
   //
