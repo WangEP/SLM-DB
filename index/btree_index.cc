@@ -75,8 +75,8 @@ void BtreeIndex::AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) {
   mutex_.Unlock();
 }
 
-Iterator* BtreeIndex::NewIterator(const ReadOptions& options, TableCache* table_cache) {
-  return new IndexIterator(options, tree_.GetIterator(), table_cache);
+Iterator* BtreeIndex::NewIterator(const ReadOptions& options, TableCache* table_cache, VersionControl* vcontrol) {
+  return new IndexIterator(options, tree_.GetIterator(), table_cache, vcontrol);
 }
 
 FFBtreeIterator* BtreeIndex::BtreeIterator() {

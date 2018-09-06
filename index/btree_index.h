@@ -28,7 +28,7 @@ public:
 
   virtual void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit);
 
-  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache);
+  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache, VersionControl* vcontrol);
 
   virtual void Break();
 

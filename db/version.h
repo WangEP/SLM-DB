@@ -16,6 +16,7 @@ class VersionControl;
 
 struct FileMetaData {
   uint64_t number;
+  int allowed_seeks;          // Seeks allowed until compaction
   uint64_t file_size;         // File size in bytes
   uint64_t total;             // Total count of keys
   uint64_t alive;             // Count of live keys
@@ -36,7 +37,7 @@ class Version {
   explicit Version(VersionControl* vcontrol)
       : vcontrol_(vcontrol), refs_(0) { }
 
-  Status Get(const ReadOptions&, const LookupKey& key, std::string* val);
+  Status Get(const ReadOptions&, const LookupKey& key, std::string* val, uint16_t*);
 
   void Ref();
   void Unref();

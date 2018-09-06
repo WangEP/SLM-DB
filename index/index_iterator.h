@@ -12,7 +12,7 @@ namespace leveldb {
 
 class IndexIterator : public Iterator {
 public:
-  IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, TableCache* table_cache);
+  IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, TableCache* table_cache, VersionControl* vcontrol);
   ~IndexIterator();
 
   virtual bool Valid() const;
@@ -27,13 +27,14 @@ public:
 
 private:
   FFBtreeIterator* btree_iterator_;
-//  Cache* cache_;
-//  Cache::Handle* handle_;
   IndexMeta* index_meta_;
   ReadOptions options_;
   TableCache* table_cache_;
+  VersionControl* vcontrol_;
   Iterator* block_iterator_;
+  std::set<uint16_t> files_;
   Status status_;
+
 
   void CacheLookup();
   void Advance();

@@ -10,10 +10,12 @@
 namespace leveldb {
 
 class Compaction;
+class DBImpl;
 
 class VersionControl {
  public:
-  VersionControl(const std::string& dbname,
+  VersionControl(DBImpl* db,
+                 const std::string& dbname,
                  const Options* options,
                  TableCache* table_cache,
                  const InternalKeyComparator*);
@@ -31,6 +33,7 @@ class VersionControl {
 
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu);
   Compaction* PickCompaction();
+  void RegisterFileAccess(const uint16_t& file_number);
   void CheckLocality();
   void UpdateLocalityCheckKey(const Slice& target);
   Status Recover(bool* save_manifest);
@@ -48,6 +51,7 @@ class VersionControl {
   void MarkFileNumberUsed(uint64_t number);
   void ReuseFileNumber(uint64_t file_number);
   void SetLastSequence(uint64_t s);
+  void StateChange();
 
   uint64_t NumFiles() { return current_->NumFiles() + current_->MergeNumFiles(); }
   uint64_t NumBytes() { return current_->NumBytes(); }
@@ -73,6 +77,7 @@ class VersionControl {
 
   const InternalKeyComparator icmp_;
   const Options* const options_;
+  DBImpl* db_;
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
   Version* current_;

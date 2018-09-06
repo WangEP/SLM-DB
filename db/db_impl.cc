@@ -149,7 +149,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
 
-  versions_ = new VersionControl(dbname_, &options_, table_cache_,
+  versions_ = new VersionControl(this, dbname_, &options_, table_cache_,
                              &internal_comparator_);
 }
 
@@ -974,6 +974,7 @@ Status DBImpl::Get(const ReadOptions& options,
   mem->Ref();
   if (imm != nullptr) imm->Ref();
   current->Ref();
+  uint16_t file_number = 0;
 
   // Unlock while reading from files and memtables
   {
@@ -988,7 +989,7 @@ Status DBImpl::Get(const ReadOptions& options,
     benchmark::LogMicros(benchmark::MEMTABLE, benchmark::NowMicros() - start_micros);
     if (!found) {
       start_micros = benchmark::NowMicros();
-      s = current->Get(options, lkey, value);
+      s = current->Get(options, lkey, value, &file_number);
       benchmark::LogMicros(benchmark::VERSION, benchmark::NowMicros() - start_micros);
     }
 #else
@@ -1002,7 +1003,7 @@ Status DBImpl::Get(const ReadOptions& options,
 #endif
     mutex_.Lock();
   }
-
+  versions_->RegisterFileAccess(file_number);
   mem->Unref();
   if (imm != nullptr) imm->Unref();
   current->Unref();
@@ -1036,7 +1037,7 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
     list.push_back(imm_->NewIterator());
     imm_->Ref();
   }
-  list.push_back(index_->NewIterator(options, table_cache_));
+  list.push_back(index_->NewIterator(options, table_cache_, versions_));
   Iterator* internal_iter =
     NewMergingIterator(&internal_comparator_, &list[0], list.size());
 

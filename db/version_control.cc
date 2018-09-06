@@ -6,6 +6,7 @@
 #include "index/btree_index.h"
 #include "index/ff_btree_iterator.h"
 #include "index/ff_btree.h"
+#include "db_impl.h"
 #ifdef PERF_LOG
 #include "util/perf_log.h"
 #endif
@@ -48,6 +49,8 @@ class VersionControl::Builder {
       f->smallest = iter.smallest;
       f->largest = iter.largest;
       deleted_files_.erase(f->number);
+      f->allowed_seeks = (f->file_size / 16384);
+      if (f->allowed_seeks < 100) f->allowed_seeks = 100;
       added_files_.push_back(f);
     }
   }
@@ -131,11 +134,13 @@ bool Compaction::IsInput(uint64_t num) {
 
 // Version Control class
 
-VersionControl::VersionControl(const std::string& dbname,
+VersionControl::VersionControl(DBImpl* db,
+                               const std::string& dbname,
                                const Options* options,
                                TableCache* table_cache,
                                const InternalKeyComparator* cmp)
     : env_(options->env),
+      db_(db),
       dbname_(dbname),
       options_(options),
       table_cache_(table_cache),
@@ -370,6 +375,28 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
+void VersionControl::RegisterFileAccess(const uint16_t& file_number) {
+  std::shared_ptr<FileMetaData> file_metadata;
+  try {
+    file_metadata = current_->files_.at(file_number);
+    file_metadata->allowed_seeks--;
+  } catch (std::exception& e) {
+    try {
+      file_metadata = current_->merge_candidates_.at(file_number);
+      file_metadata->allowed_seeks = 0;
+    } catch (std::exception& e) {
+      // File is generated and keys are added to index, but version is not committed to state
+      return;
+    }
+  }
+  if (file_metadata->allowed_seeks <= 0) {
+    state_change_ = true;
+    current_->MoveToMerge({file_number});
+    Log(options_->info_log, "File %d got exceeded access number", file_number);
+    db_->MaybeScheduleCompaction();
+  }
+}
+
 void VersionControl::UpdateLocalityCheckKey(const leveldb::Slice& target) {
   locality_check_key = fast_atoi(target);
 }
@@ -549,6 +576,11 @@ Status VersionControl::WriteSnapshot(log::Writer* log) {
 const char* VersionControl::Summary(SummaryStorage* scratch) const {
   snprintf(scratch->buffer, sizeof(scratch->buffer), " Regular files number %lu, Merge files number %lu", current_->NumFiles(), current_->MergeNumFiles());
   return scratch->buffer;
+}
+
+void VersionControl::StateChange() {
+  state_change_ = true;
+  db_->MaybeScheduleCompaction();
 }
 
 } // namespace leveldb

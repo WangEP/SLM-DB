@@ -15,7 +15,7 @@ namespace leveldb {
 
 class TableCache;
 class VersionEdit;
-
+class VersionControl;
 
 struct IndexMeta {
 public:
@@ -44,7 +44,7 @@ public:
   //virtual void Insert(const uint32_t& key, IndexMeta meta) = 0;
   virtual IndexMeta* Get(const Slice& key) = 0;
   virtual void AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) = 0;
-  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache) = 0;
+  virtual Iterator* NewIterator(const ReadOptions& options, TableCache* table_cache, VersionControl* vcontrol) = 0;
   virtual void Break() = 0;
 };
 

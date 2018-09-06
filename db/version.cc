@@ -36,7 +36,7 @@ static void SaveValue(void* arg, const Slice& ikey, const Slice& v) {
   }
 }
 
-Status Version::Get(const ReadOptions& options, const LookupKey& key, std::string* val) {
+Status Version::Get(const ReadOptions& options, const LookupKey& key, std::string* val, uint16_t* file_number) {
   Status s;
   Slice ikey = key.internal_key();
   Slice user_key = key.user_key();
@@ -60,6 +60,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& key, std::strin
     saver.value = val;
 //    uint64_t fsize = GetFileSize(index_meta.file_number);
     s = vcontrol_->cache()->Get(options, index_meta, ikey, &saver, SaveValue);
+    *file_number = index_meta->file_number;
     if (!s.ok()) {
       return s;
     }
@@ -145,6 +146,7 @@ void Version::SortMergeCandidates() {
 }
 
 void Version::MoveToMerge(std::set<uint16_t> array) {
+  if (merge_candidates_.size() > config::StopWritesTrigger) return;
   for (auto f : array) {
     if (files_.count(f) > 0) {
       auto file = files_.at(f);

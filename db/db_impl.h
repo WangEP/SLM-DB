@@ -50,6 +50,7 @@ class DBImpl : public DB {
 
  private:
   friend class DB;
+  friend class VersionControl;
   struct CompactionState;
   struct Writer;
 
