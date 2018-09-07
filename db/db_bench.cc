@@ -884,7 +884,7 @@ private:
     for (int i = 0; i < num_; i += entries_per_batch_) {
       batch.Clear();
       for (int j = 0; j < entries_per_batch_; j++) {
-        const uint64_t k = seq ? i+j : (thread->rand.Next());
+        const uint64_t k = seq ? i+j : (thread->rand.Next() % FLAGS_num);
         char key[100];
         snprintf(key, sizeof(key), config::key_format, k);
         batch.Put(key, gen.Generate(value_size_));
@@ -940,7 +940,7 @@ private:
     int found = 0;
     for (int i = 0; i < reads_; i++) {
       char key[100];
-      const uint64_t k = thread->rand.Next();
+      const uint64_t k = thread->rand.Next() % FLAGS_num;
       snprintf(key, sizeof(key), config::key_format, k);
       if (db_->Get(options, key, &value).ok()) {
         found++;
