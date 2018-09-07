@@ -663,12 +663,14 @@ public:
         }
       }
     }
+#ifdef PERF_LOG
     if (FLAGS_csv) {
       fprintf(csv_file, "%s", leveldb::benchmark::GetInfo().c_str());
       if (FLAGS_histogram) {
         fprintf(csv_file, "%s", leveldb::benchmark::GetHistogram().c_str());
       }
     }
+#endif
   }
 
 private:

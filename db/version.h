@@ -16,7 +16,7 @@ class VersionControl;
 
 struct FileMetaData {
   uint64_t number;
-  int allowed_seeks;          // Seeks allowed until compaction
+  uint32_t allowed_seeks;          // Seeks allowed until compaction
   uint64_t file_size;         // File size in bytes
   uint64_t total;             // Total count of keys
   uint64_t alive;             // Count of live keys
@@ -64,7 +64,7 @@ class Version {
     return size;
   }
 
-  void MoveToMerge(std::set<uint16_t> array);
+  bool MoveToMerge(std::set<uint16_t> array, bool is_scan);
 
   bool IsAlive(uint64_t fnumber) { return files_.count(fnumber) > 0 || merge_candidates_.count(fnumber) > 0; }
 

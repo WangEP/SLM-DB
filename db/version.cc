@@ -145,8 +145,11 @@ void Version::SortMergeCandidates() {
 
 }
 
-void Version::MoveToMerge(std::set<uint16_t> array) {
-  if (merge_candidates_.size() > config::StopWritesTrigger) return;
+bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
+  // restrict scan for less compaction
+  if (is_scan && merge_candidates_.size() > config::SlowdownWritesTrigger) return false;
+  // else still restrict if too many candidates
+  else if (merge_candidates_.size() > config::StopWritesTrigger) return false;
   for (auto f : array) {
     if (files_.count(f) > 0) {
       auto file = files_.at(f);
@@ -154,6 +157,7 @@ void Version::MoveToMerge(std::set<uint16_t> array) {
       merge_candidates_.insert({f, file});
     }
   }
+  return true;
 }
 
 } // namespace leveldb

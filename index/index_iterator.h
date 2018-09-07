@@ -32,8 +32,10 @@ private:
   TableCache* table_cache_;
   VersionControl* vcontrol_;
   Iterator* block_iterator_;
-  std::set<uint16_t> files_;
+  std::set<uint16_t> uniq_files_;
+  std::set<uint16_t> files_to_merge_;
   Status status_;
+  int counter_;
 
 
   void CacheLookup();

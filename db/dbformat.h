@@ -29,15 +29,15 @@ static constexpr int LocalityCheckRange = 10000;
 // Level-0 compaction is started when we hit this many files.
 static constexpr int CompactionTrigger = 2;
 
-static constexpr int CompactionForceTrigger = 4;
+static constexpr int LocalityMinFileNumber = 4;
 
 static constexpr int CompactionMaxSize = 6;
 
 // Soft limit on number of level-0 files.  We slow down writes at this point.
-static constexpr int SlowdownWritesTrigger = 15;
+static constexpr int SlowdownWritesTrigger = 10;
 
 // Maximum number of level-0 files.  We stop writes at this point.
-static constexpr int StopWritesTrigger = 20;
+static constexpr int StopWritesTrigger = 15;
 
 // Maximum level to which a new compacted memtable is pushed if it
 // does not create overlap.  We try to push to level 2 to avoid the

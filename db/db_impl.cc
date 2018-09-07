@@ -1206,7 +1206,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
-    } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger) {
+    } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger+10) {
       mutex_.Unlock();
       env_->SleepForMicroseconds(1000);
       allow_delay = false;
@@ -1220,7 +1220,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       bg_cv_.Wait();
-    } else if (versions_->CompactionSize() >= config::StopWritesTrigger) {
+    } else if (versions_->CompactionSize() >= config::StopWritesTrigger+10) {
       Log(options_.info_log, "Too many file for compaction, waiting..." );
       bg_cv_.Wait();
     } else {

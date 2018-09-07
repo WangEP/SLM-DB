@@ -49,7 +49,7 @@ class VersionControl::Builder {
       f->smallest = iter.smallest;
       f->largest = iter.largest;
       deleted_files_.erase(f->number);
-      f->allowed_seeks = (f->file_size / 16384);
+      f->allowed_seeks = (f->file_size / 64);
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
       added_files_.push_back(f);
     }
@@ -376,22 +376,24 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 }
 
 void VersionControl::RegisterFileAccess(const uint16_t& file_number) {
+  if (file_number == 0) return;
   std::shared_ptr<FileMetaData> file_metadata;
   try {
     file_metadata = current_->files_.at(file_number);
     file_metadata->allowed_seeks--;
   } catch (std::exception& e) {
-    try {
-      file_metadata = current_->merge_candidates_.at(file_number);
-      file_metadata->allowed_seeks = 0;
-    } catch (std::exception& e) {
-      // File is generated and keys are added to index, but version is not committed to state
-      return;
+//    try {
+//      file_metadata = current_->merge_candidates_.at(file_number);
+//      file_metadata->allowed_seeks = 0;
+//    } catch (std::exception& e) {
+//      // File is generated and keys are added to index, but version is not committed to state
+//      return;
+//    }
+    return;
     }
-  }
   if (file_metadata->allowed_seeks <= 0) {
     state_change_ = true;
-    current_->MoveToMerge({file_number});
+    current_->MoveToMerge({file_number}, false);
     Log(options_->info_log, "File %d got exceeded access number", file_number);
     db_->MaybeScheduleCompaction();
   }
@@ -421,8 +423,8 @@ void VersionControl::CheckLocality() {
     }
   }
   locality_check_key = iter->key();
-  if (uniq_files.empty() || uniq_files.size() < config::CompactionForceTrigger) {
-    Log(options_->info_log, "No locality merge candidates");
+  if (uniq_files.empty() || uniq_files.size() < config::LocalityMinFileNumber) {
+//    Log(options_->info_log, "No locality merge candidates");
     return;
   }
   delete iter;
@@ -432,7 +434,7 @@ void VersionControl::CheckLocality() {
     snprintf(buf, sizeof(buf), "%d, ", f);
     msg.append(buf);
   }
-  current_->MoveToMerge(uniq_files);
+  current_->MoveToMerge(uniq_files, false);
   state_change_ = true;
   Log(options_->info_log, "Added for locality merge [%s] files ", msg.c_str());
 }
@@ -440,16 +442,16 @@ void VersionControl::CheckLocality() {
 Compaction* VersionControl::PickCompaction() {
   // get compaction and return
   if (current_->merge_candidates_.size() <= 1) return nullptr;
-  Log(options_->info_log, "Picking compaction");
+//  Log(options_->info_log, "Picking compaction");
   state_change_ = true;
   Compaction* c = new Compaction(options_);
   RandomBasedPick(&c);
-  if (c->num_input_files() <= 1) {
-    c->ReleaseFiles();
-    if (current_->merge_candidates_.size() >= config::CompactionForceTrigger) {
-      ForcedPick(&c);
-    }
-  }
+//  if (c->num_input_files() <= 1) {
+//    c->ReleaseFiles();
+//    if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) {
+//      ForcedPick(&c);
+//    }
+//  }
   if (c->num_input_files() <= 1) {
     state_change_ = false;
     delete c;
@@ -466,7 +468,7 @@ Compaction* VersionControl::PickCompaction() {
 }
 
 void VersionControl::ForcedPick(Compaction** c) {
-  Log(options_->info_log, "Forced compaction");
+//  Log(options_->info_log, "Forced compaction");
   for (auto iter = current_->merge_candidates_.begin(); iter != current_->merge_candidates_.end() &&
       (*c)->num_input_files() <= options_->forced_compaction_size;
     iter++) {
@@ -475,7 +477,7 @@ void VersionControl::ForcedPick(Compaction** c) {
 }
 
 void VersionControl::RandomBasedPick(Compaction** c) {
-  Log(options_->info_log, "Random based compaction");
+//  Log(options_->info_log, "Random based compaction");
   auto rand_it = current_->merge_candidates_.begin();
   int rand_index = distribution(gen) % current_->merge_candidates_.size();
   while (--rand_index > 0) rand_it++;

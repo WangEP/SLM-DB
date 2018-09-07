@@ -19,13 +19,14 @@ IndexIterator::IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, T
     table_cache_(table_cache),
     block_iterator_(nullptr),
     index_meta_(nullptr),
-    vcontrol_(vcontrol) {
+    vcontrol_(vcontrol),
+    counter_(0) {
   SeekToFirst();
 }
 
 IndexIterator::~IndexIterator() {
-  if (files_.size() > config::CompactionForceTrigger) {
-    vcontrol_->current()->MoveToMerge(files_);
+  if (files_to_merge_.size() > config::LocalityMinFileNumber &&
+  vcontrol_->current()->MoveToMerge(files_to_merge_, true) {
     vcontrol_->StateChange();
   }
   delete btree_iterator_;
@@ -103,9 +104,14 @@ void IndexIterator::CacheLookup() {
 }
 
 void IndexIterator::Advance() {
+  counter_++;
   if (!IsEqual(index_meta_, (IndexMeta*)btree_iterator_->value())) {
     index_meta_ = (IndexMeta*) btree_iterator_->value();
-    files_.insert(index_meta_->file_number);
+    uniq_files_.insert(index_meta_->file_number);
+    if (counter_ % cardinality == 0 && uniq_files_.size() > files_to_merge_.size()) {
+      files_to_merge_.swap(uniq_files_);
+      uniq_files_.clear();
+    }
     CacheLookup();
   }
 }
