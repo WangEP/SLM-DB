@@ -35,7 +35,7 @@ struct FileMetaData {
 class Version {
  public:
   explicit Version(VersionControl* vcontrol)
-      : vcontrol_(vcontrol), refs_(0) { }
+      : vcontrol_(vcontrol), refs_(0), max_key_(0) { }
 
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val, uint16_t*);
 
@@ -68,8 +68,6 @@ class Version {
 
   bool IsAlive(uint64_t fnumber) { return files_.count(fnumber) > 0 || merge_candidates_.count(fnumber) > 0; }
 
-  void SortMergeCandidates();
-
   std::string DebugString() const;
 
   friend class VersionControl;
@@ -77,6 +75,7 @@ class Version {
   std::map<uint64_t, std::shared_ptr<FileMetaData>> files_;
   std::map<uint64_t, std::shared_ptr<FileMetaData>> merge_candidates_;
   VersionControl* vcontrol_;
+  entry_key_t max_key_;
   int refs_;
 
   ~Version() = default;

@@ -300,11 +300,13 @@ public:
     if (FLAGS_csv) {
       fprintf(csv_file, "%s, %f, micros/op, %s,\n",
               name.ToString().c_str(), seconds_ * 1e6 / done_, extra.c_str());
+      fflush(csv_file);
     }
     if (FLAGS_histogram) {
       if (FLAGS_csv) {
         fprintf(csv_file, "%s", hist_.GetInfo().c_str());
         fprintf(csv_file, "%s", hist_.GetHistogram().c_str());
+        fflush(csv_file);
       } else {
         fprintf(stdout, "Microseconds per op:\n%s\n", hist_.ToString().c_str());
       }
@@ -664,6 +666,7 @@ public:
 #ifdef PERF_LOG
           fprintf(file, "%s\n", leveldb::benchmark::GetInfo().c_str());
 #endif
+          fflush(file);
         }
       }
     }
@@ -673,6 +676,7 @@ public:
       if (FLAGS_histogram) {
         fprintf(csv_file, "%s", leveldb::benchmark::GetHistogram().c_str());
       }
+      fflush(csv_file);
     }
 #endif
   }
@@ -1143,6 +1147,7 @@ private:
     }
     if (FLAGS_csv) {
       fprintf(csv_file, "%s", stats.c_str());
+      fflush(csv_file);
     } else {
       fprintf(stdout, "\n%s\n", stats.c_str());
     }

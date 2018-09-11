@@ -879,7 +879,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   if (status.ok()) {
     status = input->status();
   }
-  versions_->UpdateLocalityCheckKey(ExtractUserKey(key));
   delete input;
   input = nullptr;
 

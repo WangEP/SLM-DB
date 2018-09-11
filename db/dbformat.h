@@ -22,19 +22,23 @@ namespace config {
 
 static constexpr char key_format[] = "%020lu";
 
-static constexpr int LocalityCheckRange = 10000;
-
-// Level-0 compaction is started when we hit this many files.
-static constexpr int CompactionTrigger = 2;
-
+// Locality check configs
+static constexpr int LocalityMagicNumber = 3;
+// Number of iterations for one round during locality check
+static constexpr int LocalityCheckRange = 100;
+// Min number of unique files to mark for merge during locality check
 static constexpr int LocalityMinFileNumber = 4;
 
+// Compaction is started when we hit this many merge candidate files.
+static constexpr int CompactionTrigger = 2;
+
+// Max number of files to be merged at once
 static constexpr int CompactionMaxSize = 10;
 
-// Soft limit on number of level-0 files.  We slow down writes at this point.
+// Soft limit on number of merge candidate files. We slow down writes at this point.
 static constexpr int SlowdownWritesTrigger = 10;
 
-// Maximum number of level-0 files.  We stop writes at this point.
+// Maximum number of merge candidate files.  We stop writes at this point.
 static constexpr int StopWritesTrigger = 25;
 
 // Approximate gap in bytes between samples of data read during iteration.

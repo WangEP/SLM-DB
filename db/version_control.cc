@@ -103,7 +103,7 @@ Compaction::~Compaction() {
 }
 
 void Compaction::AddInputDeletions(VersionEdit* edit) {
-  for (auto f : inputs_) {
+  for (const auto& f : inputs_) {
     edit->DeleteFile(f->number);
   }
 }
@@ -121,7 +121,7 @@ void Compaction::ReleaseFiles() {
 }
 
 bool Compaction::IsInput(uint64_t num) {
-  for (auto f : inputs_) {
+  for (const auto& f : inputs_) {
     if (f->number == num) {
       return true;
     }
@@ -396,19 +396,17 @@ void VersionControl::RegisterFileAccess(const uint16_t& file_number) {
   }
 }
 
-void VersionControl::UpdateLocalityCheckKey(const leveldb::Slice& target) {
-  locality_check_key = fast_atoi(target);
-}
-
 void VersionControl::CheckLocality() {
   if (current_->merge_candidates_.size() >= config::StopWritesTrigger) return;
   auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
-  iter->Seek(locality_check_key);
   std::set<uint16_t> uniq_files;
-  for (int64_t r = 0; r < config::LocalityCheckRange; r++) {
+  for (int64_t r = 0; r < config::LocalityMagicNumber; r++) {
+    // randomly go to some key
+    iter->Seek(distribution(gen) % current_->max_key_);
     std::set<uint16_t> uniq_files_;
+    // go to first key if not valid
     if (!iter->Valid()) iter->SeekToFirst();
-    for (int i = 0; i < cardinality && iter->Valid(); i++) {
+    for (int i = 0; i < config::LocalityCheckRange && iter->Valid(); i++) {
       uint16_t fnumber = ((IndexMeta*)iter->value())->file_number;
       if (current_->merge_candidates_.count(fnumber) == 0) {
         uniq_files_.insert(fnumber);
@@ -419,9 +417,7 @@ void VersionControl::CheckLocality() {
       uniq_files.swap(uniq_files_);
     }
   }
-  locality_check_key = iter->key();
   if (uniq_files.empty() || uniq_files.size() < config::LocalityMinFileNumber) {
-//    Log(options_->info_log, "No locality merge candidates");
     return;
   }
   delete iter;
@@ -439,13 +435,12 @@ void VersionControl::CheckLocality() {
 Compaction* VersionControl::PickCompaction() {
   // get compaction and return
   if (current_->merge_candidates_.size() <= 1) return nullptr;
-//  Log(options_->info_log, "Picking compaction");
   state_change_ = true;
   Compaction* c = new Compaction(options_);
   RandomBasedPick(&c);
   if (c->num_input_files() <= 1) {
     c->ReleaseFiles();
-    if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) {
+    if (current_->merge_candidates_.size() >= config::StopWritesTrigger) {
       ForcedPick(&c);
     }
   }
@@ -465,7 +460,7 @@ Compaction* VersionControl::PickCompaction() {
 }
 
 void VersionControl::ForcedPick(Compaction** c) {
-//  Log(options_->info_log, "Forced compaction");
+  Log(options_->info_log, "Forced compaction");
   for (auto iter = current_->merge_candidates_.begin(); iter != current_->merge_candidates_.end() &&
       (*c)->num_input_files() <= options_->forced_compaction_size;
     iter++) {

@@ -58,7 +58,6 @@ Status Version::Get(const ReadOptions& options, const LookupKey& key, std::strin
     saver.ucmp = ucmp;
     saver.user_key = user_key;
     saver.value = val;
-//    uint64_t fsize = GetFileSize(index_meta.file_number);
     s = vcontrol_->cache()->Get(options, index_meta, ikey, &saver, SaveValue);
     *file_number = index_meta->file_number;
     if (!s.ok()) {
@@ -134,15 +133,12 @@ std::string Version::DebugString() const {
 }
 
 void Version::AddFile(std::shared_ptr<FileMetaData> f) {
+  max_key_ = std::max(max_key_, fast_atoi(f->largest.user_key()));
   files_.insert({f->number, f});
 }
 
 void Version::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
   merge_candidates_.insert({f->number, f});
-}
-
-void Version::SortMergeCandidates() {
-
 }
 
 bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
