@@ -998,7 +998,7 @@ Status DBImpl::Get(const ReadOptions& options,
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
       // Done
     } else {
-      s = current->Get(options, lkey, value);
+      s = current->Get(options, lkey, value, &file_number);
     }
 #endif
     mutex_.Lock();
@@ -1206,7 +1206,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
-    } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger+10) {
+    } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger) {
       mutex_.Unlock();
       env_->SleepForMicroseconds(1000);
       allow_delay = false;
@@ -1220,7 +1220,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       bg_cv_.Wait();
-    } else if (versions_->CompactionSize() >= config::StopWritesTrigger+10) {
+    } else if (versions_->CompactionSize() >= config::StopWritesTrigger) {
       Log(options_.info_log, "Too many file for compaction, waiting..." );
       bg_cv_.Wait();
     } else {
@@ -1261,19 +1261,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
   if (!in.starts_with(prefix)) return false;
   in.remove_prefix(prefix.size());
 
-  if (in.starts_with("num-files-at-level")) {
-    in.remove_prefix(strlen("num-files-at-level"));
-    uint64_t level;
-    bool ok = ConsumeDecimalNumber(&in, &level) && in.empty();
-    if (!ok || level >= config::kNumLevels) {
-      return false;
-    } else {
-      char buf[100];
-      snprintf(buf, sizeof(buf), "%d", 0);
-      *value = buf;
-      return true;
-    }
-  } else if (in == "stats") {
+  if (in == "stats") {
     char buf[200];
     snprintf(buf, sizeof(buf),
              "                               Compactions\n"

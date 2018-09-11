@@ -132,6 +132,7 @@ set(LEVEL_DB_FILES
         util/testutil.cc
         util/perf_log.h
         util/perf_log.cc
+        util/persistant_pool.cc
         port/port.h
         port/atomic_pointer.h
         index/btree_index.cc
@@ -193,6 +194,7 @@ target_link_libraries(leveldb
         ${PMEMCTO_LIBRARY}
         ${PMEMOBJ_LIBRARY}
         ${PMEMLOG_LIBRARY}
+        ${VMEM_LIBRARY}
         )
 
 INSTALL(TARGETS leveldb ARCHIVE DESTINATION /usr/local/lib PUBLIC_HEADER DESTINATION /usr/local/include/leveldb)

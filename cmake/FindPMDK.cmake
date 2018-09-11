@@ -23,7 +23,11 @@ FIND_LIBRARY(PMEMLOG_LIBRARY NAME pmemlog
         HINTS $ENV{HOME}/local/lib64 $ENV{HOME}/local/lib /usr/local/lib64 /usr/local/lib /opt/local/lib64 /opt/local/lib /usr/lib64 /usr/lib
         )
 
-IF (PMDK_INCLUDE_DIR AND PMEM_LIBRARY AND PMEMCTO_LIBRARY AND PMEMOBJ_LIBRARY AND PMEMLOG_LIBRARY)
+FIND_LIBRARY(VMEM_LIBRARY NAME vmem
+        HINTS $ENV{HOME}/local/lib64 $ENV{HOME}/local/lib /usr/local/lib64 /usr/local/lib /opt/local/lib64 /opt/local/lib /usr/lib64 /usr/lib
+        )
+
+IF (PMDK_INCLUDE_DIR AND PMEM_LIBRARY AND PMEMCTO_LIBRARY AND PMEMOBJ_LIBRARY AND PMEMLOG_LIBRARY AND VMEM_LIBRARY)
     SET(PMDK_FOUND TRUE)
     MESSAGE(STATUS "Found PMDK: inc=${PMDK_INCLUDE_DIR}")
 ELSE ()

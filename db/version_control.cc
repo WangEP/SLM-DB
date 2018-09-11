@@ -7,9 +7,6 @@
 #include "index/ff_btree_iterator.h"
 #include "index/ff_btree.h"
 #include "db_impl.h"
-#ifdef PERF_LOG
-#include "util/perf_log.h"
-#endif
 
 
 namespace leveldb {
@@ -49,7 +46,7 @@ class VersionControl::Builder {
       f->smallest = iter.smallest;
       f->largest = iter.largest;
       deleted_files_.erase(f->number);
-      f->allowed_seeks = (f->file_size / 64);
+      f->allowed_seeks = (f->file_size / 1024);
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
       added_files_.push_back(f);
     }
@@ -404,21 +401,21 @@ void VersionControl::UpdateLocalityCheckKey(const leveldb::Slice& target) {
 }
 
 void VersionControl::CheckLocality() {
-  if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) return;
+  if (current_->merge_candidates_.size() >= config::StopWritesTrigger) return;
   auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
   iter->Seek(locality_check_key);
   std::set<uint16_t> uniq_files;
   for (int64_t r = 0; r < config::LocalityCheckRange; r++) {
     std::set<uint16_t> uniq_files_;
     if (!iter->Valid()) iter->SeekToFirst();
-    for (int i = 0; i < cardinality && iter->Valid(); i++, r++) {
+    for (int i = 0; i < cardinality && iter->Valid(); i++) {
       uint16_t fnumber = ((IndexMeta*)iter->value())->file_number;
       if (current_->merge_candidates_.count(fnumber) == 0) {
         uniq_files_.insert(fnumber);
       }
       iter->Next();
     }
-    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > config::CompactionTrigger) {
+    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > config::LocalityMinFileNumber) {
       uniq_files.swap(uniq_files_);
     }
   }
@@ -446,12 +443,12 @@ Compaction* VersionControl::PickCompaction() {
   state_change_ = true;
   Compaction* c = new Compaction(options_);
   RandomBasedPick(&c);
-//  if (c->num_input_files() <= 1) {
-//    c->ReleaseFiles();
-//    if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) {
-//      ForcedPick(&c);
-//    }
-//  }
+  if (c->num_input_files() <= 1) {
+    c->ReleaseFiles();
+    if (current_->merge_candidates_.size() >= config::SlowdownWritesTrigger) {
+      ForcedPick(&c);
+    }
+  }
   if (c->num_input_files() <= 1) {
     state_change_ = false;
     delete c;
@@ -487,6 +484,8 @@ void VersionControl::RandomBasedPick(Compaction** c) {
   assert(candidate->number < next_file_number_);
   Slice c_start = candidate->smallest.user_key();
   Slice c_end = candidate->largest.user_key();
+  uint64_t c1 = fast_atoi(c_start);
+  uint64_t c2 = fast_atoi(c_end);
   (*c)->AddInput(candidate);
 
   std::vector<std::pair<float, std::shared_ptr<FileMetaData>>> ratio_array;
@@ -495,19 +494,17 @@ void VersionControl::RandomBasedPick(Compaction** c) {
     auto f = iter.second;
     const Slice f_start = f->smallest.user_key();
     const Slice f_end = f->largest.user_key();
+    uint64_t f1 = fast_atoi(f_start);
+    uint64_t f2 = fast_atoi(f_end);
     if (f == candidate) {
       continue; // skip
-    } else if (user_comparator()->Compare(f_end, c_start) < 0 || user_comparator()->Compare(f_start, c_end) > 0) {
-      continue; // skip
+    } else if (f2 < c1 || f1 > c2) {
+      continue; // out of range, skip
 //    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
 //      ratio = 1.0;
 //    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
 //      ratio = 1.0;
     } else {
-      uint64_t c1 = fast_atoi(c_start);
-      uint64_t c2 = fast_atoi(c_end);
-      uint64_t f1 = fast_atoi(f_start);
-      uint64_t f2 = fast_atoi(f_end);
       ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
     }
     ratio_array.emplace_back(ratio, f);

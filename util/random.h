@@ -59,10 +59,6 @@ public:
   }
 
   uint64_t Next() {
-    uint64_t ret = 0;
-    // do not generate zero
-    while (ret == 0) ret = int_distribution(gen) % 100000000000000000;
-    return ret;
     static const uint32_t M = 2147483647L;   // 2^31-1
     static const uint64_t A = 16807;  // bits 14, 8, 7, 5, 2, 1, 0
     // We are computing

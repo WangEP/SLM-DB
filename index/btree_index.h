@@ -38,7 +38,6 @@ private:
   void Runner();
   static void* ThreadWrapper(void* ptr);
 
-  bool break_;
   FFBtree tree_;
   bool bgstarted_;
   pthread_t thread_;

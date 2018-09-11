@@ -9,7 +9,6 @@ namespace leveldb {
 
 BtreeIndex::BtreeIndex() : condvar_(&mutex_) {
   bgstarted_ = false;
-  break_ = false;
 }
 
 IndexMeta* BtreeIndex::Get(const Slice& key) {
@@ -28,7 +27,7 @@ void BtreeIndex::Insert(const entry_key_t& key, const IndexMeta& meta) {
   IndexMeta* old_ptr = (IndexMeta*) tree_.Insert(key, ptr);
   if (old_ptr != nullptr) {
     edit_->DecreaseCount(old_ptr->file_number);
-    delete old_ptr;
+    nvram::pfree(old_ptr);
   }
 }
 
@@ -43,16 +42,14 @@ void BtreeIndex::Runner() {
     edit_->AllocateRecoveryList(queue_.size());
     assert(!queue_.empty());
     for (;!queue_.empty();) {
-      if (break_) break;
       uint64_t key = queue_.front().key;
       std::shared_ptr<IndexMeta> value = queue_.front().meta;
       queue_.pop_front();
       Insert(key, *value);
     }
-    edit_->Unref();
+    if (edit_ != nullptr) edit_->Unref();
     assert(queue_.empty());
     mutex_.Unlock();
-    if (break_) break;
   }
 #pragma clang diagnostic pop
 }
@@ -84,9 +81,7 @@ FFBtreeIterator* BtreeIndex::BtreeIterator() {
 }
 
 void BtreeIndex::Break() {
-  break_= true;
-  mutex_.Lock();
-  mutex_.Unlock();
+  pthread_cancel(thread_);
 }
 
 

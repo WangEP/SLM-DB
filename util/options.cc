@@ -29,7 +29,7 @@ Options::Options()
       reuse_logs(false),
       filter_policy(nullptr),
       disable_recovery_log(true),
-      index(CreateBtreeIndex()) {
+      index(nullptr) {
 }
 
 }  // namespace leveldb

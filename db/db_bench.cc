@@ -9,6 +9,7 @@
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
+#include "leveldb/index.h"
 #include "leveldb/write_batch.h"
 #include "leveldb/persistant_pool.h"
 #include "port/port.h"
@@ -648,7 +649,7 @@ public:
 
       if (method != NULL) {
 #ifdef PERF_LOG
-        benchmark::ClearPerfLog();
+        leveldb::benchmark::ClearPerfLog();
 #endif
         RunBenchmark(num_threads, name, method);
         if (FLAGS_ycsb) {
@@ -660,6 +661,9 @@ public:
             fprintf(file, "%s\n", histogram.first.c_str());
             fprintf(file, "%s", histogram.second.GetInfo().c_str());
           }
+#ifdef PERF_LOG
+          fprintf(file, "%s\n", leveldb::benchmark::GetInfo().c_str());
+#endif
         }
       }
     }
@@ -845,6 +849,7 @@ private:
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
     options.merge_threshold = FLAGS_merge_threshold;
+    options.index = CreateBtreeIndex();
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
