@@ -574,7 +574,7 @@ public:
       } else if (name == Slice("readrandom")) {
         method = &Benchmark::ReadRandom;
       } else if (name == Slice("rangequery")) {
-        ranges_ = 1000;
+        ranges_ = 10000;
         range_size_ = FLAGS_range_size;
         method = &Benchmark::RangeQuery;
       } else if (name == Slice("readmissing")) {

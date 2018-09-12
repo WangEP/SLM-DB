@@ -27,7 +27,7 @@ static constexpr int LocalityMagicNumber = 1;
 // Number of iterations for one round during locality check
 static constexpr int LocalityCheckRange = 4;
 // Min number of unique files to mark for merge during locality check
-static constexpr int LocalityMinFileNumber = 10;
+static constexpr int LocalityMinFileNumber = 16;
 
 // Compaction is started when we hit this many merge candidate files.
 static constexpr int CompactionTrigger = 2;
