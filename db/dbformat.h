@@ -23,23 +23,23 @@ namespace config {
 static constexpr char key_format[] = "%020lu";
 
 // Locality check configs
-static constexpr int LocalityMagicNumber = 3;
+static constexpr int LocalityMagicNumber = 1;
 // Number of iterations for one round during locality check
-static constexpr int LocalityCheckRange = 100;
+static constexpr int LocalityCheckRange = 4;
 // Min number of unique files to mark for merge during locality check
-static constexpr int LocalityMinFileNumber = 4;
+static constexpr int LocalityMinFileNumber = 10;
 
 // Compaction is started when we hit this many merge candidate files.
 static constexpr int CompactionTrigger = 2;
 
 // Max number of files to be merged at once
-static constexpr int CompactionMaxSize = 10;
+static constexpr int CompactionMaxSize = 15;
 
 // Soft limit on number of merge candidate files. We slow down writes at this point.
-static constexpr int SlowdownWritesTrigger = 10;
+static constexpr int SlowdownWritesTrigger = 15;
 
 // Maximum number of merge candidate files.  We stop writes at this point.
-static constexpr int StopWritesTrigger = 25;
+static constexpr int StopWritesTrigger = 35;
 
 // Approximate gap in bytes between samples of data read during iteration.
 static constexpr int kReadBytesPeriod = 1048576;
@@ -72,7 +72,7 @@ static constexpr SequenceNumber kMaxSequenceNumber =
 
 struct ParsedInternalKey {
   Slice user_key;
-  SequenceNumber sequence;
+  SequenceNumber sequence{};
   ValueType type;
 
   ParsedInternalKey() = default;  // Intentionally left uninitialized (for speed)

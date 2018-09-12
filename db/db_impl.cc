@@ -618,6 +618,7 @@ void DBImpl::BackgroundCall() {
 
   // Previous compaction may have produced too many files in a level,
   // so reschedule another compaction if needed.
+  versions_->CheckLocality();
   MaybeScheduleCompaction();
   bg_cv_.SignalAll();
 }
@@ -1207,6 +1208,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       break;
     } else if (allow_delay && versions_->CompactionSize() >= config::SlowdownWritesTrigger) {
       mutex_.Unlock();
+      stats_.total_stalls++;
       env_->SleepForMicroseconds(1000);
       allow_delay = false;
       mutex_.Lock();
@@ -1285,9 +1287,9 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
   } else if (in == "csv") {
     char buf[200];
     snprintf(buf, sizeof(buf),
-             "Level, Files, Size(MB), C Time(sec), C Read(MB), C Write(MB), C File Deleted, C File Created, C Count,\n");
+             "Level, Files, Size(MB), C Time(sec), C Read(MB), C Write(MB), C File Deleted, C File Created, C Count, Stalls(ms),\n");
     value->append(buf);
-    snprintf(buf, sizeof(buf), "%d, %li, %f, %f, %f, %f, %li, %li, %li,\n",
+    snprintf(buf, sizeof(buf), "%d, %li, %f, %f, %f, %f, %li, %li, %li, %li,\n",
              0,
              versions_->NumFiles(),
              versions_->NumBytes() / 1048576.0,
@@ -1296,7 +1298,8 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
              stats_.bytes_written / 1048576.0,
              stats_.files_deleted,
              stats_.files_created,
-             stats_.count);
+             stats_.count,
+             stats_.total_stalls);
     value->append(buf);
     return true;
   } else if (in == "sstables") {

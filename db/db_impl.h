@@ -160,8 +160,9 @@ class DBImpl : public DB {
     int64_t micros;
     int64_t bytes_read;
     int64_t bytes_written;
+    int64_t total_stalls;
 
-    CompactionStats() : count(0), files_deleted(0), files_created(0), micros(0), bytes_read(0), bytes_written(0) { }
+    CompactionStats() : count(0), files_deleted(0), files_created(0), micros(0), bytes_read(0), bytes_written(0), total_stalls(0) { }
 
     void Add(const CompactionStats& c) {
       this->count++;

@@ -96,38 +96,36 @@ void Version::Unref() {
 std::string Version::DebugString() const {
   std::string r;
   r.append("Files:\n");
+  r.append("number, size, smallest, largest, alive/total, \n");
   for (const auto& file : files_) {
-    r.push_back(' ');
     AppendNumberTo(&r, file.second->number);
-    r.push_back(':');
+    r.append(", ");
     AppendNumberTo(&r, file.second->file_size);
-    r.append("[");
-    r.append(file.second->smallest.DebugString());
-    r.append(" .. ");
-    r.append(file.second->largest.DebugString());
-    r.append("]");
-    r.append(" {");
+    r.append(", ");
+    r.append(file.second->smallest.user_key().ToString());
+    r.append(", ");
+    r.append(file.second->largest.user_key().ToString());
+    r.append(", ");
     AppendNumberTo(&r, file.second->alive);
-    r.append(" / ");
+    r.append("/");
     AppendNumberTo(&r, file.second->total);
-    r.append("}\n");
+    r.append(", \n");
   }
   r.append("Files to merge:\n");
+  r.append("number, size, smallest, largest, alive/total, \n");
   for (const auto& file : merge_candidates_) {
-    r.push_back(' ');
     AppendNumberTo(&r, file.second->number);
-    r.push_back(':');
+    r.append(", ");
     AppendNumberTo(&r, file.second->file_size);
-    r.append("[");
-    r.append(file.second->smallest.DebugString());
-    r.append(" .. ");
-    r.append(file.second->largest.DebugString());
-    r.append("]");
-    r.append(" {");
+    r.append(", ");
+    r.append(file.second->smallest.user_key().ToString());
+    r.append(", ");
+    r.append(file.second->largest.user_key().ToString());
+    r.append(", ");
     AppendNumberTo(&r, file.second->alive);
-    r.append(" / ");
+    r.append("/");
     AppendNumberTo(&r, file.second->total);
-    r.append("}\n");
+    r.append(", \n");
   }
   return r;
 }

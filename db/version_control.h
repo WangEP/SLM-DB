@@ -35,6 +35,7 @@ class VersionControl {
   Compaction* PickCompaction();
   void RegisterFileAccess(const uint16_t& file_number);
   void CheckLocality();
+  void UpdateLocalityCheckKey(const Slice& target);
   Status Recover(bool* save_manifest);
   Iterator* MakeInputIterator(Compaction* c);
   const char* Summary(SummaryStorage* scratch) const;
@@ -63,7 +64,7 @@ class VersionControl {
   Status WriteSnapshot(log::Writer* log);
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
   void ForcedPick(Compaction**);
-  void RandomBasedPick(Compaction**);
+  void FIFOPick(Compaction**);
 
   Env* const env_;
   const std::string dbname_;
@@ -81,6 +82,7 @@ class VersionControl {
   log::Writer* descriptor_log_;
   Version* current_;
   TableCache* table_cache_;
+  entry_key_t locality_check_key;
   std::random_device rd;
   std::mt19937 gen;
   std::uniform_int_distribution<> distribution;

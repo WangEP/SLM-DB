@@ -149,6 +149,7 @@ VersionControl::VersionControl(DBImpl* db,
       prev_log_number_(0),
       gen(rd()),
       distribution(0, INT_MAX),
+      locality_check_key(0),
       state_change_(false),
       descriptor_file_(nullptr),
       descriptor_log_(nullptr),
@@ -396,40 +397,58 @@ void VersionControl::RegisterFileAccess(const uint16_t& file_number) {
   }
 }
 
+void VersionControl::UpdateLocalityCheckKey(const leveldb::Slice& target) {
+  locality_check_key = fast_atoi(target);
+}
+
 void VersionControl::CheckLocality() {
-  if (current_->merge_candidates_.size() >= config::StopWritesTrigger) return;
-  auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
-  std::set<uint16_t> uniq_files;
   for (int64_t r = 0; r < config::LocalityMagicNumber; r++) {
-    // randomly go to some key
-    iter->Seek(distribution(gen) % current_->max_key_);
-    std::set<uint16_t> uniq_files_;
+    Log(options_->info_log, "Locality Check");
+    if (current_->merge_candidates_.size() >= config::StopWritesTrigger) {
+      Log(options_->info_log, "Too many files... Skip locality check");
+      return;
+    }
+    auto iter = dynamic_cast<BtreeIndex*>(options_->index)->BtreeIterator();
+    std::set<uint16_t> uniq_files;
+    // go to prev RR key
+    iter->Seek(locality_check_key);
     // go to first key if not valid
     if (!iter->Valid()) iter->SeekToFirst();
-    for (int i = 0; i < config::LocalityCheckRange && iter->Valid(); i++) {
-      uint16_t fnumber = ((IndexMeta*)iter->value())->file_number;
-      if (current_->merge_candidates_.count(fnumber) == 0) {
-        uniq_files_.insert(fnumber);
-      }
+    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
+    for (uint64_t scanned_size = 0; scanned_size < options_->max_file_size*config::LocalityCheckRange && iter->Valid(); ) {
+      IndexMeta* meta = (IndexMeta*) iter->value();
+      uint16_t fnumber = meta->file_number;
+      scanned_size += meta->size;
+      uniq_files.insert(fnumber);
       iter->Next();
     }
-    if (uniq_files.size() < uniq_files_.size() && uniq_files_.size() > config::LocalityMinFileNumber) {
-      uniq_files.swap(uniq_files_);
+    if (iter->Valid()) {
+      locality_check_key = iter->key();
+    } else {
+      locality_check_key = 0;
+    }
+    if (uniq_files.empty() || uniq_files.size() < config::LocalityMinFileNumber) {
+      std::string r;
+      for (const auto& file : uniq_files) {
+        r.append(" ").append(std::to_string(file));
+      }
+      Log(options_->info_log, "Not enough files for locality merge %lu@[%s]", uniq_files.size(), r.c_str());
+      return;
+    }
+    delete iter;
+    std::string msg;
+    char buf[100];
+    for (auto f : uniq_files) {
+      snprintf(buf, sizeof(buf), "%d, ", f);
+      msg.append(buf);
+    }
+    state_change_ = true;
+    if (current_->MoveToMerge(uniq_files, false)) {
+      Log(options_->info_log, "Added for locality merge %lu@[%s] files ", uniq_files.size(), msg.c_str());
+    } else {
+      Log(options_->info_log, "Too many files... Skip add new candidates");
     }
   }
-  if (uniq_files.empty() || uniq_files.size() < config::LocalityMinFileNumber) {
-    return;
-  }
-  delete iter;
-  std::string msg;
-  char buf[100];
-  for (auto f : uniq_files) {
-    snprintf(buf, sizeof(buf), "%d, ", f);
-    msg.append(buf);
-  }
-  current_->MoveToMerge(uniq_files, false);
-  state_change_ = true;
-  Log(options_->info_log, "Added for locality merge [%s] files ", msg.c_str());
 }
 
 Compaction* VersionControl::PickCompaction() {
@@ -437,7 +456,7 @@ Compaction* VersionControl::PickCompaction() {
   if (current_->merge_candidates_.size() <= 1) return nullptr;
   state_change_ = true;
   Compaction* c = new Compaction(options_);
-  RandomBasedPick(&c);
+  FIFOPick(&c);
   if (c->num_input_files() <= 1) {
     c->ReleaseFiles();
     if (current_->merge_candidates_.size() >= config::StopWritesTrigger) {
@@ -455,7 +474,7 @@ Compaction* VersionControl::PickCompaction() {
     msg.append(std::to_string(c->input(i)->number));
     msg.append(" ");
   }
-  Log(options_->info_log, "Merge %s", msg.c_str());
+  Log(options_->info_log, "Picking files for merge %s", msg.c_str());
   return c;
 }
 
@@ -468,11 +487,11 @@ void VersionControl::ForcedPick(Compaction** c) {
   }
 }
 
-void VersionControl::RandomBasedPick(Compaction** c) {
+void VersionControl::FIFOPick(Compaction** c) {
 //  Log(options_->info_log, "Random based compaction");
   auto rand_it = current_->merge_candidates_.begin();
-  int rand_index = distribution(gen) % current_->merge_candidates_.size();
-  while (--rand_index > 0) rand_it++;
+//  int rand_index = distribution(gen) % current_->merge_candidates_.size();
+//  while (--rand_index > 0) rand_it++;
   auto candidate = rand_it->second;
   assert(candidate != nullptr);
   assert(candidate->number >= 2);
