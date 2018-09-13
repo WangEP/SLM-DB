@@ -142,22 +142,23 @@ void Version::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
 bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
   // restrict scan for less compaction
   if (is_scan && merge_candidates_.size() > config::SlowdownWritesTrigger) return false;
-  if (is_scan) {
-    Log(vcontrol_->options()->info_log, "Scan compaction added %lu files", array.size());
-  }
   // else still restrict if too many candidates
   else if (merge_candidates_.size() > config::StopWritesTrigger) return false;
-  if (is_scan) {
-    Log(vcontrol_->options()->info_log, "Scan check adding %lu files", array.size());
-  }
   int added_files = 0;
+  std::string msg;
   for (auto f : array) {
-    if (is_scan && ++added_files > config::CompactionMaxSize/2) break;
-    if (files_.count(f) > 0) {
+    if (files_.count(f) > 0) { // make sure that file is not among merge candidates
+      if (is_scan) {
+        msg.append(" ").append(std::to_string(f));
+      }
+      if (is_scan && ++added_files > config::CompactionMaxSize/2) break;
       auto file = files_.at(f);
       files_.erase(f);
       merge_candidates_.insert({f, file});
     }
+  }
+  if (is_scan) {
+    Log(vcontrol_->options()->info_log, "Scan check adding %d files [%s] from %lu candidates", added_files, msg.c_str(), array.size());
   }
   return true;
 }

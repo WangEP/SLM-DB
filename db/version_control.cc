@@ -370,6 +370,11 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
       env_->DeleteFile(new_manifest_file);
     }
   }
+  std::string msg;
+  for (auto f : current()->merge_candidates_) {
+    msg.append(" ").append(std::to_string(f.first));
+  }
+  Log(options_->info_log, "Merge candidates left [%s]", msg.c_str());
   return s;
 }
 
