@@ -11,8 +11,6 @@
 
 namespace leveldb {
 
-static uint64_t garbage_count = 0;
-
 // Builder class
 
 class VersionControl::Builder {
@@ -66,7 +64,6 @@ class VersionControl::Builder {
         if (f->alive > dead) {
           f->alive -= dead;
           if (100 * f->alive / f->total <= threshold) { // move to compaction list
-            garbage_count++;
             v->AddCompactionFile(f);
             vcontrol_->state_change_ = true;
           } else {
@@ -161,7 +158,6 @@ VersionControl::VersionControl(DBImpl* db,
 }
 
 VersionControl::~VersionControl() {
-  fprintf(stdout, "Garbage collector %lu\n", garbage_count);
   delete descriptor_log_;
   delete descriptor_file_;
   current_->Unref();
@@ -421,6 +417,8 @@ void VersionControl::CheckLocality() {
     uint64_t temp = iter->key();
 //    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
     for (uint64_t scan = 0; scan < config::LocalityCheckRange; scan++) {
+    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
+    for (uint64_t scanned_size = 0; scanned_size < config::LocalityCheckRange && iter->Valid(); scanned_size++) {
       IndexMeta* meta = (IndexMeta*) iter->value();
       uint16_t fnumber = meta->file_number;
       uniq_files.insert(fnumber);
@@ -494,8 +492,8 @@ void VersionControl::ForcedPick(Compaction** c) {
 void VersionControl::FIFOPick(Compaction** c) {
 //  Log(options_->info_log, "Random based compaction");
   auto rand_it = current_->merge_candidates_.begin();
-//  int rand_index = distribution(gen) % current_->merge_candidates_.size();
-//  while (--rand_index > 0) rand_it++;
+  int rand_index = distribution(gen) % current_->merge_candidates_.size();
+  while (--rand_index > 0) rand_it++;
   auto candidate = rand_it->second;
   assert(candidate != nullptr);
   assert(candidate->number >= 2);
@@ -518,10 +516,10 @@ void VersionControl::FIFOPick(Compaction** c) {
       continue; // skip
     } else if (f2 < c1 || f1 > c2) {
       continue; // out of range, skip
-    } else if (f1 > c1 && f2 < c2) {
-      ratio = 1.0;
-    } else if (f1 < c1 && f2 > c2) {
-      ratio = 1.0;
+//    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
+//      ratio = 1.0;
+//    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
+//      ratio = 1.0;
     } else {
       ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
     }
@@ -540,7 +538,7 @@ void VersionControl::FIFOPick(Compaction** c) {
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-  return current_->merge_candidates_.size() > config::CompactionTrigger && state_change_;
+  return current_->merge_candidates_.size() > config::CompactionTrigger;
 }
 
 Iterator* VersionControl::MakeInputIterator(Compaction* c) {

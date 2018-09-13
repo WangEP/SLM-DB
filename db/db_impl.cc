@@ -1423,7 +1423,7 @@ Status DestroyDB(const std::string& dbname, const Options& options) {
 }
 
 void DBImpl::WaitComp() {
-  while (env_->IsSchedulerEmpty() && bg_compaction_scheduled_) {
+  while (!env_->IsSchedulerEmpty() || bg_compaction_scheduled_) {
     env_->SleepForMicroseconds(1000000);
   }
   Log(options_.info_log, "Finished all scheduled compaction");

@@ -147,7 +147,12 @@ bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
   }
   // else still restrict if too many candidates
   else if (merge_candidates_.size() > config::StopWritesTrigger) return false;
+  if (is_scan) {
+    Log(vcontrol_->options()->info_log, "Scan check adding %lu files", array.size());
+  }
+  int added_files = 0;
   for (auto f : array) {
+    if (is_scan && ++added_files > config::CompactionMaxSize/2) break;
     if (files_.count(f) > 0) {
       auto file = files_.at(f);
       files_.erase(f);
