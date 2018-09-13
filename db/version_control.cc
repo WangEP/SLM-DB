@@ -415,8 +415,6 @@ void VersionControl::CheckLocality() {
     // go to first key if not valid
     if (!iter->Valid()) iter->SeekToFirst();
     uint64_t temp = iter->key();
-//    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
-    for (uint64_t scan = 0; scan < config::LocalityCheckRange; scan++) {
     Log(options_->info_log, "Starting locality check by key %lu", iter->key());
     for (uint64_t scanned_size = 0; scanned_size < config::LocalityCheckRange && iter->Valid(); scanned_size++) {
       IndexMeta* meta = (IndexMeta*) iter->value();
