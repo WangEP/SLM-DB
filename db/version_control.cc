@@ -11,6 +11,8 @@
 
 namespace leveldb {
 
+static uint64_t garbage_count = 0;
+
 // Builder class
 
 class VersionControl::Builder {
@@ -46,7 +48,7 @@ class VersionControl::Builder {
       f->smallest = iter.smallest;
       f->largest = iter.largest;
       deleted_files_.erase(f->number);
-      f->allowed_seeks = (f->file_size / 1024);
+      f->allowed_seeks = (f->file_size / 2048);
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
       added_files_.push_back(f);
     }
@@ -64,6 +66,7 @@ class VersionControl::Builder {
         if (f->alive > dead) {
           f->alive -= dead;
           if (100 * f->alive / f->total <= threshold) { // move to compaction list
+            garbage_count++;
             v->AddCompactionFile(f);
             vcontrol_->state_change_ = true;
           } else {
@@ -158,6 +161,7 @@ VersionControl::VersionControl(DBImpl* db,
 }
 
 VersionControl::~VersionControl() {
+  fprintf(stdout, "Garbage collector %lu\n", garbage_count);
   delete descriptor_log_;
   delete descriptor_file_;
   current_->Unref();
@@ -414,11 +418,11 @@ void VersionControl::CheckLocality() {
     iter->Seek(locality_check_key);
     // go to first key if not valid
     if (!iter->Valid()) iter->SeekToFirst();
-    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
-    for (uint64_t scanned_size = 0; scanned_size < options_->max_file_size*config::LocalityCheckRange && iter->Valid(); ) {
+    uint64_t temp = iter->key();
+//    Log(options_->info_log, "Starting locality check by key %lu", iter->key());
+    for (uint64_t scan = 0; scan < config::LocalityCheckRange; scan++) {
       IndexMeta* meta = (IndexMeta*) iter->value();
       uint16_t fnumber = meta->file_number;
-      scanned_size += meta->size;
       uniq_files.insert(fnumber);
       iter->Next();
     }
@@ -444,9 +448,9 @@ void VersionControl::CheckLocality() {
     }
     state_change_ = true;
     if (current_->MoveToMerge(uniq_files, false)) {
-      Log(options_->info_log, "Added for locality merge %lu@[%s] files ", uniq_files.size(), msg.c_str());
+      Log(options_->info_log, "Added for locality merge %lu@[%s] files; Starting key %lu", uniq_files.size(), msg.c_str(), temp);
     } else {
-      Log(options_->info_log, "Too many files... Skip add new candidates");
+      Log(options_->info_log, "Too many files... Skip add new candidates; Starting key %lu", temp);
     }
   }
 }
@@ -514,10 +518,10 @@ void VersionControl::FIFOPick(Compaction** c) {
       continue; // skip
     } else if (f2 < c1 || f1 > c2) {
       continue; // out of range, skip
-//    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
-//      ratio = 1.0;
-//    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
-//      ratio = 1.0;
+    } else if (f1 > c1 && f2 < c2) {
+      ratio = 1.0;
+    } else if (f1 < c1 && f2 > c2) {
+      ratio = 1.0;
     } else {
       ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
     }

@@ -25,9 +25,9 @@ static constexpr char key_format[] = "%020lu";
 // Locality check configs
 static constexpr int LocalityMagicNumber = 1;
 // Number of iterations for one round during locality check
-static constexpr int LocalityCheckRange = 4;
+static constexpr int LocalityCheckRange = 64000; // for 1kb
 // Min number of unique files to mark for merge during locality check
-static constexpr int LocalityMinFileNumber = 16;
+static constexpr int LocalityMinFileNumber = 6;
 
 // Compaction is started when we hit this many merge candidate files.
 static constexpr int CompactionTrigger = 2;

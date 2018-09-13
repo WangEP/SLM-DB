@@ -618,7 +618,7 @@ void DBImpl::BackgroundCall() {
 
   // Previous compaction may have produced too many files in a level,
   // so reschedule another compaction if needed.
-  versions_->CheckLocality();
+//  versions_->CheckLocality();
   MaybeScheduleCompaction();
   bg_cv_.SignalAll();
 }

@@ -142,6 +142,9 @@ void Version::AddCompactionFile(std::shared_ptr<FileMetaData> f) {
 bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
   // restrict scan for less compaction
   if (is_scan && merge_candidates_.size() > config::SlowdownWritesTrigger) return false;
+  if (is_scan) {
+    Log(vcontrol_->options()->info_log, "Scan compaction added %lu files", array.size());
+  }
   // else still restrict if too many candidates
   else if (merge_candidates_.size() > config::StopWritesTrigger) return false;
   for (auto f : array) {
