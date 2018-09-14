@@ -25,7 +25,7 @@ IndexIterator::IndexIterator(ReadOptions options, FFBtreeIterator* btree_iter, T
 }
 
 IndexIterator::~IndexIterator() {
-  if (files_to_merge_.size() > config::LocalityMinFileNumber &&
+  if (files_to_merge_.size() > config::ScanCheckMinFileNumber &&
   vcontrol_->current()->MoveToMerge(files_to_merge_, true)) {
     vcontrol_->StateChange();
   }

@@ -461,7 +461,7 @@ Compaction* VersionControl::PickCompaction() {
   if (current_->merge_candidates_.size() <= 1) return nullptr;
   state_change_ = true;
   Compaction* c = new Compaction(options_);
-  FIFOPick(&c);
+  TryToPick(&c);
   if (c->num_input_files() <= 1) {
     c->ReleaseFiles();
     if (current_->merge_candidates_.size() >= config::StopWritesTrigger) {
@@ -470,6 +470,13 @@ Compaction* VersionControl::PickCompaction() {
   }
   if (c->num_input_files() <= 1) {
     state_change_ = false;
+    c->ReleaseFiles();
+    TryToPick(&c);
+    if (c->num_input_files() > 1) state_change_ = true;
+  }
+  if (c->num_input_files() <= 1) {
+    state_change_ = false;
+    Log(options_->info_log, "No compaction candidates were picked");
     delete c;
     return nullptr;
   }
@@ -492,56 +499,51 @@ void VersionControl::ForcedPick(Compaction** c) {
   }
 }
 
-void VersionControl::FIFOPick(Compaction** c) {
-//  Log(options_->info_log, "Random based compaction");
-  auto rand_it = current_->merge_candidates_.begin();
-  int rand_index = distribution(gen) % current_->merge_candidates_.size();
-  while (--rand_index > 0) rand_it++;
-  auto candidate = rand_it->second;
-  assert(candidate != nullptr);
-  assert(candidate->number >= 2);
-  assert(candidate->number < next_file_number_);
-  Slice c_start = candidate->smallest.user_key();
-  Slice c_end = candidate->largest.user_key();
-  uint64_t c1 = fast_atoi(c_start);
-  uint64_t c2 = fast_atoi(c_end);
-  (*c)->AddInput(candidate);
-
-  std::vector<std::pair<float, std::shared_ptr<FileMetaData>>> ratio_array;
-  for (auto iter : current_->merge_candidates_) {
-    float ratio = 0.0;
-    auto f = iter.second;
-    const Slice f_start = f->smallest.user_key();
-    const Slice f_end = f->largest.user_key();
-    uint64_t f1 = fast_atoi(f_start);
-    uint64_t f2 = fast_atoi(f_end);
-    if (f == candidate) {
-      continue; // skip
-    } else if (f2 < c1 || f1 > c2) {
-      continue; // out of range, skip
-//    } else if (user_comparator()->Compare(f_start, c_start) > 0 && user_comparator()->Compare(f_end, c_end) < 0) {
-//      ratio = 1.0;
-//    } else if (user_comparator()->Compare(f_start, c_start) < 0 && user_comparator()->Compare(f_end, c_end) > 0) {
-//      ratio = 1.0;
-    } else {
-      ratio = (float)(max(c1, f1) + min(c2, f2))/(min(c1, f1) + max(c2, f2));
+void VersionControl::TryToPick(Compaction** c) {
+  std::vector<std::pair<double, std::shared_ptr<FileMetaData>>> best_pick_list;
+  double best_pick_score = 0.0;
+  for (const auto& main_candidate : current()->merge_candidates_) {
+    std::vector<std::pair<double, std::shared_ptr<FileMetaData>>> current_pick_list;
+    double current_pick_score = 0.0;
+    double smallest1 = fast_atoi(main_candidate.second->smallest.user_key());
+    double largest1 = fast_atoi(main_candidate.second->largest.user_key());
+    for (const auto& next_candidate : current()->merge_candidates_) {
+      double smallest2 = fast_atoi(next_candidate.second->smallest.user_key());
+      double largest2 = fast_atoi(next_candidate.second->largest.user_key());
+      if (largest2 < smallest1 || smallest2 > largest1) {
+        continue; // skip
+      } else {
+        double score = (min(largest1, largest2) - max(smallest1, smallest2))/(max(largest1, largest2) - min(smallest1, smallest2));
+        current_pick_score += score;
+        current_pick_list.emplace_back(score, next_candidate.second);
+      }
     }
-    ratio_array.emplace_back(ratio, f);
+    if (current_pick_score > best_pick_score) {
+      best_pick_list.swap(current_pick_list);
+      best_pick_score = current_pick_score;
+    }
   }
-  std::sort(ratio_array.begin(), ratio_array.end(), [](const auto& a, const auto& b) {
+
+  std::sort(best_pick_list.begin(), best_pick_list.end(), [](const auto& a, const auto& b) {
     return a.first > b.first;
   });
-  for (auto iter : ratio_array) {
+
+//  printf("start\n");
+  double threshold = state_change_ ? 0.5 : 0.0;
+  for (auto iter : best_pick_list) {
+//    printf("score %f file %lu \n", iter.first, iter.second->number);
     (*c)->AddInput(iter.second);
-    if ((*c)->num_input_files() >= config::CompactionMaxSize) {
+//    if ((*c)->num_input_files() >= config::CompactionMaxSize) {
+    if (iter.first <= threshold || (*c)->num_input_files() >= config::CompactionMaxSize) {
       break;
     }
   }
+//  printf("finish\n");
 }
 
 bool VersionControl::NeedsCompaction() const {
   // decide whether it needed or not looking for current version
-  return current_->merge_candidates_.size() > config::CompactionTrigger;
+  return current_->merge_candidates_.size() > config::CompactionTrigger && state_change_;
 }
 
 Iterator* VersionControl::MakeInputIterator(Compaction* c) {

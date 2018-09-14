@@ -159,6 +159,7 @@ bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
   }
   if (is_scan) {
     Log(vcontrol_->options()->info_log, "Scan check adding %d files [%s] from %lu candidates", added_files, msg.c_str(), array.size());
+    return added_files != 0;
   }
   return true;
 }

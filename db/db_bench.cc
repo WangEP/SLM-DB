@@ -1133,6 +1133,7 @@ private:
   }
 
   void WaitCompaction(ThreadState* thread) {
+    Log(db_->GetLogger(), "[db_bench] Starting wait compaction");
     db_->WaitComp();
   }
 

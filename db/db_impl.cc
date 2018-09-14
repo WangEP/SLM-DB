@@ -592,6 +592,7 @@ void DBImpl::MaybeScheduleCompaction() {
     // Already got an error; no more changes
   } else if (imm_ == nullptr &&
              !versions_->NeedsCompaction()) {
+    Log(options_.info_log, "Skipping reschedule");
     // No work to be done
   } else {
     bg_compaction_scheduled_ = true;
@@ -1425,6 +1426,9 @@ Status DestroyDB(const std::string& dbname, const Options& options) {
 void DBImpl::WaitComp() {
   while (!env_->IsSchedulerEmpty() || bg_compaction_scheduled_) {
     env_->SleepForMicroseconds(1000000);
+    if (!versions_->State()) {
+      break;
+    }
   }
   Log(options_.info_log, "Finished all scheduled compaction");
 }

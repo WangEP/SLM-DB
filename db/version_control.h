@@ -57,6 +57,8 @@ class VersionControl {
   uint64_t NumBytes() { return current_->NumBytes(); }
   uint64_t CompactionSize() { return current_->merge_candidates_.size(); }
 
+  bool State() { return state_change_; }
+
  private:
   class Builder;
 
@@ -64,7 +66,7 @@ class VersionControl {
   Status WriteSnapshot(log::Writer* log);
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
   void ForcedPick(Compaction**);
-  void FIFOPick(Compaction**);
+  void TryToPick(Compaction**);
 
   Env* const env_;
   const std::string dbname_;
