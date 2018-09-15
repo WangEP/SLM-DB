@@ -31,10 +31,10 @@ class VersionControl::Builder {
   }
 
   void Apply(VersionEdit* edit) {
-    for (auto iter : edit->deleted_files_) {
+    for (const auto& iter : edit->deleted_files_) {
       deleted_files_.insert(iter);
     }
-    for (auto iter : edit->dead_key_counter_) {
+    for (const auto& iter : edit->dead_key_counter_) {
       dead_key_counter_.insert({iter.first, iter.second});
     }
     for (const auto& iter : edit->new_files_) {
@@ -53,7 +53,7 @@ class VersionControl::Builder {
   }
 
   void SaveTo(Version* v, int threshold) {
-    for (auto iter : base_->files_) {
+    for (const auto& iter : base_->files_) {
       assert(iter.first == iter.second->number);
       auto f = iter.second;
       if (deleted_files_.count(iter.first) <= 0) { // do not add if got deleted
@@ -72,7 +72,7 @@ class VersionControl::Builder {
         }
       }
     }
-    for (auto iter : base_->merge_candidates_) {
+    for (const auto& iter : base_->merge_candidates_) {
       assert(iter.first == iter.second->number);
       auto f = iter.second;
       if (deleted_files_.count(iter.first) <= 0) { // do not add if got deleted
@@ -371,7 +371,7 @@ Status VersionControl::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     }
   }
   std::string msg;
-  for (auto f : current()->merge_candidates_) {
+  for (const auto& f : current()->merge_candidates_) {
     msg.append(" ").append(std::to_string(f.first));
   }
   Log(options_->info_log, "Merge candidates left [%s]", msg.c_str());
@@ -433,17 +433,17 @@ void VersionControl::CheckLocality() {
       locality_check_key = 0;
     }
     if (uniq_files.empty() || uniq_files.size() < config::LocalityMinFileNumber) {
-      std::string r;
+      std::string msg;
       for (const auto& file : uniq_files) {
-        r.append(" ").append(std::to_string(file));
+        msg.append(" ").append(std::to_string(file));
       }
-      Log(options_->info_log, "Not enough files for locality merge %lu@[%s]", uniq_files.size(), r.c_str());
+      Log(options_->info_log, "Not enough files for locality merge %lu@[%s]", uniq_files.size(), msg.c_str());
       return;
     }
     delete iter;
     std::string msg;
     char buf[100];
-    for (auto f : uniq_files) {
+    for (const auto& f : uniq_files) {
       snprintf(buf, sizeof(buf), "%d, ", f);
       msg.append(buf);
     }
@@ -528,12 +528,9 @@ void VersionControl::TryToPick(Compaction** c) {
     return a.first > b.first;
   });
 
-//  printf("start\n");
-  double threshold = state_change_ ? 0.5 : 0.0;
-  for (auto iter : best_pick_list) {
-//    printf("score %f file %lu \n", iter.first, iter.second->number);
+  double threshold = state_change_ ? config::OverlapRatioThreshold : 0.0;
+  for (const auto& iter : best_pick_list) {
     (*c)->AddInput(iter.second);
-//    if ((*c)->num_input_files() >= config::CompactionMaxSize) {
     if (iter.first <= threshold || (*c)->num_input_files() >= config::CompactionMaxSize) {
       break;
     }
@@ -580,11 +577,11 @@ void VersionControl::SetLastSequence(uint64_t s) {
 Status VersionControl::WriteSnapshot(log::Writer* log) {
   VersionEdit edit;
   edit.SetComparatorName(icmp_.user_comparator()->Name());
-  for (auto iter : current_->files_) {
+  for (const auto& iter : current_->files_) {
     auto f = iter.second;
     edit.AddFile(f->number, f->file_size, f->total, f->alive, f->smallest, f->largest);
   }
-  for (auto iter : current_->merge_candidates_) {
+  for (const auto& iter : current_->merge_candidates_) {
     auto f = iter.second;
     edit.AddMergeCandidates(f->number, f->file_size, f->total, f->alive, f->smallest, f->largest);
   }

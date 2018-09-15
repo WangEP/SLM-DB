@@ -24,10 +24,13 @@ static constexpr char key_format[] = "%020lu";
 
 // Locality check configs
 static constexpr int LocalityMagicNumber = 1;
+
 // Number of iterations for one round during locality check
 static constexpr int LocalityCheckRange = 64000;
+
 // Min number of unique files to mark for merge during locality check
 static constexpr int LocalityMinFileNumber = 4;
+
 // Scan compaction locality check
 static constexpr int ScanCheckMinFileNumber = 8;
 
@@ -36,6 +39,9 @@ static constexpr int CompactionTrigger = 4;
 
 // Max number of files to be merged at once
 static constexpr int CompactionMaxSize = 15;
+
+// Overlap ratio threshold for compaction
+static constexpr float OverlapRatioThreshold = 0.025;
 
 // Soft limit on number of merge candidate files. We slow down writes at this point.
 static constexpr int SlowdownWritesTrigger = 15;
