@@ -798,7 +798,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       if (imm_ != nullptr) {
         CompactMemTable();
         bg_cv_.SignalAll();  // Wakeup MakeRoomForWrite() if necessary
-        versions_->CheckLocality();
+//        versions_->CheckLocality();
       }
       mutex_.Unlock();
       imm_micros += (env_->NowMicros() - imm_start);
