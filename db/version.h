@@ -72,8 +72,8 @@ class Version {
 
   friend class VersionControl;
  private:
-  std::map<uint64_t, std::shared_ptr<FileMetaData>> files_;
-  std::map<uint64_t, std::shared_ptr<FileMetaData>> merge_candidates_;
+  std::unordered_map<uint64_t, std::shared_ptr<FileMetaData>> files_;
+  std::unordered_map<uint64_t, std::shared_ptr<FileMetaData>> merge_candidates_;
   VersionControl* vcontrol_;
   entry_key_t max_key_;
   int refs_;

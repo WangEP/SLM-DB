@@ -117,6 +117,11 @@ class DBImpl : public DB {
 
   // B-tree data block indexing
   Index* index_;
+//  // NVRam root
+//  struct PM_Root {
+//    Index* index;
+//    Version* current;
+//  };
 
   // Lock over the persistent DB state.  Non-NULL iff successfully acquired.
   FileLock* db_lock_;

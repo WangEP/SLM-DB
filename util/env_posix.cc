@@ -167,6 +167,7 @@ class PosixRandomAccessFile: public RandomAccessFile {
     }
 
     Status s;
+    scratch = new char[n];
     ssize_t r = pread(fd, scratch, n, static_cast<off_t>(offset));
     *result = Slice(scratch, (r < 0) ? 0 : r);
     if (r < 0) {

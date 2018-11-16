@@ -100,7 +100,9 @@ class Compaction {
   Compaction(const Options* options)
       : max_output_file_size_(options->max_file_size),
         edit_(nullptr),
-        input_version_(nullptr) { }
+        input_version_(nullptr) {
+    inputs_.reserve(config::CompactionMaxSize);
+  }
 
   ~Compaction();
 
@@ -111,7 +113,7 @@ class Compaction {
 
   void SetEdit(VersionEdit* edit) { edit_ = edit; }
 
-  void AddInput(std::shared_ptr<FileMetaData> f) { inputs_.push_back(f); }
+  void AddInput(const std::shared_ptr<FileMetaData>& f) { inputs_.push_back(f); }
 
   bool IsInput(uint64_t num);
 

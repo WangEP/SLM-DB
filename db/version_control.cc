@@ -501,9 +501,11 @@ void VersionControl::ForcedPick(Compaction** c) {
 
 void VersionControl::TryToPick(Compaction** c) {
   std::vector<std::pair<double, std::shared_ptr<FileMetaData>>> best_pick_list;
+  best_pick_list.reserve(current()->merge_candidates_.size());
   double best_pick_score = 0.0;
   for (const auto& main_candidate : current()->merge_candidates_) {
     std::vector<std::pair<double, std::shared_ptr<FileMetaData>>> current_pick_list;
+    current_pick_list.reserve(current()->merge_candidates_.size());
     double current_pick_score = 0.0;
     double smallest1 = fast_atoi(main_candidate.second->smallest.user_key());
     double largest1 = fast_atoi(main_candidate.second->largest.user_key());

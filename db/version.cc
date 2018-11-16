@@ -147,19 +147,14 @@ bool Version::MoveToMerge(std::set<uint16_t> array, bool is_scan) {
   int added_files = 0;
   std::string msg;
   for (auto f : array) {
-    if (files_.count(f) > 0) { // make sure that file is not among merge candidates
-      if (is_scan) {
-        msg.append(" ").append(std::to_string(f));
-      }
+    try{
       if (is_scan && ++added_files > config::CompactionMaxSize/2) break;
-      auto file = files_.at(f);
+      auto file = files_.at(f); // should rise exception if not among files
       files_.erase(f);
       merge_candidates_.insert({f, file});
+    } catch (const std::exception& e) {
+
     }
-  }
-  if (is_scan) {
-    Log(vcontrol_->options()->info_log, "Scan check adding %d files [%s] from %lu candidates", added_files, msg.c_str(), array.size());
-    return added_files != 0;
   }
   return true;
 }
