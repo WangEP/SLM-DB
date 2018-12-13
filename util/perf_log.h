@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <sys/time.h>
-#include <map>
+#include <unordered_map>
 #include "histogram.h"
 
 namespace leveldb {
@@ -12,6 +12,7 @@ namespace leveldb {
 namespace  benchmark {
 
 enum Type {
+  INSERT,
   MEMTABLE,
   VERSION,
   QUERY,
@@ -20,11 +21,12 @@ enum Type {
   VALUE_COPY,
 };
 
-static const Type AllTypes[] = { MEMTABLE, VERSION, QUERY, BLOCK_READ, QUERY_VALUE,VALUE_COPY };
+static const Type AllTypes[] = { INSERT, MEMTABLE, VERSION, QUERY, BLOCK_READ, QUERY_VALUE,VALUE_COPY };
 
 class PerfLog {
 public:
   PerfLog() {
+    names_.insert({Type::INSERT, "Insert"});
     names_.insert({Type::MEMTABLE, "Memtable"});
     names_.insert({Type::VERSION, "Version"});
     names_.insert({Type::QUERY, "Query for file"});
@@ -70,8 +72,8 @@ public:
   }
 
 private:
-  std::map<Type, Histogram> histograms_;
-  std::map<Type, std::string> names_;
+  std::unordered_map<Type, Histogram> histograms_;
+  std::unordered_map<Type, std::string> names_;
 };
 
 extern void CreatePerfLog();

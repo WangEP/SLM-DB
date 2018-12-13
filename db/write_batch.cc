@@ -13,6 +13,7 @@
 //    len: varint32
 //    data: uint8[len]
 
+#include <util/perf_log.h>
 #include "leveldb/write_batch.h"
 
 #include "leveldb/db.h"
@@ -119,8 +120,15 @@ class MemTableInserter : public WriteBatch::Handler {
   MemTable* mem_;
 
   virtual void Put(const Slice& key, const Slice& value) {
+#ifdef PERF_LOG
+    uint64_t micros = benchmark::NowMicros();
+    mem_->Add(sequence_, kTypeValue, key, value);
+    benchmark::LogMicros(benchmark::INSERT, benchmark::NowMicros() - micros);
+    sequence_++;
+#else
     mem_->Add(sequence_, kTypeValue, key, value);
     sequence_++;
+#endif
   }
   virtual void Delete(const Slice& key) {
     mem_->Add(sequence_, kTypeDeletion, key, Slice());
