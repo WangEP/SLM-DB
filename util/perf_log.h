@@ -33,7 +33,7 @@ public:
     names_.insert({Type::BLOCK_READ, "Read for data block"});
     names_.insert({Type::QUERY_VALUE, "Query for value"});
     names_.insert({Type::VALUE_COPY, "Copy for value"});
-    for (const auto type : AllTypes) {
+    for (auto type : AllTypes) {
       histograms_.insert({type, Histogram()});
     }
     Clear();
@@ -42,7 +42,7 @@ public:
   ~PerfLog() = default;
 
   void Clear() {
-    for (const auto type : AllTypes) {
+    for (auto type : AllTypes) {
       histograms_.at(type).Clear();
     }
   }
@@ -53,7 +53,7 @@ public:
 
   std::string GetInfo() {
     std::string r;
-    for (const auto type : AllTypes) {
+    for (auto type : AllTypes) {
       r.append(names_.at(type));
       r.append("\n");
       r.append(histograms_.at(type).GetInfo());
@@ -63,7 +63,7 @@ public:
 
   std::string GetHistogram() {
     std::string r;
-    for (const auto type : AllTypes) {
+    for (auto type : AllTypes) {
       r.append(names_.at(type));
       r.append("\n");
       r.append(histograms_.at(type).GetHistogram());

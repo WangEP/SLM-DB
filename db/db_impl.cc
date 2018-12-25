@@ -1113,7 +1113,13 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
         }
       }
       if (status.ok()) {
+#ifdef PERF_LOG
+        uint64_t micros = benchmark::NowMicros();
         status = WriteBatchInternal::InsertInto(updates, mem_);
+        benchmark::LogMicros(benchmark::INSERT, benchmark::NowMicros() - micros);
+#else
+        status = WriteBatchInternal::InsertInto(updates, mem_);
+#endif
       }
       mutex_.Lock();
       if (sync_error) {
