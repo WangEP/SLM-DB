@@ -10,7 +10,7 @@
 #define VAL_SIZE 1024
 
 constexpr char nvm_dir[] = "/mnt/mem/tmp";
-constexpr size_t nvm_size = 1*1024*1024;
+constexpr size_t nvm_size = 2147483648;
 
 using namespace leveldb;
 
@@ -31,5 +31,5 @@ int main() {
     tree->Insert(s+i, &k);
   }
   uint64_t end_us = benchmark::NowMicros();
-  fprintf(stdout, "[BTree] micros: %lu", end_us - start_us);
+  fprintf(stdout, "[BTree] micros: %lu\n", end_us - start_us);
 }

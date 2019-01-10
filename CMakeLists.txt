@@ -216,3 +216,6 @@ target_link_libraries(btree_bench PUBLIC leveldb)
 
 add_executable(file_bench bench/file_bench.cc)
 target_link_libraries(file_bench PUBLIC leveldb)
+
+add_executable(pm_stream util/persist_stream.cc)
+target_link_libraries(pm_stream ${VMEM_LIBRARY})
