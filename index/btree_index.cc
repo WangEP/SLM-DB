@@ -59,6 +59,7 @@ void* BtreeIndex::ThreadWrapper(void* ptr) {
   return NULL;
 }
 void BtreeIndex::AddQueue(std::deque<KeyAndMeta>& queue, VersionEdit* edit) {
+  if (edit == nullptr) return;
   mutex_.Lock();
   assert(queue_.size() == 0);
   queue_.swap(queue);

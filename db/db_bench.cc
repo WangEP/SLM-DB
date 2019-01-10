@@ -137,6 +137,7 @@ namespace leveldb {
 namespace {
 leveldb::Env* g_env = NULL;
 
+/*
 // Helper for quickly generating random data.
 class RandomGenerator {
 private:
@@ -168,6 +169,7 @@ public:
     return Slice(data_.data() + pos_ - len, len);
   }
 };
+*/
 
 #if defined(__linux)
 static Slice TrimSpace(Slice s) {

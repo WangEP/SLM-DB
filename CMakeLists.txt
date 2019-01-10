@@ -208,8 +208,11 @@ target_link_libraries(db_bench PUBLIC leveldb)
 add_executable(ff_btree_test index/ff_btree_test.cc)
 target_link_libraries(ff_btree_test PUBLIC leveldb)
 
-add_executable(persist_test util/persist_test.cc)
-target_link_libraries(persist_test ${PMEM_LIBRARY} ${VMEM_LIBRARY})
+add_executable(memtable_bench bench/memtable_bench.cc)
+target_link_libraries(memtable_bench PUBLIC leveldb)
 
-add_executable(persist_stream util/persist_stream.cc)
-target_link_libraries(persist_stream ${PMEM_LIBRARY} ${VMEM_LIBRARY})
+add_executable(btree_bench bench/btree_bench.cc)
+target_link_libraries(btree_bench PUBLIC leveldb)
+
+add_executable(file_bench bench/file_bench.cc)
+target_link_libraries(file_bench PUBLIC leveldb)
