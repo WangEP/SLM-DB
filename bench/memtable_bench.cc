@@ -3,14 +3,15 @@
 #include "db/memtable.h"
 #include "leveldb/slice.h"
 #include "util/perf_log.h"
+#include "leveldb/persistant_pool.h"
 
 using namespace leveldb;
 
 #define N 64000
 #define VAL_SIZE 1024
 
-static constexpr std::string nvm_dir = "/mnt/mem/tmp";
-static constexpr size_t nvm_size = 1*1024*1024;
+constexpr char nvm_dir[] = "/mnt/mem/tmp";
+constexpr size_t nvm_size = 1*1024*1024;
 
 Slice RandomString(Random* rnd, int len, std::string* dst) {
   dst->resize(len);
@@ -24,8 +25,8 @@ int main() {
   Random rand(10);
   nvram::create_pool(nvm_dir, nvm_size);
   const Comparator* comparator = BytewiseComparator();
-  const InternalKeyComparator icomparator = comparator;
-  MemTable* memtable = new MemTable(comparator);
+  const InternalKeyComparator icomparator(comparator);
+  MemTable* memtable = new MemTable(icomparator);
   uint64_t start_us = benchmark::NowMicros();
   std::string s;
   for (uint64_t i = 0; i < N; i++) {

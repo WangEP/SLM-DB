@@ -10,7 +10,8 @@
 #define N 64000
 #define VAL_SIZE 1024
 
-constexpr std::string ssd_dir = "/mnt/ssd";
+constexpr char ssd_dir[] = "/mnt/ssd";
+using namespace leveldb;
 
 Slice RandomString(Random* rnd, int len, std::string* dst) {
   dst->resize(len);
@@ -20,7 +21,6 @@ Slice RandomString(Random* rnd, int len, std::string* dst) {
   return Slice(*dst);
 }
 
-using namespace leveldb;
 
 int main() {
   Status s;
@@ -30,19 +30,20 @@ int main() {
   Random rand(10);
   VersionEdit* edit = nullptr;
 
-  std::string fname = ssd_dir + "/tempfile";
+  std::string fname = std::string(ssd_dir).append("/tempfile");
   WritableFile* file;
   s = env->NewWritableFile(fname, &file);
   if (!s.ok()) {
     return 1;
   }
   TableBuilder* builder = new TableBuilder(options, file, 1);
-  std::string s;
+  std::string v;
+  Slice prev_key;
   for (uint64_t i = 0; i < N; i++) {
     char k[100];
     snprintf(k, sizeof(k), config::key_format, i);
     Slice key = k;
-    Slice value = RandomString(&rand, VAL_SIZE, &s);
+    Slice value = RandomString(&rand, VAL_SIZE, &v);
     if (prev_key.empty() || options.comparator->Compare(ExtractUserKey(prev_key), ExtractUserKey(key)) != 0) {
       builder->Add(key, value);
       prev_key = key;

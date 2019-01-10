@@ -343,7 +343,7 @@ struct ThreadState {
 
   ThreadState(int index)
     : tid(index),
-      rand(1000 + index, FLAGS_num) {
+      rand(1000 + index) {
   }
 };
 

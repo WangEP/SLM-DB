@@ -11,7 +11,6 @@
 #include <cfloat>
 #include <climits>
 #include "coding.h"
-#include "testutil.h"
 
 namespace leveldb {
 

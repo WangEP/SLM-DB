@@ -9,8 +9,8 @@
 #define N 64000
 #define VAL_SIZE 1024
 
-static constexpr std::string nvm_dir = "/mnt/mem/tmp";
-static constexpr size_t nvm_size = 1*1024*1024;
+constexpr char nvm_dir[] = "/mnt/mem/tmp";
+constexpr size_t nvm_size = 1*1024*1024;
 
 using namespace leveldb;
 
