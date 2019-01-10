@@ -12,6 +12,14 @@
 
 constexpr std::string ssd_dir = "/mnt/ssd";
 
+Slice RandomString(Random* rnd, int len, std::string* dst) {
+  dst->resize(len);
+  for (int i = 0; i < len; i++) {
+    (*dst)[i] = static_cast<char>(' ' + rnd->Uniform(95));   // ' ' .. '~'
+  }
+  return Slice(*dst);
+}
+
 using namespace leveldb;
 
 int main() {
@@ -20,7 +28,6 @@ int main() {
   options.index = CreateBtreeIndex();
   Env* env = Env::Default();
   Random rand(10);
-  RandomGenerator gen;
   VersionEdit* edit = nullptr;
 
   std::string fname = ssd_dir + "/tempfile";
@@ -30,12 +37,12 @@ int main() {
     return 1;
   }
   TableBuilder* builder = new TableBuilder(options, file, 1);
-  Slice prev_key;
+  std::string s;
   for (uint64_t i = 0; i < N; i++) {
     char k[100];
     snprintf(k, sizeof(k), config::key_format, i);
     Slice key = k;
-    Slice value = gen.Generate(VAL_SIZE);
+    Slice value = RandomString(&rand, VAL_SIZE, &s);
     if (prev_key.empty() || options.comparator->Compare(ExtractUserKey(prev_key), ExtractUserKey(key)) != 0) {
       builder->Add(key, value);
       prev_key = key;

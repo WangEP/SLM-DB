@@ -11,6 +11,7 @@
 #include <cfloat>
 #include <climits>
 #include "coding.h"
+#include "testutil.h"
 
 namespace leveldb {
 
@@ -58,38 +59,6 @@ public:
   // range [0,2^max_log-1] with exponential bias towards smaller numbers.
   uint32_t Skewed(int max_log) {
     return Uniform(1 << Uniform(max_log + 1));
-  }
-};
-
-// Helper for quickly generating random data.
-class RandomGenerator {
-private:
-  std::string data_;
-  int pos_;
-
-public:
-  RandomGenerator() {
-    // We use a limited amount of data over and over again and ensure
-    // that it is larger than the compression window (32KB), and also
-    // large enough to serve all typical value sizes we want to write.
-    Random rnd(301);
-    std::string piece;
-    while (data_.size() < 1048576) {
-      // Add a short fragment that is as compressible as specified
-      // by FLAGS_compression_ratio.
-      test::CompressibleString(&rnd, FLAGS_compression_ratio, 100, &piece);
-      data_.append(piece);
-    }
-    pos_ = 0;
-  }
-
-  Slice Generate(size_t len) {
-    if (pos_ + len > data_.size()) {
-      pos_ = 0;
-      assert(len < data_.size());
-    }
-    pos_ += len;
-    return Slice(data_.data() + pos_ - len, len);
   }
 };
 

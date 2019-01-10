@@ -16,7 +16,6 @@ using namespace leveldb;
 
 int main() {
   Random rand(10);
-  RandomGenerator gen;
   nvram::create_pool(nvm_dir, nvm_size);
   FFBtree* tree = new FFBtree;
   // populate index with some data
