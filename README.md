@@ -1,4 +1,4 @@
-# SLM-DB
+# SLM-DB: Single-Level Key-Value Store with Persistent Memory
 
 Paper and presentation of SLM-DB presented at USENIX FAST'19 <https://www.usenix.org/conference/fast19/presentation/kaiyrakhmet>
 
