@@ -167,6 +167,8 @@ void VersionControl::AppendVersion(Version* v) {
   assert(v->refs_ == 0);
   assert(v != current_);
   if (current_ != nullptr) {
+		db_->pm_root_->current = v;
+		clflush((char*)(db_->pm_root_->current), sizeof(void*));
     current_->Unref();
   }
   current_ = v;

@@ -142,7 +142,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       seed_(0),
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
-      index_(raw_options.index) {
+      pm_root_(allocate_pm_root(raw_options.index)) {
   has_imm_.Release_Store(nullptr);
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
@@ -161,7 +161,7 @@ DBImpl::~DBImpl() {
   while (bg_compaction_scheduled_) {
     bg_cv_.Wait();
   }
-  index_->Break();
+  pm_root_->index->Break();
   mutex_.Unlock();
 
   if (db_lock_ != nullptr) {
@@ -839,7 +839,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         compact->compaction->IsBaseLevelForKey(ikey.user_key),
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
-    auto m_ = index_->Get(ExtractUserKey(key));
+    auto m_ = pm_root_->index->Get(ExtractUserKey(key));
     assert(m_ != nullptr);
     if (!compact->compaction->IsInput(m_->file_number)) {
       drop = true;
@@ -938,7 +938,7 @@ Status DBImpl::Update(const leveldb::WriteOptions& options,
   MemTable* imm = imm_;
   mem->Ref();
   if (imm != nullptr) imm->Ref();
-  Index* index = index_;
+  Index* index = pm_root_->index;
   bool exists = false;
   std::string v;
   LookupKey lkey(key, snapshot);
@@ -1039,7 +1039,7 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
     list.push_back(imm_->NewIterator());
     imm_->Ref();
   }
-  list.push_back(index_->NewIterator(options, table_cache_, versions_));
+  list.push_back(pm_root_->index->NewIterator(options, table_cache_, versions_));
   Iterator* internal_iter =
     NewMergingIterator(&internal_comparator_, &list[0], list.size());
 
@@ -1438,6 +1438,12 @@ void DBImpl::WaitComp() {
     }
   }
   Log(options_.info_log, "Finished all scheduled compaction");
+}
+
+DBImpl::PM_root* DBImpl::allocate_pm_root(Index* index_) {
+	PM_root* p = static_cast<PM_root*>(nvram::pmalloc(sizeof(PM_root)));
+	p->index = index_;
+	return p;
 }
 
 }  // namespace leveldb

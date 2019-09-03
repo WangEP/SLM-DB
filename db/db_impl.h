@@ -115,13 +115,13 @@ class DBImpl : public DB {
   // table_cache_ provides its own synchronization
   TableCache* table_cache_;
 
-  // B-tree data block indexing
-  Index* index_;
-//  // NVRam root
-//  struct PM_Root {
-//    Index* index;
-//    Version* current;
-//  };
+	// PM root
+  struct PM_root {
+    Index* index; 			// B-tree data block indexing
+    Version* current;		// Files metadata
+  };
+  static PM_root* allocate_pm_root(Index* index_);
+  PM_root* pm_root_;
 
   // Lock over the persistent DB state.  Non-NULL iff successfully acquired.
   FileLock* db_lock_;

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <thread>
 #include <map>
+#include <include/leveldb/index.h>
 #include "leveldb/db.h"
 #include "util/testharness.h"
 #include "util/perf_log.h"
@@ -22,6 +23,7 @@ TEST(SanityCheck, Create) {
   options.compression = leveldb::kNoCompression;
   options.write_buffer_size = 64 << 20;
   options.max_file_size = 64 << 20;
+	options.index = leveldb::CreateBtreeIndex();
   const char *c = "/tmp/testdb";
   std::string dbpath(c);
   leveldb::DestroyDB(dbpath, leveldb::Options());
